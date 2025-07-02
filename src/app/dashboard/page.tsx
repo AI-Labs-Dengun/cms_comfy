@@ -10,13 +10,11 @@ const emotionTags = [
   "Inveja",
   "Medo",
   "Tristeza",
-  "Tédio",
-  "Vergonha",
 ];
 
 const mockContent = [
   {
-    title: "Explorando a Amazônia",
+    title: "Explorar a Amazónia",
     date: "2024-01-15",
     tags: ["Aventura", "Natureza"],
     emotions: ["Entusiasmo", "Admiração"],
@@ -42,7 +40,7 @@ const mockContent = [
   {
     title: "Práticas de Vida Sustentável",
     date: "2024-05-12",
-    tags: ["Meio Ambiente", "Estilo de Vida"],
+    tags: ["Ambiente", "Estilo de Vida"],
     emotions: ["Esperança", "Responsabilidade"],
   },
 ];
@@ -97,7 +95,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-white flex flex-col">
       <div className="flex flex-1 bg-white overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 bg-white border-r flex flex-col py-8 px-6 min-h-full">
+        <aside className="w-64 bg-white border-r flex flex-col py-8 px-6 min-h-full shadow-2xl z-10" style={{ boxShadow: '12px 0 40px 0 rgba(0,0,0,0.18)' }}>
           <div className="mb-12 flex flex-col items-center justify-center">
             <img src="/cms-logo.png" alt="Comfy Content Hub Logo" className="mb-2 w-28 h-auto" />
           </div>
@@ -123,7 +121,7 @@ export default function Dashboard() {
           {activeTab === 'create' ? (
             <div className="w-full max-w-xl">
               <div className="text-xs text-gray-500 mb-2 font-medium">Novo Conteúdo</div>
-              <h1 className="text-2xl font-bold mb-6 text-gray-900" style={{ fontFamily: 'Quicksand, Inter, sans-serif' }}>Adicionar um Novo Conteúdo</h1>
+              <h1 className="text-2xl font-bold mb-6 text-gray-900" style={{ fontFamily: 'Quicksand, Inter, sans-serif' }}>Adicionar Novo Conteúdo</h1>
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* File Upload */}
                 <div>
@@ -178,7 +176,7 @@ export default function Dashboard() {
                     <option value="Artigo">Artigo</option>
                     <option value="Livro">Livro</option>
                     <option value="Áudio">Áudio</option>
-                    <option value="Imagens">Imagens</option>
+                    <option value="Shorts">Shorts</option>
                   </select>
                 </div>
                 {/* Tags */}
@@ -216,7 +214,7 @@ export default function Dashboard() {
                     className="bg-black text-white px-6 py-2 rounded-md font-semibold hover:bg-gray-800 transition-colors disabled:opacity-60"
                     disabled={isUploading}
                   >
-                    {isUploading ? "Enviando..." : "Enviar Conteúdo"}
+                    {isUploading ? "A enviar..." : "Enviar Conteúdo"}
                   </button>
                 </div>
               </form>
