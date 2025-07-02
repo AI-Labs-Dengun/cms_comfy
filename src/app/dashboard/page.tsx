@@ -1,342 +1,275 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Edit, Trash2, Image, Video, FileText, X } from "lucide-react";
+import { CloudUpload } from "lucide-react";
+import { useRouter } from "next/navigation";
 
-interface ContentItem {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  type: 'image' | 'video' | 'text';
-  mediaUrl?: string;
-  createdAt: string;
-}
+const emotionTags = [
+  "Raiva",
+  "Alegria",
+  "Inveja",
+  "Medo",
+  "Tristeza",
+  "Tédio",
+  "Vergonha",
+];
+
+const mockContent = [
+  {
+    title: "Explorando a Amazônia",
+    date: "2024-01-15",
+    tags: ["Aventura", "Natureza"],
+    emotions: ["Entusiasmo", "Admiração"],
+  },
+  {
+    title: "Fotografia Urbana em Tóquio",
+    date: "2024-02-20",
+    tags: ["Fotografia", "Viagem"],
+    emotions: ["Curiosidade", "Espanto"],
+  },
+  {
+    title: "Culinária Italiana",
+    date: "2024-03-10",
+    tags: ["Comida", "Cultura"],
+    emotions: ["Alegria", "Satisfação"],
+  },
+  {
+    title: "A Arte da Caligrafia",
+    date: "2024-04-05",
+    tags: ["Arte", "Habilidade"],
+    emotions: ["Foco", "Calma"],
+  },
+  {
+    title: "Práticas de Vida Sustentável",
+    date: "2024-05-12",
+    tags: ["Meio Ambiente", "Estilo de Vida"],
+    emotions: ["Esperança", "Responsabilidade"],
+  },
+];
 
 export default function Dashboard() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'create' | 'manage'>('create');
+  const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
-  const [contentType, setContentType] = useState<'image' | 'video' | 'text'>('text');
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [category, setCategory] = useState("Vídeo");
+  const [tags, setTags] = useState("");
+  const [emotions, setEmotions] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  
-  // Mock data for existing content
-  const [contentItems, setContentItems] = useState<ContentItem[]>([
-    {
-      id: '1',
-      title: 'Sample Blog Post',
-      description: 'This is a sample blog post about technology.',
-      category: 'Technology',
-      type: 'text',
-      createdAt: '2024-01-15'
-    },
-    {
-      id: '2',
-      title: 'Product Image',
-      description: 'A beautiful product showcase image.',
-      category: 'Marketing',
-      type: 'image',
-      mediaUrl: '/sample-image.jpg',
-      createdAt: '2024-01-14'
-    }
-  ]);
-
-  const categories = ['Technology', 'Marketing', 'News', 'Tutorial', 'Entertainment', 'Other'];
+  const [search, setSearch] = useState("");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setMediaFile(file);
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleEmotionChange = (emotion: string) => {
+    setEmotions((prev) =>
+      prev.includes(emotion)
+        ? prev.filter((e) => e !== emotion)
+        : [...prev, emotion]
+    );
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsUploading(true);
-
-    // TODO: Implement Supabase upload
-    console.log('Creating content:', {
-      title,
-      description,
-      category,
-      contentType,
-      mediaFile
-    });
-
-    // Simulate upload
+    // TODO: Implement upload logic
     setTimeout(() => {
-      const newContent: ContentItem = {
-        id: Date.now().toString(),
-        title,
-        description,
-        category,
-        type: contentType,
-        mediaUrl: mediaFile ? URL.createObjectURL(mediaFile) : undefined,
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-
-      setContentItems([newContent, ...contentItems]);
-      
-      // Reset form
-      setTitle("");
-      setDescription("");
-      setCategory("");
-      setContentType('text');
-      setMediaFile(null);
       setIsUploading(false);
-      
-      // Switch to manage tab to show the new content
-      setActiveTab('manage');
+      alert("Conteúdo enviado!");
     }, 1000);
   };
 
-  const handleDelete = (id: string) => {
-    setContentItems(contentItems.filter(item => item.id !== id));
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'image': return <Image className="w-4 h-4" />;
-      case 'video': return <Video className="w-4 h-4" />;
-      case 'text': return <FileText className="w-4 h-4" />;
-      default: return <FileText className="w-4 h-4" />;
-    }
-  };
+  // Filter content by search
+  const filteredContent = mockContent.filter((item) => {
+    const searchLower = search.toLowerCase();
+    return (
+      item.title.toLowerCase().includes(searchLower) ||
+      item.tags.some((tag) => tag.toLowerCase().includes(searchLower)) ||
+      item.emotions.some((emo) => emo.toLowerCase().includes(searchLower))
+    );
+  });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <h1 className="text-2xl font-bold text-gray-900">Content Management</h1>
-            <button
-              onClick={() => {/* TODO: Implement logout */}}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              Logout
-            </button>
+    <div className="min-h-screen bg-white flex flex-col">
+      <div className="flex flex-1 bg-white overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-64 bg-white border-r flex flex-col py-8 px-6 min-h-full">
+          <div className="mb-12 flex flex-col items-center justify-center">
+            <img src="/cms-logo.png" alt="Comfy Content Hub Logo" className="mb-2 w-28 h-auto" />
           </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Tab Navigation */}
-        <div className="flex space-x-8 mb-8">
-          <button
-            onClick={() => setActiveTab('create')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'create'
-                ? 'bg-blue-100 text-blue-700'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Plus className="w-5 h-5" />
-            <span>Create Content</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('manage')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'manage'
-                ? 'bg-blue-100 text-blue-700'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <span>Manage Content</span>
-          </button>
-        </div>
-
-        {/* Create Content Tab */}
-        {activeTab === 'create' && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-6">Create New Content</h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Content Type Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Content Type
-                </label>
-                <div className="flex space-x-4">
-                  {[
-                    { type: 'text', label: 'Text', icon: FileText },
-                    { type: 'image', label: 'Image', icon: Image },
-                    { type: 'video', label: 'Video', icon: Video }
-                  ].map(({ type, label, icon: Icon }) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setContentType(type as 'text' | 'image' | 'video')}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
-                        contentType === type
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-300 text-gray-700 hover:border-gray-400'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      <span>{label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Title */}
-              <div>
-                <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter content title"
-                  required
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                <textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter content description"
-                  required
-                />
-              </div>
-
-              {/* Category */}
-              <div>
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
-                  Category
-                </label>
-                <select
-                  id="category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                >
-                  <option value="">Select a category</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Media Upload */}
-              {(contentType === 'image' || contentType === 'video') && (
+          <nav className="flex flex-col gap-2">
+            <button
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium ${activeTab === 'create' ? 'bg-black text-white' : 'text-gray-900 hover:bg-gray-100'}`}
+              onClick={() => setActiveTab('create')}
+            >
+              <span className="h-2 w-2 rounded-full bg-white mr-2" /> Novo Conteúdo
+            </button>
+            <button
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium ${activeTab === 'manage' ? 'bg-black text-white' : 'text-gray-900 hover:bg-gray-100'}`}
+              onClick={() => setActiveTab('manage')}
+            >
+              <span className="h-2 w-2 rounded-full border border-gray-400 mr-2" /> Gerir Conteúdo
+            </button>
+          </nav>
+        </aside>
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col items-center py-12 px-8 overflow-y-auto">
+          {activeTab === 'create' ? (
+            <div className="w-full max-w-xl">
+              <div className="text-xs text-gray-500 mb-2 font-medium">Novo Conteúdo</div>
+              <h1 className="text-2xl font-bold mb-6 text-gray-900" style={{ fontFamily: 'Quicksand, Inter, sans-serif' }}>Adicionar um Novo Conteúdo</h1>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* File Upload */}
                 <div>
-                  <label htmlFor="media" className="block text-sm font-medium text-gray-700 mb-2">
-                    Upload {contentType === 'image' ? 'Image' : 'Video'}
-                  </label>
-                  <div className="flex items-center space-x-4">
+                  <label className="block text-sm font-medium mb-2 text-gray-900">Ficheiro de Conteúdo</label>
+                  <div className="border-2 border-gray-300 border-dashed rounded-lg flex flex-col items-center justify-center py-12 cursor-pointer hover:border-gray-400 transition-colors relative">
                     <input
                       type="file"
-                      id="media"
-                      accept={contentType === 'image' ? 'image/*' : 'video/*'}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
                       onChange={handleFileChange}
-                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                      required
                     />
-                    {mediaFile && (
-                      <button
-                        type="button"
-                        onClick={() => setMediaFile(null)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
+                    <CloudUpload className="w-12 h-12 text-gray-400 mb-2" />
+                    <span className="text-gray-900">Escolher Ficheiro</span>
+                    {file && (
+                      <span className="mt-2 text-xs text-gray-500">{file.name}</span>
                     )}
                   </div>
-                  {mediaFile && (
-                    <p className="mt-2 text-sm text-gray-600">
-                      Selected: {mediaFile.name}
-                    </p>
-                  )}
                 </div>
-              )}
-
-              {/* Submit Button */}
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isUploading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isUploading ? 'Creating...' : 'Create Content'}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Manage Content Tab */}
-        {activeTab === 'manage' && (
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-semibold">Your Content</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                {contentItems.length} content item{contentItems.length !== 1 ? 's' : ''}
-              </p>
-            </div>
-            
-            <div className="divide-y divide-gray-200">
-              {contentItems.length === 0 ? (
-                <div className="px-6 py-12 text-center">
-                  <p className="text-gray-500">No content created yet.</p>
-                  <button
-                    onClick={() => setActiveTab('create')}
-                    className="mt-2 text-blue-600 hover:text-blue-700 font-medium"
+                {/* Title */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-900">Título</label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                    placeholder="Escreva aqui um título"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                  />
+                </div>
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-900">Descrição</label>
+                  <textarea
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                    placeholder="Escreva aqui uma descrição"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                    required
+                  />
+                </div>
+                {/* Category */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-900">Categoria</label>
+                  <select
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
                   >
-                    Create your first content
+                    <option value="Vídeo">Vídeo</option>
+                    <option value="Podcast">Podcast</option>
+                    <option value="Artigo">Artigo</option>
+                    <option value="Livro">Livro</option>
+                    <option value="Áudio">Áudio</option>
+                    <option value="Imagens">Imagens</option>
+                  </select>
+                </div>
+                {/* Tags */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-900">Tags</label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                    placeholder="Adicione tags"
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                  />
+                </div>
+                {/* Emotion Tags */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-900">Tags de Emoção</label>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {emotionTags.map((emotion) => (
+                      <label key={emotion} className="flex items-center gap-2 text-sm text-gray-900 font-medium">
+                        <input
+                          type="checkbox"
+                          checked={emotions.includes(emotion)}
+                          onChange={() => handleEmotionChange(emotion)}
+                          className="accent-black"
+                        />
+                        {emotion}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {/* Upload Button */}
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="bg-black text-white px-6 py-2 rounded-md font-semibold hover:bg-gray-800 transition-colors disabled:opacity-60"
+                    disabled={isUploading}
+                  >
+                    {isUploading ? "Enviando..." : "Enviar Conteúdo"}
                   </button>
                 </div>
-              ) : (
-                contentItems.map((item) => (
-                  <div key={item.id} className="px-6 py-4 hover:bg-gray-50">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          {getTypeIcon(item.type)}
-                          <h3 className="text-lg font-medium text-gray-900">{item.title}</h3>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {item.category}
-                          </span>
-                        </div>
-                        <p className="text-gray-600 mb-2">{item.description}</p>
-                        <p className="text-sm text-gray-500">Created: {item.createdAt}</p>
-                      </div>
-                      <div className="flex items-center space-x-2 ml-4">
-                        <button
-                          onClick={() => {/* TODO: Implement edit */}}
-                          className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
+              </form>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="w-full max-w-4xl">
+              <div className="text-xs text-gray-500 mb-2 font-medium">Gerir Conteúdo</div>
+              <h1 className="text-2xl font-bold mb-1 text-gray-900" style={{ fontFamily: 'Quicksand, Inter, sans-serif' }}>Gerir Conteúdo</h1>
+              <div className="text-sm text-gray-500 mb-6 font-medium">Monitore e edite o seu conteúdo</div>
+              <div className="flex items-center w-full mb-6">
+                <span className="pl-3 pr-2 text-gray-500">
+                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1 0 6.5 6.5a7.5 7.5 0 0 0 10.6 10.6Z"/></svg>
+                </span>
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                  placeholder="Pesquise por tag, categoria ou título"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{ fontFamily: 'Inter, Quicksand, sans-serif' }}
+                />
+              </div>
+              <div className="bg-white rounded-lg shadow border overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left px-6 py-3 font-semibold text-gray-900">Título</th>
+                      <th className="text-left px-6 py-3 font-semibold text-gray-900">Data de Upload</th>
+                      <th className="text-left px-6 py-3 font-semibold text-gray-900">Tags</th>
+                      <th className="text-left px-6 py-3 font-semibold text-gray-900">Tags de Emoção</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredContent.map((item, idx) => (
+                      <tr
+                        key={idx}
+                        className="border-b last:border-0 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => router.push(`/dashboard/detalhes/${idx + 1}`)}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-gray-900 font-medium">{item.title}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-gray-900 font-medium">{item.date}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-gray-900 font-medium">
+                          {item.tags.join(", ")}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-gray-900 font-medium">
+                          {item.emotions.join(", ")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );
