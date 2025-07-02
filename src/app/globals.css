@@ -1,14 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=Quicksand:wght@500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --font-primary: 'Quicksand', 'Inter', sans-serif;
+  --font-secondary: 'Inter', 'Quicksand', sans-serif;
+  --font-size-10: 10px;
+  --font-size-12: 12px;
+  --font-size-14: 14px;
+  --font-size-16: 16px;
+  --font-size-18: 18px;
+  --font-size-32: 32px;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-primary);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -22,5 +34,17 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-primary);
 }
+
+/* Utility classes for font sizes and weights */
+.font-10 { font-size: var(--font-size-10); }
+.font-12 { font-size: var(--font-size-12); }
+.font-14 { font-size: var(--font-size-14); }
+.font-16 { font-size: var(--font-size-16); }
+.font-18 { font-size: var(--font-size-18); }
+.font-32 { font-size: var(--font-size-32); }
+
+.font-medium { font-weight: var(--font-weight-medium); }
+.font-semibold { font-weight: var(--font-weight-semibold); }
+.font-bold { font-weight: var(--font-weight-bold); }
