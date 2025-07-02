@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { CloudUpload } from "lucide-react";
+import { CloudUpload, Plus, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const emotionTags = [
@@ -106,13 +106,15 @@ export default function Dashboard() {
               className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium ${activeTab === 'create' ? 'bg-black text-white' : 'text-gray-900 hover:bg-gray-100'}`}
               onClick={() => setActiveTab('create')}
             >
-              <span className="h-2 w-2 rounded-full bg-white mr-2" /> Novo Conteúdo
+              <Plus className="w-4 h-4 mr-1" />
+              Novo Conteúdo
             </button>
             <button
               className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium ${activeTab === 'manage' ? 'bg-black text-white' : 'text-gray-900 hover:bg-gray-100'}`}
               onClick={() => setActiveTab('manage')}
             >
-              <span className="h-2 w-2 rounded-full border border-gray-400 mr-2" /> Gerir Conteúdo
+              <ArrowRight className="w-4 h-4 mr-1" />
+              Gerir Conteúdo
             </button>
           </nav>
         </aside>
