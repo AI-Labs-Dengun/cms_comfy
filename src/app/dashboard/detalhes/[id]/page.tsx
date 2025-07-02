@@ -3,6 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { Plus, ArrowRight } from "lucide-react";
 
 export default function DetalhesConteudo() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function DetalhesConteudo() {
     <div className="min-h-screen bg-white flex flex-col">
       <div className="flex flex-1 bg-white overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 bg-white border-r flex flex-col py-8 px-6 min-h-full">
+        <aside className="w-64 bg-white border-r flex flex-col py-8 px-6 min-h-full shadow-2xl z-10" style={{ boxShadow: '12px 0 40px 0 rgba(0,0,0,0.18)' }}>
           <div className="mb-12 flex flex-col items-center justify-center">
             <img src="/cms-logo.png" alt="Comfy Content Hub Logo" className="mb-2 w-28 h-auto" />
           </div>
@@ -38,13 +39,15 @@ export default function DetalhesConteudo() {
               className="flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-gray-900 hover:bg-gray-100"
               onClick={() => router.push('/dashboard')}
             >
-              <span className="h-2 w-2 rounded-full bg-white mr-2" /> Novo Conteúdo
+              <Plus className="w-4 h-4 mr-1" />
+              Novo Conteúdo
             </button>
             <button
               className="flex items-center gap-2 px-3 py-2 rounded-lg font-medium bg-black text-white"
               onClick={() => router.push('/dashboard')}
             >
-              <span className="h-2 w-2 rounded-full border border-gray-400 mr-2" /> Gerir Conteúdo
+              <ArrowRight className="w-4 h-4 mr-1" />
+              Gerir Conteúdo
             </button>
           </nav>
         </aside>
