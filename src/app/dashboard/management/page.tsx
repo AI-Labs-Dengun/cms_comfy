@@ -4,7 +4,14 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, ArrowRight } from "lucide-react";
 
-const mockContent: any[] = [
+interface ContentItem {
+  title: string;
+  date: string;
+  tags: string[];
+  emotions: string[];
+}
+
+const mockContent: ContentItem[] = [
   {
     title: "Explorar a Amazónia",
     date: "2024-01-15",

@@ -12,39 +12,6 @@ const emotionTags = [
   "Tristeza",
 ];
 
-const mockContent = [
-  {
-    title: "Explorar a Amazónia",
-    date: "2024-01-15",
-    tags: ["Aventura", "Natureza"],
-    emotions: ["Entusiasmo", "Admiração"],
-  },
-  {
-    title: "Fotografia Urbana em Tóquio",
-    date: "2024-02-20",
-    tags: ["Fotografia", "Viagem"],
-    emotions: ["Curiosidade", "Espanto"],
-  },
-  {
-    title: "Culinária Italiana",
-    date: "2024-03-10",
-    tags: ["Comida", "Cultura"],
-    emotions: ["Alegria", "Satisfação"],
-  },
-  {
-    title: "A Arte da Caligrafia",
-    date: "2024-04-05",
-    tags: ["Arte", "Habilidade"],
-    emotions: ["Foco", "Calma"],
-  },
-  {
-    title: "Práticas de Vida Sustentável",
-    date: "2024-05-12",
-    tags: ["Ambiente", "Estilo de Vida"],
-    emotions: ["Esperança", "Responsabilidade"],
-  },
-];
-
 export default function CreateContent() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
