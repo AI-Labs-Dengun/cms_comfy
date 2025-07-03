@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, ArrowRight } from "lucide-react";
 
-const mockContent = [
+const mockContent: any[] = [
   {
     title: "Explorar a Amazónia",
     date: "2024-01-15",
@@ -46,8 +46,8 @@ export default function Management() {
     const searchLower = search.toLowerCase();
     return (
       item.title.toLowerCase().includes(searchLower) ||
-      item.tags.some((tag) => tag.toLowerCase().includes(searchLower)) ||
-      item.emotions.some((emo) => emo.toLowerCase().includes(searchLower))
+      item.tags.some((tag: string) => tag.toLowerCase().includes(searchLower)) ||
+      item.emotions.some((emo: string) => emo.toLowerCase().includes(searchLower))
     );
   });
 
