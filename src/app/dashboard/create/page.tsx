@@ -52,7 +52,8 @@ export default function Dashboard() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Vídeo");
-  const [tags, setTags] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
   const [emotions, setEmotions] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [search, setSearch] = useState("");
@@ -91,6 +92,21 @@ export default function Dashboard() {
     );
   });
 
+  // Função para adicionar tag
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && tagInput.trim() !== "") {
+      e.preventDefault();
+      if (!tags.includes(tagInput.trim())) {
+        setTags([...tags, tagInput.trim()]);
+      }
+      setTagInput("");
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
+  };
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <div className="flex flex-1 bg-white overflow-hidden">
@@ -123,47 +139,7 @@ export default function Dashboard() {
               <div className="text-xs text-gray-500 mb-2 font-medium">Novo Conteúdo</div>
               <h1 className="text-2xl font-bold mb-6 text-gray-900" style={{ fontFamily: 'Quicksand, Inter, sans-serif' }}>Adicionar Novo Conteúdo</h1>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* File Upload */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-900">Ficheiro de Conteúdo</label>
-                  <div className="border-2 border-gray-300 border-dashed rounded-lg flex flex-col items-center justify-center py-12 cursor-pointer hover:border-gray-400 transition-colors relative">
-                    <input
-                      type="file"
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                      onChange={handleFileChange}
-                    />
-                    <CloudUpload className="w-12 h-12 text-gray-400 mb-2" />
-                    <span className="text-gray-900">Escolher Ficheiro</span>
-                    {file && (
-                      <span className="mt-2 text-xs text-gray-500">{file.name}</span>
-                    )}
-                  </div>
-                </div>
-                {/* Title */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-900">Título</label>
-                  <input
-                    type="text"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
-                    placeholder="Escreva aqui um título"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                  />
-                </div>
-                {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-900">Descrição</label>
-                  <textarea
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
-                    placeholder="Escreva aqui uma descrição"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={3}
-                    required
-                  />
-                </div>
-                {/* Category */}
+                {/* Categoria - agora em primeiro lugar */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-900">Categoria</label>
                   <select
@@ -179,16 +155,96 @@ export default function Dashboard() {
                     <option value="Shorts">Shorts</option>
                   </select>
                 </div>
+                {/* Conteúdo dividido em URL ou Ficheiro */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-900">Conteúdo</label>
+                  <p className="text-xs text-gray-500 mb-2">Insira uma URL ou faça upload de um ficheiro para o seu post</p>
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium mb-1 text-gray-900">URL do Conteúdo: (nenhum url inserido)</label>
+                    <div className="flex items-center border border-gray-300 rounded-md px-3 py-2 bg-gray-50">
+                      <span className="text-gray-400 mr-2">🌐</span>
+                      <input
+                        type="url"
+                        className="flex-1 bg-transparent outline-none text-gray-900"
+                        placeholder="www.exemplo.com/conteudo"
+                        // value={url} // Adicione o estado se desejar controlar
+                        // onChange={(e) => setUrl(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center my-2">
+                    <div className="flex-1 border-t border-gray-300"></div>
+                    <span className="mx-4 text-gray-400 text-xs font-medium">Ou</span>
+                    <div className="flex-1 border-t border-gray-300"></div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-gray-900">Ficheiro: (nenhum ficheiro selecionado)</label>
+                    <div className="border-2 border-gray-300 border-dashed rounded-lg flex flex-col items-center justify-center py-6 cursor-pointer hover:border-gray-400 transition-colors relative bg-black">
+                      <input
+                        type="file"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={handleFileChange}
+                      />
+                      <CloudUpload className="w-8 h-8 text-white mb-2" />
+                      <span className="text-white">Escolher um ficheiro</span>
+                      {file && (
+                        <span className="mt-2 text-xs text-gray-200">{file.name}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {/* Título */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-900">Título</label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                    placeholder="Escreva aqui um título"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                  />
+                </div>
+                {/* Descrição */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-900">Descrição</label>
+                  <textarea
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                    placeholder="Escreva aqui uma descrição"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                    required
+                  />
+                </div>
                 {/* Tags */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-900">Tags</label>
                   <input
                     type="text"
                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
-                    placeholder="Adicione tags"
-                    value={tags}
-                    onChange={(e) => setTags(e.target.value)}
+                    placeholder="Adicione tags e pressione Enter"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleTagKeyDown}
                   />
+                  {/* Exibir tags abaixo do input */}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {tags.length === 0 ? (
+                      <span className="bg-gray-100 text-gray-400 px-3 py-1 rounded-full flex items-center text-sm font-medium opacity-80 select-none pointer-events-none">
+                        Exemplo
+                      </span>
+                    ) : (
+                      tags.map((tag) => (
+                        <span key={tag} className="bg-gray-200 text-gray-800 px-3 py-1 rounded-full flex items-center text-sm font-medium">
+                          {tag}
+                          <button type="button" className="ml-2 text-gray-500 hover:text-red-500" onClick={() => removeTag(tag)}>
+                            ×
+                          </button>
+                        </span>
+                      ))
+                    )}
+                  </div>
                 </div>
                 {/* Emotion Tags */}
                 <div>
