@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { getPost, deletePost, togglePostPublication, updatePost, Post } from "@/services/posts";
 import { getFileUrl, getSignedUrl } from "@/services/storage";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,6 +15,223 @@ const emotionTags = [
   "Medo",
   "Tristeza",
 ];
+
+// Componente do Editor Markdown
+const MarkdownEditor = ({ value, onChange, placeholder }: { 
+  value: string; 
+  onChange: (value: string) => void; 
+  placeholder?: string;
+}) => {
+  const [selectionStart, setSelectionStart] = useState(0);
+  const [selectionEnd, setSelectionEnd] = useState(0);
+
+  const handleTextAreaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onChange(e.target.value);
+    setSelectionStart(e.target.selectionStart);
+    setSelectionEnd(e.target.selectionEnd);
+  };
+
+  const handleTextAreaSelect = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setSelectionStart(e.target.selectionStart);
+    setSelectionEnd(e.target.selectionEnd);
+  };
+
+  const insertText = (before: string, after: string = "") => {
+    const textArea = document.getElementById('markdown-editor-details') as HTMLTextAreaElement;
+    if (!textArea) return;
+
+    const beforeText = value.substring(0, selectionStart);
+    const selectedText = value.substring(selectionStart, selectionEnd);
+    const afterText = value.substring(selectionEnd);
+
+    // Remover espaços desnecessários do texto selecionado para garantir formatação correta
+    const trimmedSelectedText = selectedText.trim();
+    
+    // Se não há texto selecionado, apenas inserir os marcadores
+    if (trimmedSelectedText === "") {
+      const newText = beforeText + before + after + afterText;
+      onChange(newText);
+      
+      // Posicionar cursor entre os marcadores
+      setTimeout(() => {
+        textArea.focus();
+        const newCursorPos = selectionStart + before.length;
+        textArea.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+      return;
+    }
+
+    // Aplicar formatação ao texto trimmed
+    const newText = beforeText + before + trimmedSelectedText + after + afterText;
+    onChange(newText);
+
+    // Restaurar foco e seleção
+    setTimeout(() => {
+      textArea.focus();
+      const newCursorPos = selectionStart + before.length;
+      textArea.setSelectionRange(newCursorPos, newCursorPos + trimmedSelectedText.length);
+    }, 0);
+  };
+
+  const insertLine = (prefix: string) => {
+    const textArea = document.getElementById('markdown-editor-details') as HTMLTextAreaElement;
+    if (!textArea) return;
+
+    const beforeText = value.substring(0, selectionStart);
+    const selectedText = value.substring(selectionStart, selectionEnd);
+    const afterText = value.substring(selectionEnd);
+
+    // Se há texto selecionado, aplicar o prefixo ao texto selecionado
+    if (selectedText.trim()) {
+      const trimmedSelectedText = selectedText.trim();
+      const newText = beforeText + prefix + trimmedSelectedText + afterText;
+      onChange(newText);
+      
+      setTimeout(() => {
+        textArea.focus();
+        const newCursorPos = selectionStart + prefix.length;
+        textArea.setSelectionRange(newCursorPos, newCursorPos + trimmedSelectedText.length);
+      }, 0);
+      return;
+    }
+
+    // Se não há texto selecionado, trabalhar com a linha atual
+    const lines = value.split('\n');
+    const currentLineIndex = value.substring(0, selectionStart).split('\n').length - 1;
+    const currentLine = lines[currentLineIndex] || '';
+    
+    // Se a linha já tem o prefixo, remover. Senão, adicionar.
+    if (currentLine.startsWith(prefix)) {
+      lines[currentLineIndex] = currentLine.substring(prefix.length);
+    } else {
+      lines[currentLineIndex] = prefix + currentLine;
+    }
+
+    const newText = lines.join('\n');
+    onChange(newText);
+
+    // Restaurar foco
+    setTimeout(() => {
+      textArea.focus();
+      const newCursorPos = selectionStart + (currentLine.startsWith(prefix) ? -prefix.length : prefix.length);
+      textArea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  };
+
+  return (
+    <div className="border border-gray-300 rounded-md overflow-hidden">
+      {/* Barra de ferramentas */}
+      <div className="bg-gray-100 border-b border-gray-300 p-2 flex flex-wrap gap-1">
+        {/* Títulos */}
+        <button
+          type="button"
+          onClick={() => insertLine('# ')}
+          className="px-2 py-1 text-xs font-bold bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm"
+          title="Título H1"
+        >
+          H1
+        </button>
+        <button
+          type="button"
+          onClick={() => insertLine('## ')}
+          className="px-2 py-1 text-xs font-bold bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm"
+          title="Título H2"
+        >
+          H2
+        </button>
+        <button
+          type="button"
+          onClick={() => insertLine('### ')}
+          className="px-2 py-1 text-xs font-bold bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm"
+          title="Título H3"
+        >
+          H3
+        </button>
+        
+        <div className="w-px h-6 bg-gray-400 mx-1"></div>
+        
+        {/* Formatação de texto */}
+        <button
+          type="button"
+          onClick={() => insertText('**', '**')}
+          className="px-2 py-1 text-xs font-bold bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm"
+          title="Negrito"
+        >
+          <strong className="text-gray-900">B</strong>
+        </button>
+        <button
+          type="button"
+          onClick={() => insertText('*', '*')}
+          className="px-2 py-1 text-xs italic bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm"
+          title="Itálico"
+        >
+          I
+        </button>
+        <button
+          type="button"
+          onClick={() => insertText('~~', '~~')}
+          className="px-2 py-1 text-xs line-through bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm"
+          title="Riscado"
+        >
+          S
+        </button>
+        
+        <div className="w-px h-6 bg-gray-400 mx-1"></div>
+        
+        {/* Listas */}
+        <button
+          type="button"
+          onClick={() => insertLine('- ')}
+          className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm font-medium"
+          title="Lista com marcadores"
+        >
+          •
+        </button>
+        <button
+          type="button"
+          onClick={() => insertLine('1. ')}
+          className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm font-medium"
+          title="Lista numerada"
+        >
+          1.
+        </button>
+        
+        <div className="w-px h-6 bg-gray-400 mx-1"></div>
+        
+        {/* Citação */}
+        <button
+          type="button"
+          onClick={() => insertLine('> ')}
+          className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm font-medium"
+          title="Citação"
+        >
+          &quot;
+        </button>
+        
+        {/* Código */}
+        <button
+          type="button"
+          onClick={() => insertText('`', '`')}
+          className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm font-mono"
+          title="Código inline"
+        >
+          &lt;/&gt;
+        </button>
+      </div>
+      
+      {/* Área de texto */}
+      <textarea
+        id="markdown-editor-details"
+        value={value}
+        onChange={handleTextAreaChange}
+        onSelect={handleTextAreaSelect}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 focus:outline-none text-gray-900 font-medium resize-none"
+        rows={6}
+      />
+    </div>
+  );
+};
 
 export default function DetalhesConteudo() {
   const router = useRouter();
@@ -144,7 +362,7 @@ export default function DetalhesConteudo() {
                 Tem certeza que deseja eliminar o post:
               </p>
               <p className="font-semibold text-gray-900 bg-gray-50 p-3 rounded border-l-4 border-red-400">
-                "{post.title}"
+                &quot;{post.title}&quot;
               </p>
               <p className="text-red-600 text-sm mt-2 font-medium">
                 ⚠️ Esta ação não pode ser desfeita.
@@ -839,24 +1057,43 @@ export default function DetalhesConteudo() {
                   
                   <div className="mb-4">
                     <label className="block text-xs text-gray-500 font-bold mb-1">Descrição</label>
-                    <textarea
+                    <MarkdownEditor
                       value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      rows={3}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium"
-                      placeholder="Descrição do post"
+                      onChange={setEditDescription}
+                      placeholder="Descrição do post usando markdown..."
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Use os botões acima para formatar o texto ou digite diretamente em markdown
+                    </p>
+                    
+                    {/* Prévia do Markdown */}
+                    {editDescription.trim() && (
+                      <div className="mt-4 p-4 bg-gray-50 rounded-md border">
+                        <div className="text-xs text-gray-500 font-bold mb-2">Prévia da formatação:</div>
+                        <div className="bg-white p-3 rounded border">
+                          <MarkdownRenderer content={editDescription} />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mb-4">
                     <label className="block text-xs text-gray-500 font-bold mb-1">URL do Conteúdo (opcional)</label>
-                    <input
-                      type="url"
-                      value={editContentUrl}
-                      onChange={(e) => setEditContentUrl(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium"
-                      placeholder="https://exemplo.com/conteudo"
-                    />
+                    <div className="relative">
+                      <input
+                        type="url"
+                        value={editContentUrl}
+                        onChange={(e) => setEditContentUrl(e.target.value)}
+                        className={`w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium ${post?.file_path ? 'bg-gray-100 opacity-50' : ''}`}
+                        placeholder={post?.file_path ? "Este post tem ficheiro anexado" : "https://exemplo.com/conteudo"}
+                        disabled={!!post?.file_path}
+                      />
+                      {post?.file_path && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          ⚠️ Este post tem um ficheiro anexado. Não é possível adicionar URL externa.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               ) : (
@@ -868,7 +1105,9 @@ export default function DetalhesConteudo() {
                   
                   <div className="mb-2">
                     <div className="text-xs text-gray-500 font-bold">Descrição</div>
-                    <div className="text-gray-900 font-medium">{post.description}</div>
+                    <div className="text-gray-900">
+                      <MarkdownRenderer content={post.description} />
+                    </div>
                   </div>
                 </>
               )}
