@@ -7,6 +7,7 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { getPost, deletePost, togglePostPublication, updatePost, Post } from "@/services/posts";
 import { getFileUrl, getSignedUrl } from "@/services/storage";
 import { useAuth } from "@/hooks/useAuth";
+import { DeleteConfirmationModal, PublishToggleModal } from "@/components/modals";
 
 const emotionTags = [
   "Raiva",
@@ -247,6 +248,7 @@ export default function DetalhesConteudo() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   
   // Estados para os campos editáveis
   const [editTitle, setEditTitle] = useState("");
@@ -325,7 +327,6 @@ export default function DetalhesConteudo() {
       
       if (response.success) {
         setShowDeleteModal(false);
-        alert('Post eliminado com sucesso!');
         router.push('/dashboard/management');
       } else {
         alert(response.error || 'Erro ao eliminar post');
@@ -338,81 +339,11 @@ export default function DetalhesConteudo() {
     }
   };
 
-  // Modal de confirmação de exclusão
-  const DeleteConfirmationModal = () => {
-    if (!showDeleteModal || !post) return null;
 
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-          <div className="p-6">
-            <div className="flex items-center mb-4">
-              <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.732 15.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">Confirmar Exclusão</h3>
-              </div>
-            </div>
-            
-            <div className="mb-6">
-              <p className="text-gray-700 mb-2">
-                Tem certeza que deseja eliminar o post:
-              </p>
-              <p className="font-semibold text-gray-900 bg-gray-50 p-3 rounded border-l-4 border-red-400">
-                &quot;{post.title}&quot;
-              </p>
-              <p className="text-red-600 text-sm mt-2 font-medium">
-                ⚠️ Esta ação não pode ser desfeita.
-              </p>
-            </div>
-            
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                disabled={deleting}
-                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md font-medium transition-colors disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {deleting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Eliminando...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Eliminar Definitivamente
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   // Função para alternar publicação
   const handleTogglePublication = async () => {
     if (!post) return;
-
-    const action = post.is_published ? 'despublicar' : 'publicar';
-    const confirmAction = window.confirm(
-      `Tem certeza que deseja ${action} o post "${post.title}"?`
-    );
-
-    if (!confirmAction) return;
 
     try {
       setPublishing(true);
@@ -421,10 +352,10 @@ export default function DetalhesConteudo() {
       
       if (response.success) {
         // Atualizar o estado local
-        setPost(prev => prev ? { ...prev, is_published: !prev.is_published } : null);
-        alert(response.message || `Post ${action}do com sucesso!`);
+        setPost((prev: Post | null) => prev ? { ...prev, is_published: !prev.is_published } : null);
+        setShowPublishModal(false);
       } else {
-        alert(response.error || `Erro ao ${action} post`);
+        alert(response.error || 'Erro ao alterar status de publicação');
       }
     } catch (err) {
       console.error('Erro ao alterar publicação:', err);
@@ -479,7 +410,7 @@ export default function DetalhesConteudo() {
 
       if (response.success) {
         // Atualizar o estado local
-        setPost(prev => prev ? {
+        setPost((prev: Post | null) => prev ? {
           ...prev,
           title: updateData.title,
           description: updateData.description,
@@ -515,14 +446,14 @@ export default function DetalhesConteudo() {
 
   // Função para remover tag
   const removeTag = (tagToRemove: string) => {
-    setEditTags(editTags.filter(tag => tag !== tagToRemove));
+    setEditTags(editTags.filter((tag: string) => tag !== tagToRemove));
   };
 
   // Função para alternar emotion tag
   const handleEmotionToggle = (emotion: string) => {
-    setEditEmotionTags(prev =>
+    setEditEmotionTags((prev: string[]) =>
       prev.includes(emotion)
-        ? prev.filter(e => e !== emotion)
+        ? prev.filter((e: string) => e !== emotion)
         : [...prev, emotion]
     );
   };
@@ -610,7 +541,7 @@ export default function DetalhesConteudo() {
                 src={fileUrl} 
                 alt={post.title}
                 className="max-w-full h-auto max-h-96 object-contain mx-auto"
-                onError={(e) => {
+                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
                   // Mostrar informações de erro
@@ -786,7 +717,7 @@ export default function DetalhesConteudo() {
                 src={url} 
                 alt={post.title}
                 className="max-w-full h-auto max-h-96 object-contain mx-auto"
-                onError={(e) => {
+                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
                 }}
@@ -836,14 +767,11 @@ export default function DetalhesConteudo() {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
             <p className="text-gray-600">Verificando autenticação...</p>
-                  </div>
-      </div>
-
-      {/* Modal de Confirmação de Exclusão */}
-      <DeleteConfirmationModal />
-    </CMSLayout>
-  );
-}
+          </div>
+        </div>
+      </CMSLayout>
+    );
+  }
 
   if (!isAuthenticated || !canAccessCMS) {
     router.push('/login');
@@ -952,7 +880,7 @@ export default function DetalhesConteudo() {
 
                     {/* Botão Publicar/Despublicar */}
                     <button 
-                      onClick={handleTogglePublication}
+                      onClick={() => setShowPublishModal(true)}
                       disabled={publishing}
                       className={`px-4 py-2 rounded-md font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
                         post.is_published 
@@ -1049,7 +977,7 @@ export default function DetalhesConteudo() {
                     <input
                       type="text"
                       value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditTitle(e.target.value)}
                       className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium"
                       placeholder="Título do post"
                     />
@@ -1083,7 +1011,7 @@ export default function DetalhesConteudo() {
                       <input
                         type="url"
                         value={editContentUrl}
-                        onChange={(e) => setEditContentUrl(e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditContentUrl(e.target.value)}
                         className={`w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium ${post?.file_path ? 'bg-gray-100 opacity-50' : ''}`}
                         placeholder={post?.file_path ? "Este post tem ficheiro anexado" : "https://exemplo.com/conteudo"}
                         disabled={!!post?.file_path}
@@ -1192,7 +1120,7 @@ export default function DetalhesConteudo() {
                     <input
                       type="text"
                       value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTagInput(e.target.value)}
                       onKeyDown={handleTagKeyDown}
                       className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium"
                       placeholder="Digite uma tag e pressione Enter"
@@ -1203,7 +1131,7 @@ export default function DetalhesConteudo() {
                           Nenhuma tag adicionada
                         </span>
                       ) : (
-                        editTags.map((tag, idx) => (
+                        editTags.map((tag: string, idx: number) => (
                           <span key={idx} className="bg-gray-200 text-gray-800 px-3 py-1 rounded-full flex items-center text-sm font-medium">
                             {tag}
                             <button 
@@ -1244,7 +1172,7 @@ export default function DetalhesConteudo() {
                         <div className="mb-4">
                           <div className="text-xs text-gray-500 font-bold">Tags</div>
                           <div className="flex flex-row gap-2 mt-1 flex-wrap">
-                            {post.tags.map((tag, idx) => (
+                            {post.tags.map((tag: string, idx: number) => (
                               <span key={idx} className="inline-block bg-gray-100 text-gray-900 rounded px-3 py-1 text-sm font-medium">{tag}</span>
                             ))}
                           </div>
@@ -1255,7 +1183,7 @@ export default function DetalhesConteudo() {
                         <div className="mb-4">
                           <div className="text-xs text-gray-500 font-bold">Tags de Emoção</div>
                           <div className="flex flex-row gap-2 mt-1 flex-wrap">
-                            {post.emotion_tags.map((emo, idx) => (
+                            {post.emotion_tags.map((emo: string, idx: number) => (
                               <span key={idx} className="inline-block bg-blue-100 text-blue-900 rounded px-3 py-1 text-sm font-medium">{emo}</span>
                             ))}
                           </div>
@@ -1284,6 +1212,25 @@ export default function DetalhesConteudo() {
           )}
         </div>
       </div>
+
+      {/* Modals de Confirmação */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        title="Eliminar Conteúdo"
+        message={`Tem certeza que deseja eliminar o conteúdo "${post?.title}"?`}
+        isLoading={deleting}
+      />
+
+      <PublishToggleModal
+        isOpen={showPublishModal}
+        onClose={() => setShowPublishModal(false)}
+        onConfirm={handleTogglePublication}
+        isPublished={post?.is_published || false}
+        title={post?.title || ""}
+        isLoading={publishing}
+      />
     </CMSLayout>
   );
 } 
