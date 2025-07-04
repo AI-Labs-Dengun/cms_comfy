@@ -3,6 +3,9 @@
 import React, { useState } from "react";
 import { CloudUpload } from "lucide-react";
 import CMSLayout from "@/components/CMSLayout";
+import { createPost, CreatePostData, uploadFileForPost } from "@/services/posts";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 
 const emotionTags = [
   "Raiva",
@@ -13,14 +16,20 @@ const emotionTags = [
 ];
 
 export default function CreateContent() {
+  const router = useRouter();
+  const { canAccessCMS, loading: authLoading, error: authError } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Vídeo");
+  const [category, setCategory] = useState<"Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts">("Vídeo");
+  const [contentUrl, setContentUrl] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [emotions, setEmotions] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -36,14 +45,110 @@ export default function CreateContent() {
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUploading(true);
-    // TODO: Implement upload logic
-    setTimeout(() => {
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // Validar dados obrigatórios
+      if (!title.trim()) {
+        setError("Título é obrigatório");
+        return;
+      }
+
+      if (!description.trim()) {
+        setError("Descrição é obrigatória");
+        return;
+      }
+
+      if (!contentUrl.trim() && !file) {
+        setError("É necessário fornecer uma URL ou fazer upload de um arquivo");
+        return;
+      }
+
+      // Preparar dados do post
+      const postData: CreatePostData = {
+        title: title.trim(),
+        description: description.trim(),
+        category,
+        tags,
+        emotion_tags: emotions
+      };
+
+      // Adicionar URL se fornecida
+      if (contentUrl.trim()) {
+        postData.content_url = contentUrl.trim();
+      }
+
+      // Upload de arquivo se fornecido
+      if (file && !contentUrl.trim()) {
+        setUploadProgress(0);
+        setError(null);
+        
+        // Simular progresso de upload
+        const progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            if (prev >= 90) {
+              clearInterval(progressInterval);
+              return 90;
+            }
+            return prev + 10;
+          });
+        }, 200);
+
+        try {
+          const uploadResult = await uploadFileForPost(file);
+          
+          if (uploadResult.success && uploadResult.data) {
+            postData.file_path = uploadResult.data.path;
+            postData.file_name = uploadResult.data.file_name;
+            postData.file_type = uploadResult.data.file_type;
+            postData.file_size = uploadResult.data.file_size;
+            setUploadProgress(100);
+          } else {
+            setError(uploadResult.error || "Erro no upload do arquivo");
+            return;
+          }
+        } catch (uploadError) {
+          console.error("Erro no upload:", uploadError);
+          setError("Erro inesperado no upload do arquivo");
+          return;
+        } finally {
+          clearInterval(progressInterval);
+        }
+      }
+
+      // Criar o post
+      const result = await createPost(postData);
+
+      if (result.success) {
+        setSuccess(result.message || "Post criado com sucesso!");
+        
+        // Limpar formulário
+        setTitle("");
+        setDescription("");
+        setContentUrl("");
+        setCategory("Vídeo");
+        setTags([]);
+        setEmotions([]);
+        setFile(null);
+        setTagInput("");
+
+        // Redirecionar para página de gestão após 2 segundos
+        setTimeout(() => {
+          router.push("/dashboard/management");
+        }, 2000);
+      } else {
+        setError(result.error || "Erro desconhecido ao criar post");
+      }
+    } catch (error) {
+      console.error("Erro inesperado:", error);
+      setError("Erro inesperado ao criar post");
+    } finally {
       setIsUploading(false);
-      alert("Conteúdo enviado!");
-    }, 1000);
+    }
   };
 
   // Função para adicionar tag
@@ -61,6 +166,46 @@ export default function CreateContent() {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
+  // Verificar carregamento de autenticação
+  if (authLoading) {
+    return (
+      <CMSLayout currentPage="create">
+        <div className="flex flex-col items-center justify-center py-12 px-8 min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto mb-4"></div>
+            <p className="text-gray-600">Verificando permissões...</p>
+          </div>
+        </div>
+      </CMSLayout>
+    );
+  }
+
+  // Verificar se o usuário tem permissão para acessar o CMS
+  if (!canAccessCMS) {
+    return (
+      <CMSLayout currentPage="create">
+        <div className="flex flex-col items-center justify-center py-12 px-8 min-h-[400px]">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Acesso Negado</h2>
+            <p className="text-gray-600 mb-4">
+              Você não tem permissão para acessar esta página. <br />
+              É necessário ter uma conta CMS autorizada.
+            </p>
+            {authError && (
+              <p className="text-red-600 text-sm">{authError}</p>
+            )}
+            <button
+              onClick={() => router.push('/login')}
+              className="bg-black text-white px-4 py-2 rounded-md font-medium hover:bg-gray-800 transition-colors"
+            >
+              Fazer Login
+            </button>
+          </div>
+        </div>
+      </CMSLayout>
+    );
+  }
+
   return (
     <CMSLayout currentPage="create">
       <div className="flex flex-col items-center py-12 px-8">
@@ -68,6 +213,21 @@ export default function CreateContent() {
           <h1 className="text-2xl font-bold mb-6 text-gray-900 text-center" style={{ fontFamily: 'Quicksand, Inter, sans-serif' }}>
             Adicionar Novo Conteúdo
           </h1>
+          
+          {/* Mensagens de feedback */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
+              <p className="text-sm font-medium">{error}</p>
+            </div>
+          )}
+          
+          {success && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md mb-4">
+              <p className="text-sm font-medium">{success}</p>
+              <p className="text-xs mt-1">Redirecionando para gestão de posts...</p>
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Categoria - agora em primeiro lugar */}
             <div>
@@ -90,15 +250,17 @@ export default function CreateContent() {
               <label className="block text-sm font-medium mb-2 text-gray-900">Conteúdo</label>
               <p className="text-xs text-gray-500 mb-2">Insira uma URL ou faça upload de um ficheiro para o seu post</p>
               <div className="mb-4">
-                <label className="block text-xs font-medium mb-1 text-gray-900">URL do Conteúdo: (nenhum url inserido)</label>
+                <label className="block text-xs font-medium mb-1 text-gray-900">
+                  URL do Conteúdo: {contentUrl.trim() ? contentUrl : "(nenhum url inserido)"}
+                </label>
                 <div className="flex items-center border border-gray-300 rounded-md px-3 py-2 bg-gray-50">
                   <span className="text-gray-400 mr-2">🌐</span>
                   <input
                     type="url"
                     className="flex-1 bg-transparent outline-none text-gray-900"
                     placeholder="www.exemplo.com/conteudo"
-                    // value={url} // Adicione o estado se desejar controlar
-                    // onChange={(e) => setUrl(e.target.value)}
+                    value={contentUrl}
+                    onChange={(e) => setContentUrl(e.target.value)}
                   />
                 </div>
               </div>
@@ -108,17 +270,42 @@ export default function CreateContent() {
                 <div className="flex-1 border-t border-gray-300"></div>
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1 text-gray-900">Ficheiro: (nenhum ficheiro selecionado)</label>
+                <label className="block text-xs font-medium mb-1 text-gray-900">
+                  Ficheiro: {file ? file.name : "(nenhum ficheiro selecionado)"}
+                </label>
                 <div className="border-2 border-gray-300 border-dashed rounded-lg flex flex-col items-center justify-center py-6 cursor-pointer hover:border-gray-400 transition-colors relative bg-black">
                   <input
                     type="file"
                     className="absolute inset-0 opacity-0 cursor-pointer"
                     onChange={handleFileChange}
+                    disabled={isUploading}
                   />
                   <CloudUpload className="w-8 h-8 text-white mb-2" />
-                  <span className="text-white">Escolher um ficheiro</span>
+                  <span className="text-white">
+                    {isUploading ? "A fazer upload..." : "Escolher um ficheiro"}
+                  </span>
                   {file && (
-                    <span className="mt-2 text-xs text-gray-200">{file.name}</span>
+                    <div className="mt-2 text-center">
+                      <span className="text-xs text-gray-200 block">{file.name}</span>
+                      <span className="text-xs text-gray-400 block">
+                        {(file.size / (1024 * 1024)).toFixed(2)} MB
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Barra de progresso */}
+                  {isUploading && uploadProgress > 0 && (
+                    <div className="w-full max-w-xs mt-3">
+                      <div className="bg-gray-700 rounded-full h-2">
+                        <div 
+                          className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-xs text-gray-300 mt-1 block">
+                        {uploadProgress}% completo
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -197,10 +384,17 @@ export default function CreateContent() {
             <div className="flex justify-center">
               <button
                 type="submit"
-                className="bg-black text-white px-6 py-2 rounded-md font-semibold hover:bg-gray-800 transition-colors disabled:opacity-60 cursor-pointer"
-                disabled={isUploading}
+                className="bg-black text-white px-6 py-2 rounded-md font-semibold hover:bg-gray-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                disabled={isUploading || success !== null}
               >
-                {isUploading ? "A enviar..." : "Enviar Conteúdo"}
+                {isUploading 
+                  ? uploadProgress > 0 
+                    ? `A fazer upload... ${uploadProgress}%` 
+                    : "A enviar..." 
+                  : success 
+                    ? "Enviado!" 
+                    : "Enviar Conteúdo"
+                }
               </button>
             </div>
           </form>
