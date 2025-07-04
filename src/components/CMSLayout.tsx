@@ -26,7 +26,7 @@ export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
   return (
     <AuthGuard requiredRole="cms">
       <div className="min-h-screen bg-white flex flex-col">
-        <div className="flex flex-1 bg-white overflow-hidden">
+        <div className="flex flex-1 bg-white">
           {/* Sidebar */}
           <aside className="w-64 bg-white border-r flex flex-col py-8 px-6 min-h-full shadow-2xl z-10" style={{ boxShadow: '12px 0 40px 0 rgba(0,0,0,0.18)' }}>
             <div className="mb-12 flex flex-col items-center justify-center">
@@ -76,7 +76,7 @@ export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
           </aside>
 
           {/* Main Content */}
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1">
             {children}
           </main>
         </div>
