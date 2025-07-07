@@ -2,51 +2,44 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AuthService } from "@/services/auth";
+import { useAuth } from "@/context/AuthContext";
 import LoginPage from "./login/page";
 
 export default function Home() {
-  const [isChecking, setIsChecking] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+  const { loading, isAuthenticated, canAccessCMS } = useAuth();
 
+  // Prevenir hydration mismatch
   useEffect(() => {
-    checkAuthStatus();
+    setMounted(true);
   }, []);
 
-  const checkAuthStatus = async () => {
-    try {
-      const user = await AuthService.getUser();
-      
-      if (user?.email) {
-        // Se tem usuário logado, redirecionar para página de criação
-        // O AuthGuard fará a verificação de role
-        setIsLoggedIn(true);
-        router.push('/dashboard/create');
-        return;
-      }
-      
-      // Se não está logado, mostrar página de login
-      setIsChecking(false);
-      
-    } catch (error) {
-      console.error('Erro ao verificar status de auth:', error);
-      setIsChecking(false);
+  // Redirect logic simplificada
+  useEffect(() => {
+    if (!mounted || loading) return;
+    
+    if (isAuthenticated && canAccessCMS) {
+      router.push('/dashboard/create');
     }
-  };
+  }, [mounted, loading, isAuthenticated, canAccessCMS, router]);
 
-  if (isChecking || isLoggedIn) {
+  // Loading state durante verificação inicial
+  if (!mounted || loading || (isAuthenticated && canAccessCMS)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mb-4"></div>
           <p className="text-gray-600">
-            {isLoggedIn ? 'Redirecionando para página de criação...' : 'Verificando acesso...'}
+            {!mounted ? 'Carregando...' : 
+             loading ? 'Verificando acesso...' : 
+             'Redirecionando...'}
           </p>
         </div>
       </div>
     );
   }
 
+  // Se não está autenticado ou não tem acesso CMS, mostrar login
   return <LoginPage />;
 } 
