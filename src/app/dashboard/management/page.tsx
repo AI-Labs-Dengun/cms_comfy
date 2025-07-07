@@ -21,7 +21,7 @@ interface FilterState {
 }
 
 // Tipos para ordenação
-type SortField = 'title' | 'category' | 'created_at' | 'is_published' | 'tags';
+type SortField = 'title' | 'category' | 'created_at' | 'is_published' | 'tags' | 'emotion_tags';
 type SortDirection = 'asc' | 'desc';
 
 interface SortState {
@@ -169,8 +169,14 @@ export default function Management() {
 
   // Função para obter tags únicas
   const uniqueTags = useMemo(() => {
-    const allTags = posts.flatMap(post => [...post.tags, ...post.emotion_tags]);
+    const allTags = posts.flatMap(post => post.tags);
     return [...new Set(allTags)].sort();
+  }, [posts]);
+
+  // Função para obter emotion tags únicas
+  const uniqueEmotionTags = useMemo(() => {
+    const allEmotionTags = posts.flatMap(post => post.emotion_tags);
+    return [...new Set(allEmotionTags)].sort();
   }, [posts]);
 
   // Função para ordenar posts
@@ -197,8 +203,12 @@ export default function Management() {
           bValue = b.is_published;
           break;
         case 'tags':
-          aValue = [...a.tags, ...a.emotion_tags].join(', ').toLowerCase();
-          bValue = [...b.tags, ...b.emotion_tags].join(', ').toLowerCase();
+          aValue = a.tags.join(', ').toLowerCase();
+          bValue = b.tags.join(', ').toLowerCase();
+          break;
+        case 'emotion_tags':
+          aValue = a.emotion_tags.join(', ').toLowerCase();
+          bValue = b.emotion_tags.join(', ').toLowerCase();
           break;
         default:
           return 0;
@@ -623,19 +633,7 @@ export default function Management() {
                       />
                     </div>
 
-                    {/* Filtro por emotion tags */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Tags de Emoção
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black"
-                        placeholder="Filtrar por emotion tags..."
-                        value={filters.emotionTags}
-                        onChange={e => setFilters(prev => ({ ...prev, emotionTags: e.target.value }))}
-                      />
-                    </div>
+
 
                     {/* Agrupamento por tag */}
                     {showGroupedView && (
@@ -652,32 +650,60 @@ export default function Management() {
                           {uniqueTags.map(tag => (
                             <option key={tag} value={tag}>{tag}</option>
                           ))}
+                          {["Medo", "Alegria", "Raiva", "Inveja", "Tristeza"].map(tag => (
+                            <option key={`emotion-${tag}`} value={tag}>{tag} (emoção)</option>
+                          ))}
                         </select>
                       </div>
                     )}
                   </div>
 
                   {/* Tags disponíveis */}
-                  {uniqueTags.length > 0 && (
+                  {(uniqueTags.length > 0 || uniqueEmotionTags.length > 0) && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Tags Disponíveis
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {uniqueTags.slice(0, 10).map(tag => (
-                          <button
-                            key={tag}
-                            onClick={() => setFilters(prev => ({ ...prev, tags: tag }))}
-                            className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
-                          >
-                            {tag}
-                          </button>
-                        ))}
-                        {uniqueTags.length > 10 && (
-                          <span className="text-xs text-gray-600 self-center font-medium">
-                            +{uniqueTags.length - 10} mais
-                          </span>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Tags normais */}
+                        {uniqueTags.length > 0 && (
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-900 mb-2">
+                              Tags Disponíveis
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                              {uniqueTags.slice(0, 8).map(tag => (
+                                <button
+                                  key={tag}
+                                  onClick={() => setFilters(prev => ({ ...prev, tags: tag }))}
+                                  className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
+                                >
+                                  {tag}
+                                </button>
+                              ))}
+                              {uniqueTags.length > 8 && (
+                                <span className="text-xs text-gray-600 self-center font-medium">
+                                  +{uniqueTags.length - 8} mais
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         )}
+
+                        {/* Emotion Tags */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-900 mb-2">
+                            Tags de Emoção Disponíveis
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {["Medo", "Alegria", "Raiva", "Inveja", "Tristeza"].map(tag => (
+                              <button
+                                key={tag}
+                                onClick={() => setFilters(prev => ({ ...prev, emotionTags: tag }))}
+                                className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded hover:bg-purple-200 transition-colors"
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -685,9 +711,9 @@ export default function Management() {
               )}
             </div>
 
-            {/* Contador de resultados */}
+            {/* Contador de resultados e filtros ativos */}
             {!loading && !error && (
-              <div className="w-full max-w-4xl mb-4">
+              <div className="w-full max-w-4xl mb-4 space-y-3">
                 <div className="flex justify-between items-center text-sm text-gray-700">
                   <span className="font-medium">
                     {filteredPosts.length} de {posts.length} posts encontrados
@@ -699,6 +725,137 @@ export default function Management() {
                     </span>
                   )}
                 </div>
+                
+                {/* Filtros ativos */}
+                {hasActiveFilters() && (
+                  <div className="flex flex-wrap gap-2">
+                                         {search && (
+                       <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                         Busca: &ldquo;{search}&rdquo;
+                         <button
+                          onClick={() => setSearch("")}
+                          className="ml-1 hover:text-blue-600"
+                          title="Remover busca"
+                        >
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      </span>
+                    )}
+                    
+                                         {filters.title && (
+                       <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
+                         Título: &ldquo;{filters.title}&rdquo;
+                         <button
+                          onClick={() => setFilters(prev => ({ ...prev, title: "" }))}
+                          className="ml-1 hover:text-gray-600"
+                          title="Remover filtro de título"
+                        >
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      </span>
+                    )}
+                    
+                    {filters.category && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
+                        Categoria: {filters.category}
+                        <button
+                          onClick={() => setFilters(prev => ({ ...prev, category: "" }))}
+                          className="ml-1 hover:text-gray-600"
+                          title="Remover filtro de categoria"
+                        >
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      </span>
+                    )}
+                    
+                    {filters.status && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
+                        Status: {filters.status === "published" ? "Publicado" : "Rascunho"}
+                        <button
+                          onClick={() => setFilters(prev => ({ ...prev, status: "" }))}
+                          className="ml-1 hover:text-gray-600"
+                          title="Remover filtro de status"
+                        >
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      </span>
+                    )}
+                    
+                    {filters.dateRange.start && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
+                        Data início: {new Date(filters.dateRange.start).toLocaleDateString('pt-PT')}
+                        <button
+                          onClick={() => setFilters(prev => ({ 
+                            ...prev, 
+                            dateRange: { ...prev.dateRange, start: "" }
+                          }))}
+                          className="ml-1 hover:text-gray-600"
+                          title="Remover filtro de data início"
+                        >
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      </span>
+                    )}
+                    
+                    {filters.dateRange.end && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
+                        Data fim: {new Date(filters.dateRange.end).toLocaleDateString('pt-PT')}
+                        <button
+                          onClick={() => setFilters(prev => ({ 
+                            ...prev, 
+                            dateRange: { ...prev.dateRange, end: "" }
+                          }))}
+                          className="ml-1 hover:text-gray-600"
+                          title="Remover filtro de data fim"
+                        >
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      </span>
+                    )}
+                    
+                                         {filters.tags && (
+                       <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                         Tag: &ldquo;{filters.tags}&rdquo;
+                         <button
+                          onClick={() => setFilters(prev => ({ ...prev, tags: "" }))}
+                          className="ml-1 hover:text-blue-600"
+                          title="Remover filtro de tag"
+                        >
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      </span>
+                    )}
+                    
+                    {filters.emotionTags && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
+                        Emoção: {filters.emotionTags}
+                        <button
+                          onClick={() => setFilters(prev => ({ ...prev, emotionTags: "" }))}
+                          className="ml-1 hover:text-purple-600"
+                          title="Remover filtro de emoção"
+                        >
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -832,6 +989,15 @@ export default function Management() {
                                     {getSortIcon('tags')}
                                   </button>
                                 </th>
+                                <th className="text-left px-6 py-3 font-semibold text-gray-900">
+                                  <button
+                                    onClick={() => toggleSort('emotion_tags')}
+                                    className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                                  >
+                                    Tags de Emoção
+                                    {getSortIcon('emotion_tags')}
+                                  </button>
+                                </th>
                                 <th className="text-left px-6 py-3 font-semibold text-gray-900">Ações</th>
                               </tr>
                             </thead>
@@ -868,14 +1034,28 @@ export default function Management() {
                                   </td>
                                   <td className="px-6 py-4">
                                     <div className="flex flex-wrap gap-1 max-w-xs">
-                                      {[...post.tags, ...post.emotion_tags].slice(0, 3).map((tag, idx) => (
+                                      {post.tags.slice(0, 3).map((tag, idx) => (
                                         <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
                                           {tag}
                                         </span>
                                       ))}
-                                      {[...post.tags, ...post.emotion_tags].length > 3 && (
+                                      {post.tags.length > 3 && (
                                         <span className="text-gray-600 text-xs font-medium">
-                                          +{[...post.tags, ...post.emotion_tags].length - 3}
+                                          +{post.tags.length - 3}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <div className="flex flex-wrap gap-1 max-w-xs">
+                                      {post.emotion_tags.slice(0, 3).map((tag, idx) => (
+                                        <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">
+                                          {tag}
+                                        </span>
+                                      ))}
+                                      {post.emotion_tags.length > 3 && (
+                                        <span className="text-gray-600 text-xs font-medium">
+                                          +{post.emotion_tags.length - 3}
                                         </span>
                                       )}
                                     </div>
