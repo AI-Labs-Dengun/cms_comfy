@@ -321,6 +321,13 @@ export default function DetalhesConteudo() {
   const handleDelete = async () => {
     if (!post) return;
 
+    // Verificar se o post está publicado
+    if (post.is_published) {
+      alert('Este post está publicado. Despublique-o primeiro antes de eliminá-lo.');
+      setShowDeleteModal(false);
+      return;
+    }
+
     try {
       setDeleting(true);
       
@@ -881,15 +888,23 @@ export default function DetalhesConteudo() {
                   <>
                     {/* Botão Excluir */}
                     <button 
-                      onClick={() => setShowDeleteModal(true)}
-                      disabled={deleting || publishing}
-                      className="bg-red-600 text-white px-4 py-2 rounded-md font-medium hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
-                      title="Eliminar post"
+                      onClick={() => post.is_published ? null : setShowDeleteModal(true)}
+                      disabled={deleting || publishing || post.is_published}
+                      className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center gap-2 ${
+                        post.is_published
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+                          : 'bg-red-600 text-white hover:bg-red-700 cursor-pointer disabled:opacity-50'
+                      }`}
+                      title={
+                        post.is_published 
+                          ? "Para eliminar este post, despublique-o primeiro" 
+                          : "Eliminar post"
+                      }
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
-                      Eliminar
+                      {post.is_published ? 'Eliminar Bloqueado' : 'Eliminar'}
                     </button>
 
                     {/* Botão Editar */}
@@ -1102,6 +1117,28 @@ export default function DetalhesConteudo() {
                 </div>
               </div>
 
+              {/* Aviso sobre eliminação para posts publicados */}
+              {post.is_published && !isEditing && (
+                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <div>
+                      <h4 className="text-sm font-medium text-amber-800 mb-1">
+                        📝 Post Publicado - Eliminação Restrita
+                      </h4>
+                      <p className="text-sm text-amber-700 mb-2">
+                        Este post está atualmente publicado e não pode ser eliminado diretamente.
+                      </p>
+                      <p className="text-xs text-amber-600">
+                        <strong>Para eliminar:</strong> Primeiro despublique o post usando o botão &quot;Despublicar&quot; acima, depois poderá eliminá-lo.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* File Info - apenas informações técnicas */}
               {post.file_name && (
                 <>
@@ -1243,7 +1280,11 @@ export default function DetalhesConteudo() {
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDelete}
         title="Eliminar Conteúdo"
-        message={`Tem certeza que deseja eliminar o conteúdo "${post?.title}"?`}
+        message={
+          post?.is_published 
+            ? `Atenção: O post &quot;${post?.title}&quot; está publicado e não pode ser eliminado. Despublique-o primeiro.`
+            : `Tem certeza que deseja eliminar o conteúdo &quot;${post?.title}&quot;? Esta ação não pode ser desfeita.`
+        }
         isLoading={deleting}
       />
 
