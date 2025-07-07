@@ -8,6 +8,38 @@ const nextConfig: NextConfig = {
     optimizeCss: true,
   },
   
+  // Configuração de imagens para permitir URLs externas
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.cloudinary.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.amazonaws.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
+    // Permitir URLs não otimizadas para casos especiais
+    unoptimized: false,
+  },
+  
   // Otimizações de performance
   compress: true,
   poweredByHeader: false,

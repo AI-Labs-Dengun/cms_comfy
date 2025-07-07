@@ -551,12 +551,18 @@ export default function DetalhesConteudo() {
                         <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                         </svg>
-                        <p class="text-sm">Erro ao carregar imagem</p>
-                        <p class="text-xs text-gray-400 mt-1">${fileUrl}</p>
-                        <a href="${fileUrl}" target="_blank" class="text-blue-600 text-xs hover:underline mt-2 inline-block">Tentar abrir em nova aba</a>
+                        <p class="text-sm font-medium mb-2">Erro ao carregar imagem</p>
+                        <p class="text-xs text-gray-400 mb-4">A imagem pode estar temporariamente indisponível</p>
+                        <div class="space-y-2">
+                          <a href="${fileUrl}" target="_blank" class="text-blue-600 text-xs hover:underline block">Tentar abrir em nova aba</a>
+                          <button onclick="window.location.reload()" class="text-blue-600 text-xs hover:underline block">Recarregar página</button>
+                        </div>
                       </div>
                     `;
                   }
+                }}
+                onLoad={() => {
+                  console.log('✅ Imagem carregada com sucesso:', fileUrl);
                 }}
               />
             </div>
@@ -720,6 +726,26 @@ export default function DetalhesConteudo() {
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
+                  // Mostrar informações de erro
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.innerHTML = `
+                      <div class="p-8 text-center text-gray-500">
+                        <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <p class="text-sm font-medium mb-2">Erro ao carregar imagem externa</p>
+                        <p class="text-xs text-gray-400 mb-4">A URL pode estar indisponível ou bloqueada</p>
+                        <div class="space-y-2">
+                          <a href="${url}" target="_blank" class="text-blue-600 text-xs hover:underline block">Tentar abrir em nova aba</a>
+                          <button onclick="window.location.reload()" class="text-blue-600 text-xs hover:underline block">Recarregar página</button>
+                        </div>
+                      </div>
+                    `;
+                  }
+                }}
+                onLoad={() => {
+                  console.log('✅ Imagem externa carregada com sucesso:', url);
                 }}
               />
             </div>
