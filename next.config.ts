@@ -3,8 +3,48 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   experimental: {
-    optimizePackageImports: ['@supabase/supabase-js', '@supabase/auth-helpers-nextjs']
+    optimizePackageImports: ['@supabase/supabase-js', '@supabase/auth-helpers-nextjs', 'lucide-react'],
+    // Melhorar performance de desenvolvimento
+    optimizeCss: true,
   },
+  
+  // Otimizações de performance
+  compress: true,
+  poweredByHeader: false,
+  generateEtags: false,
+  
+  // Cache mais agressivo para assets estáticos
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on'
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
+          }
+        ]
+      },
+      {
+        source: '/static/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable'
+          }
+        ]
+      }
+    ]
+  },
+
   async redirects() {
     return [
       {
@@ -20,24 +60,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // Otimizações para melhorar performance
-  compress: true,
-  poweredByHeader: false,
-  generateEtags: false,
-  // Configurações para resolver problemas de fontes
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on'
-          }
-        ]
-      }
-    ]
-  }
 };
 
 export default nextConfig;
