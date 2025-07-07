@@ -1,5 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient, createServerClient, type CookieOptions } from '@supabase/ssr'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -14,59 +13,37 @@ if (!supabaseAnonKey) {
   throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY não está definida. Verifique seu arquivo .env.local')
 }
 
-// Configurações otimizadas para o cliente browser com foco em performance
-const browserConfig = {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-    // Reduzir intervalo de refresh para melhor UX
-    refreshThreshold: 30, // segundos antes do token expirar
-  },
-  global: {
-    headers: {
-      'X-Client-Info': 'cms-comfy'
-    }
-  },
-  // Desabilitar realtime se não usado para melhor performance
-  realtime: {
-    params: {
-      eventsPerSecond: 2, // Reduzido para economizar recursos
-    }
-  },
-  // Cache de queries para melhor performance
-  db: {
-    schema: 'public'
-  }
+// Cliente browser-side usando @supabase/ssr (novo padrão)
+export function createClient() {
+  return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
-// Cliente browser-side para autenticação (compatível com middleware)
-export const supabase = createPagesBrowserClient({
-  supabaseUrl,
-  supabaseKey: supabaseAnonKey,
-  options: browserConfig
-})
+// Cliente singleton para uso direto (compatibilidade com código existente)
+export const supabase = createClient()
 
-// Cliente server-side com service role (para chamadas de funções administrativas)
-export const supabaseAdmin = createClient(
-  supabaseUrl,
-  supabaseServiceRoleKey || supabaseAnonKey, // Fallback para anon key se service role não estiver definida
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    },
-    global: {
-      headers: {
-        'X-Client-Info': 'cms-comfy-admin'
-      }
-    },
-    // Configurações otimizadas para server-side
-    db: {
-      schema: 'public'
+// Cliente server-side com service role (para chamadas administrativas)
+export function createServerClientWithServiceRole() {
+  return createServerClient(
+    supabaseUrl,
+    supabaseServiceRoleKey || supabaseAnonKey,
+    {
+      cookies: {
+        get() {
+          return undefined
+        },
+        set() {
+          // Server-side admin client não precisa gerenciar cookies
+        },
+        remove() {
+          // Server-side admin client não precisa gerenciar cookies
+        },
+      },
     }
-  }
-)
+  )
+}
+
+// Cliente admin para uso direto (compatibilidade com código existente)
+export const supabaseAdmin = createServerClientWithServiceRole()
 
 // Cache simples em memória para queries frequentes (apenas no cliente)
 const queryCache = new Map<string, { data: unknown; timestamp: number }>()
