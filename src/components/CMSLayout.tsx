@@ -3,7 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, ArrowRight, LogOut, User } from 'lucide-react';
-import { AuthService } from '@/services/auth';
+import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
 
 interface CMSLayoutProps {
@@ -13,13 +13,23 @@ interface CMSLayoutProps {
 
 export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
   const router = useRouter();
+  const { signOut, user, profile } = useAuth();
 
   const handleLogout = async () => {
     try {
-      await AuthService.logout();
-      router.push('/login');
+      console.log('🚪 CMSLayout - Iniciando logout...');
+      const result = await signOut();
+      
+      if (!result.success) {
+        console.error('❌ CMSLayout - Erro no logout:', result.error);
+        // Mesmo com erro, tentar redirecionar
+        router.push('/login');
+      }
+      // O redirecionamento é feito automaticamente pelo signOut do contexto
     } catch (error) {
-      console.error('Erro no logout:', error);
+      console.error('❌ CMSLayout - Erro inesperado no logout:', error);
+      // Em caso de erro inesperado, forçar redirecionamento
+      window.location.href = '/login';
     }
   };
 
@@ -63,7 +73,7 @@ export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
             <div className="border-t pt-4 mt-4">
               <div className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 mb-2">
                 <User className="w-4 h-4" />
-                <span>Administrador CMS</span>
+                <span>{profile?.name || user?.email || 'Administrador CMS'}</span>
               </div>
               <button
                 onClick={handleLogout}
