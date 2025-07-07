@@ -108,10 +108,34 @@ export class AuthService {
   }
 
   /**
-   * Faz logout do usuário
+   * Faz logout do usuário com limpeza completa
    */
-  static async logout(): Promise<void> {
-    await supabase.auth.signOut();
+  static async logout(): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('🚪 AuthService - Fazendo logout...');
+      
+      // Encerrar sessão no Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('❌ AuthService - Erro ao fazer logout:', error);
+        return { success: false, error: error.message };
+      }
+      
+      // Limpar cache de queries
+      try {
+        const { clearQueryCache } = await import('@/lib/supabase');
+        clearQueryCache();
+      } catch {
+        // Ignorar erro se função não estiver disponível
+      }
+      
+      console.log('✅ AuthService - Logout realizado com sucesso');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ AuthService - Erro inesperado no logout:', error);
+      return { success: false, error: 'Erro de conexão ao fazer logout' };
+    }
   }
 
   /**
