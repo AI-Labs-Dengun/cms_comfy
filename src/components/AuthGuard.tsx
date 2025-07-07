@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import LoadingSpinner from './LoadingSpinner';
@@ -17,6 +17,10 @@ export default function AuthGuard({
   redirectTo = '/login' 
 }: AuthGuardProps) {
   const router = useRouter();
+  const [isChecking, setIsChecking] = useState(true);
+  const [hasAccess, setHasAccess] = useState(false);
+  const checkingRef = useRef(false);
+  
   const { 
     authInfo, 
     loading, 
@@ -27,43 +31,87 @@ export default function AuthGuard({
   } = useAuth();
 
   useEffect(() => {
+    let mounted = true;
+
     const handleAuthCheck = async () => {
-      if (loading) return; // Ainda carregando
-
-      if (!isAuthenticated) {
-        console.log('Usuário não autenticado, redirecionando...');
-        router.push(redirectTo);
+      // Evitar múltiplas execuções simultâneas
+      if (checkingRef.current || !mounted) return;
+      
+      if (loading) {
+        setIsChecking(true);
         return;
       }
 
-      // Verificar role específico se necessário
-      if (requiredRole === 'cms' && !canAccessCMS) {
-        console.log('Usuário sem permissão CMS, redirecionando...');
-        router.push(redirectTo);
-        return;
-      }
+      checkingRef.current = true;
 
-      // Para roles diferentes de CMS, verificar dinamicamente
-      if (requiredRole !== 'cms') {
-        const hasAccess = await checkRoleAccess(requiredRole);
-        if (!hasAccess) {
-          console.log(`Usuário sem permissão ${requiredRole}, redirecionando...`);
-          router.push(redirectTo);
+      try {
+        if (!isAuthenticated) {
+          console.log('Usuário não autenticado, redirecionando...');
+          if (mounted) {
+            router.push(redirectTo);
+          }
           return;
         }
+
+        // Para CMS, usar o valor já calculado do contexto
+        if (requiredRole === 'cms') {
+          if (!canAccessCMS) {
+            console.log('Usuário sem permissão CMS, redirecionando...');
+            if (mounted) {
+              router.push(redirectTo);
+            }
+            return;
+          }
+          if (mounted) {
+            setHasAccess(true);
+            setIsChecking(false);
+          }
+          return;
+        }
+
+        // Para outros roles, verificar dinamicamente (com cache)
+        try {
+          const access = await checkRoleAccess(requiredRole);
+          if (!access) {
+            console.log(`Usuário sem permissão ${requiredRole}, redirecionando...`);
+            if (mounted) {
+              router.push(redirectTo);
+            }
+            return;
+          }
+          if (mounted) {
+            setHasAccess(true);
+          }
+        } catch (error) {
+          console.error('Erro ao verificar acesso:', error);
+          if (mounted) {
+            router.push(redirectTo);
+          }
+          return;
+        }
+        
+        if (mounted) {
+          setIsChecking(false);
+        }
+      } finally {
+        checkingRef.current = false;
       }
     };
 
     handleAuthCheck();
-  }, [loading, isAuthenticated, canAccessCMS, requiredRole, router, redirectTo, checkRoleAccess]);
 
-  // Ainda carregando
-  if (loading) {
+    return () => {
+      mounted = false;
+    };
+  }, [loading, isAuthenticated, canAccessCMS]); // Dependências mínimas
+
+  // Estados de loading otimizados
+  if (loading || isChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <LoadingSpinner 
           size="lg" 
-          text="Verificando acesso..." 
+          text={loading ? "Verificando acesso..." : "Carregando..."} 
           className="text-center"
         />
       </div>
@@ -97,8 +145,8 @@ export default function AuthGuard({
     );
   }
 
-  // Usuário não autenticado ou sem permissão
-  if (!isAuthenticated || (requiredRole === 'cms' && !canAccessCMS)) {
+  // Verificação final de acesso
+  if (!hasAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center max-w-md mx-auto px-4">
