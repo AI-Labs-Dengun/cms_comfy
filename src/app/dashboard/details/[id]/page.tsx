@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
@@ -8,6 +8,7 @@ import { getPost, deletePost, togglePostPublication, updatePost, Post } from "@/
 import { getFileUrl, getSignedUrl } from "@/services/storage";
 import { useAuth } from "@/context/AuthContext";
 import { DeleteConfirmationModal, PublishToggleModal } from "@/components/modals";
+import Image from 'next/image';
 
 const emotionTags = [
   "Raiva",
@@ -260,14 +261,7 @@ export default function DetalhesConteudo() {
 
   const postId = params.id as string;
 
-  // Carregar post ao montar componente
-  useEffect(() => {
-    if (!authLoading && canAccessCMS && postId) {
-      loadPost();
-    }
-  }, [authLoading, canAccessCMS, postId]);
-
-  const loadPost = async () => {
+  const loadPost = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -291,7 +285,14 @@ export default function DetalhesConteudo() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [postId]);
+
+  // Carregar post ao montar componente
+  useEffect(() => {
+    if (!authLoading && canAccessCMS && postId) {
+      loadPost();
+    }
+  }, [authLoading, canAccessCMS, postId, loadPost]);
 
   // Função para carregar URL assinada do arquivo
   const loadFileUrl = async (filePath: string) => {
@@ -338,8 +339,6 @@ export default function DetalhesConteudo() {
       setDeleting(false);
     }
   };
-
-
 
   // Função para alternar publicação
   const handleTogglePublication = async () => {
@@ -483,8 +482,6 @@ export default function DetalhesConteudo() {
     if (post.file_path && post.file_type) {
       const fileType = post.file_type.toLowerCase();
       
-
-
       // Se ainda está carregando a URL do arquivo
       if (loadingFile) {
         return (
@@ -498,38 +495,38 @@ export default function DetalhesConteudo() {
         );
       }
 
-             // Se não conseguiu carregar a URL do arquivo
-       if (!fileUrl) {
-         return (
-           <div className="mb-6">
-             <div className="text-xs text-gray-500 font-bold mb-2">Arquivo não disponível para visualização</div>
-             <div className="border rounded-lg p-8 text-center text-gray-500">
-               <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-               </svg>
-               <p className="text-sm">Arquivo carregado mas não visualizável</p>
-               <p className="text-xs text-gray-400 mt-1">Arquivo: {post.file_name}</p>
-               <div className="mt-4 space-y-2">
-                 <button
-                   onClick={() => loadFileUrl(post.file_path!)}
-                   className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 mr-2"
-                 >
-                   Tentar carregar novamente
-                 </button>
-                 <button
-                   onClick={() => {
-                     const publicUrl = getFileUrl(post.file_path!);
-                     window.open(publicUrl, '_blank');
-                   }}
-                   className="bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-700"
-                 >
-                   Tentar URL pública
-                 </button>
-               </div>
-             </div>
-           </div>
-         );
-       }
+      // Se não conseguiu carregar a URL do arquivo
+      if (!fileUrl) {
+        return (
+          <div className="mb-6">
+            <div className="text-xs text-gray-500 font-bold mb-2">Arquivo não disponível para visualização</div>
+            <div className="border rounded-lg p-8 text-center text-gray-500">
+              <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-sm">Arquivo carregado mas não visualizável</p>
+              <p className="text-xs text-gray-400 mt-1">Arquivo: {post.file_name}</p>
+              <div className="mt-4 space-y-2">
+                <button
+                  onClick={() => loadFileUrl(post.file_path!)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 mr-2"
+                >
+                  Tentar carregar novamente
+                </button>
+                <button
+                  onClick={() => {
+                    const publicUrl = getFileUrl(post.file_path!);
+                    window.open(publicUrl, '_blank');
+                  }}
+                  className="bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-700"
+                >
+                  Tentar URL pública
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
 
       // Imagens
       if (fileType.startsWith('image/')) {
@@ -537,11 +534,13 @@ export default function DetalhesConteudo() {
           <div className="mb-6">
             <div className="text-xs text-gray-500 font-bold mb-2">Pré-visualização</div>
             <div className="border rounded-lg overflow-hidden">
-              <img 
+              <Image 
                 src={fileUrl} 
                 alt={post.title}
                 className="max-w-full h-auto max-h-96 object-contain mx-auto"
-                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                width={600}
+                height={400}
+                onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
                   // Mostrar informações de erro
@@ -559,7 +558,6 @@ export default function DetalhesConteudo() {
                     `;
                   }
                 }}
-                
               />
             </div>
           </div>
@@ -713,11 +711,13 @@ export default function DetalhesConteudo() {
           <div className="mb-6">
             <div className="text-xs text-gray-500 font-bold mb-2">Imagem Externa</div>
             <div className="border rounded-lg overflow-hidden">
-              <img 
+              <Image 
                 src={url} 
                 alt={post.title}
                 className="max-w-full h-auto max-h-96 object-contain mx-auto"
-                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                width={600}
+                height={400}
+                onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
                 }}
@@ -1193,8 +1193,6 @@ export default function DetalhesConteudo() {
                   )}
                 </>
               )}
-
-
 
               {/* Informação sobre Storage */}
               {post.file_path && !fileUrl && !loadingFile && (

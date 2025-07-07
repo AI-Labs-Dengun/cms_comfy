@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 interface EnvironmentStatus {
   supabaseUrl: boolean;
@@ -39,7 +40,7 @@ export default function EnvironmentCheck({ children }: { children: React.ReactNo
       <div className="min-h-screen flex items-center justify-center bg-white p-8">
         <div className="max-w-md w-full text-center">
           <div className="mb-6">
-            <img src="/cms-logo.png" alt="Comfy CMS" className="w-20 h-auto mx-auto mb-4" />
+            <Image src="/cms-logo.png" alt="Comfy CMS" className="w-20 h-auto mx-auto mb-4" width={80} height={80} />
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Configuração Necessária</h1>
             <p className="text-gray-600">As variáveis de ambiente do Supabase não estão configuradas</p>
           </div>

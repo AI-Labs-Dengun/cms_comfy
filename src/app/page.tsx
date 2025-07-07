@@ -83,7 +83,7 @@ export default function Home() {
     } else {
       console.log('❌ HomePage - Condições não atendidas, não redirecionando');
     }
-  }, [mounted, loading, isAuthenticated, canAccessCMS, router]);
+  }, [mounted, loading, isAuthenticated, canAccessCMS, user, profile, authInfo, router]);
 
   // Reset do flag quando o usuário sair
   useEffect(() => {

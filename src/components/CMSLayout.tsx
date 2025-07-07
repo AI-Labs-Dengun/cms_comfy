@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, ArrowRight, LogOut, User } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
+import Image from 'next/image';
 
 interface CMSLayoutProps {
   children: React.ReactNode;
@@ -40,7 +41,7 @@ export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
           {/* Sidebar */}
           <aside className="w-64 bg-white border-r flex flex-col py-8 px-6 min-h-full shadow-2xl z-10" style={{ boxShadow: '12px 0 40px 0 rgba(0,0,0,0.18)' }}>
             <div className="mb-12 flex flex-col items-center justify-center">
-              <img src="/cms-logo.png" alt="Comfy Content Hub Logo" className="mb-2 w-28 h-auto" />
+              <Image src="/cms-logo.png" alt="Comfy Content Hub Logo" className="mb-2 w-28 h-auto" width={112} height={48} />
               <div className="text-xs text-gray-500 font-medium">Sistema de Administração</div>
             </div>
             

@@ -37,9 +37,6 @@ const CACHE_KEYS = {
   LAST_CHECK: 'cms_last_auth_check'
 };
 
-// Cache duration - mais curto para melhor responsividade
-const CACHE_DURATION = 30 * 1000; // 30 seconds apenas
-
 interface CachedAuthData {
   user: User | null;
   profile: UserProfile | null;
@@ -57,34 +54,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Usar useRef para evitar re-renders desnecessários
   const initializingRef = useRef(false);
   const initializedRef = useRef(false);
-
-  // Função para verificar se o cache é válido
-  const isCacheValid = useCallback((): boolean => {
-    const lastCheck = localStorage.getItem(CACHE_KEYS.LAST_CHECK);
-    if (!lastCheck) return false;
-    
-    const timeDiff = Date.now() - parseInt(lastCheck);
-    return timeDiff < CACHE_DURATION;
-  }, []);
-
-  // Função para carregar dados do cache
-  const loadFromCache = useCallback((): CachedAuthData | null => {
-    try {
-      if (!isCacheValid()) {
-        console.log('📦 AuthContext - Cache expirado, ignorando...');
-        return null;
-      }
-      
-      const cachedData = localStorage.getItem(CACHE_KEYS.AUTH_DATA);
-      if (!cachedData) return null;
-      
-      console.log('📦 AuthContext - Carregando dados do cache...');
-      return JSON.parse(cachedData);
-    } catch (error) {
-      console.error('❌ AuthContext - Erro ao carregar cache:', error);
-      return null;
-    }
-  }, [isCacheValid]);
 
   // Função para salvar no cache
   const saveToCache = useCallback((data: CachedAuthData) => {
@@ -347,7 +316,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []); // Dependências vazias para executar apenas uma vez
+  }, [clearCache, refreshAuth]); // Incluir dependências necessárias
 
   // UseRef para controlar logs sem causar re-renders
   const lastLogKeyRef = useRef<string>('');

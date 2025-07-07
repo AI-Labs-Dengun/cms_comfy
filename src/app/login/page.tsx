@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AuthService } from "@/services/auth";
 import { useAuth } from "@/context/AuthContext";
+import Image from 'next/image';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -120,7 +121,7 @@ export default function LoginPage() {
         redirectTimer.current = null;
       }
     };
-  }, [authLoading, isAuthenticated, canAccessCMS]); // Dependências mínimas
+  }, [authLoading, isAuthenticated, canAccessCMS, user, profile, authInfo, redirecting, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,7 +246,7 @@ export default function LoginPage() {
         className="w-full max-w-md flex flex-col items-center"
       >
         <div className="mb-8 flex flex-col items-center">
-          <img src="/cms-logo.png" alt="Comfy Content Hub Logo" className="mb-2 w-28 h-auto mx-auto" />
+          <Image src="/cms-logo.png" alt="Comfy Content Hub Logo" className="mb-2 w-28 h-auto mx-auto" width={112} height={48} />
         </div>
         <div className="mb-6 text-center text-sm text-gray-900">
           Inicie sessão para acessar o CMS
