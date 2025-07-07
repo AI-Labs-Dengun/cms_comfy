@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import { getUserPosts, togglePostPublication, deletePost, Post } from "@/services/posts";
@@ -180,7 +180,7 @@ export default function Management() {
   }, [posts]);
 
   // Função para ordenar posts
-  const sortPosts = (postsToSort: Post[]) => {
+  const sortPosts = useCallback((postsToSort: Post[]) => {
     return [...postsToSort].sort((a, b) => {
       let aValue: string | Date | boolean;
       let bValue: string | Date | boolean;
@@ -222,10 +222,10 @@ export default function Management() {
       }
       return 0;
     });
-  };
+  }, [sortState]);
 
   // Função para agrupar posts por tag
-  const groupPostsByTag = (postsToGroup: Post[]) => {
+  const groupPostsByTag = useCallback((postsToGroup: Post[]) => {
     if (!groupByTag) return { "Todos os Posts": postsToGroup };
 
     const grouped: GroupedPosts = {};
@@ -252,7 +252,7 @@ export default function Management() {
     });
 
     return grouped;
-  };
+  }, [groupByTag]);
 
   // Função para filtrar posts
   const filteredPosts = useMemo(() => {
@@ -305,7 +305,7 @@ export default function Management() {
   const processedPosts = useMemo(() => {
     const sorted = sortPosts(filteredPosts);
     return showGroupedView ? groupPostsByTag(sorted) : { "Todos os Posts": sorted };
-  }, [filteredPosts, sortState, groupByTag, showGroupedView]);
+  }, [filteredPosts, showGroupedView, sortPosts, groupPostsByTag]);
 
   // Função para alternar ordenação
   const toggleSort = (field: SortField) => {
@@ -418,6 +418,18 @@ export default function Management() {
   // Função para confirmar exclusão
   const handleConfirmDelete = async () => {
     if (!deleteModal.postId) return;
+
+    // Verificar se o post está publicado
+    const postToDelete = posts.find(p => p.id === deleteModal.postId);
+    if (postToDelete?.is_published) {
+      showNotification(
+        "error", 
+        "Eliminação Bloqueada", 
+        "Este post está publicado. Despublique-o primeiro antes de eliminá-lo."
+      );
+      closeDeleteModal();
+      return;
+    }
 
     setDeleteModal(prev => ({ ...prev, isLoading: true }));
 
@@ -725,6 +737,21 @@ export default function Management() {
                     </span>
                   )}
                 </div>
+                
+                {/* Aviso sobre posts publicados */}
+                {filteredPosts.some(post => post.is_published) && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-sm text-blue-800">
+                        <strong>ℹ️ Informação:</strong> Posts publicados não podem ser eliminados diretamente. 
+                        Despublique primeiro para poder eliminá-los.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Filtros ativos */}
                 {hasActiveFilters() && (
@@ -1099,9 +1126,18 @@ export default function Management() {
                                       )}
                                     </button>
                                       <button
-                                        onClick={() => openDeleteModal(post.id, post.title)}
-                                        className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center gap-1"
-                                        title="Eliminar post"
+                                        onClick={() => post.is_published ? null : openDeleteModal(post.id, post.title)}
+                                        disabled={post.is_published}
+                                        className={`text-sm font-medium flex items-center gap-1 transition-colors ${
+                                          post.is_published 
+                                            ? 'text-gray-400 cursor-not-allowed opacity-50' 
+                                            : 'text-red-600 hover:text-red-800 cursor-pointer'
+                                        }`}
+                                        title={
+                                          post.is_published 
+                                            ? "Para eliminar este post, despublique-o primeiro" 
+                                            : "Eliminar post"
+                                        }
                                       >
                                         <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
                                           <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/>
@@ -1131,7 +1167,11 @@ export default function Management() {
         onClose={closeDeleteModal}
         onConfirm={handleConfirmDelete}
         title="Confirmar Exclusão"
-        message={`Tem certeza que deseja eliminar o post "${deleteModal.postTitle}"?`}
+        message={
+          posts.find(p => p.id === deleteModal.postId)?.is_published 
+            ? `Atenção: O post &quot;${deleteModal.postTitle}&quot; está publicado e não pode ser eliminado. Despublique-o primeiro.`
+            : `Tem certeza que deseja eliminar o post &quot;${deleteModal.postTitle}&quot;? Esta ação não pode ser desfeita.`
+        }
         isLoading={deleteModal.isLoading}
       />
 
