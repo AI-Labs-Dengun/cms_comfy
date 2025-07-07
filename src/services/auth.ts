@@ -1,5 +1,11 @@
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { supabase, supabaseAdmin, getCachedQuery, setCachedQuery } from '@/lib/supabase';
 import { AuthResponse } from '@/types/auth';
+
+interface CachedUser {
+  id: string;
+  email: string;
+  [key: string]: unknown;
+}
 
 export class AuthService {
   /**
@@ -57,9 +63,17 @@ export class AuthService {
 
   /**
    * Verifica se um usuário pode fazer login com o role específico
-   * Usa a função can_user_login_with_role do banco de dados
+   * Usa cache para evitar múltiplas consultas
    */
   static async canUserLoginWithRole(email: string, requiredRole: 'cms' | 'app'): Promise<AuthResponse> {
+    const cacheKey = `role_check_${email}_${requiredRole}`;
+    
+    // Tentar cache primeiro
+    const cached = getCachedQuery(cacheKey);
+    if (cached && typeof cached === 'object' && cached !== null && 'success' in cached) {
+      return cached as AuthResponse;
+    }
+
     try {
       const { data, error } = await supabase.rpc('can_user_login_with_role', {
         user_email: email,
@@ -67,14 +81,22 @@ export class AuthService {
       });
 
       if (error) {
-        return {
+        const response = {
           success: false,
           error: 'Erro na verificação de permissões',
           code: 'PERMISSION_CHECK_ERROR'
         };
+        return response;
       }
 
-      return data as AuthResponse;
+      const response = data as AuthResponse;
+      
+      // Cachear apenas respostas de sucesso
+      if (response.success) {
+        setCachedQuery(cacheKey, response);
+      }
+      
+      return response;
 
     } catch {
       return {
@@ -93,20 +115,32 @@ export class AuthService {
   }
 
   /**
-   * Verifica se há um usuário logado
+   * Verifica se há um usuário logado (com cache)
    */
   static async getUser() {
+    const cacheKey = 'current_user';
+    const cached = getCachedQuery(cacheKey);
+    
+    if (cached && typeof cached === 'object' && cached !== null && 'id' in cached) {
+      return cached as CachedUser;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
+    
+    if (user) {
+      setCachedQuery(cacheKey, user);
+    }
+    
     return user;
   }
 
   /**
-   * Verifica se o usuário atual tem acesso ao CMS
+   * Verifica se o usuário atual tem acesso ao CMS (otimizado)
    */
   static async checkCMSAccess(): Promise<AuthResponse> {
     const user = await this.getUser();
     
-    if (!user?.email) {
+    if (!user || typeof user !== 'object' || !('email' in user) || !user.email) {
       return {
         success: false,
         error: 'Usuário não autenticado',
@@ -114,14 +148,27 @@ export class AuthService {
       };
     }
 
-    return await this.canUserLoginWithRole(user.email, 'cms');
+    return await this.canUserLoginWithRole(user.email as string, 'cms');
   }
 
   /**
-   * Obter sessão atual
+   * Obter sessão atual (com cache leve)
    */
   static async getSession() {
+    const cacheKey = 'current_session';
+    const cached = getCachedQuery(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
+      // Cache por apenas 1 minuto para sessões
+      setCachedQuery(cacheKey, session);
+    }
+    
     return session;
   }
 
