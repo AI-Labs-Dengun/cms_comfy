@@ -122,7 +122,7 @@ export async function uploadFile(file: File): Promise<UploadResult> {
     const filePath = `${user.id}/${fileName}`
 
     // Fazer upload
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from(BUCKET_NAME)
       .upload(filePath, file, {
         cacheControl: '3600',

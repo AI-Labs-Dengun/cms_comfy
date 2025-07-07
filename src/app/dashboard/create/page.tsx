@@ -6,7 +6,7 @@ import CMSLayout from "@/components/CMSLayout";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { createPost, CreatePostData, uploadFileForPost } from "@/services/posts";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 
 const emotionTags = [
   "Raiva",
@@ -359,10 +359,18 @@ export default function CreateContent() {
         setFile(null);
         setTagInput("");
 
-        // Redirecionar para página de gestão após 2 segundos
-        setTimeout(() => {
-          router.push("/dashboard/management");
-        }, 2000);
+        // Redirecionar para página de detalhes do post criado após 2 segundos
+        if (result.data?.id) {
+          const postId = result.data.id;
+          setTimeout(() => {
+            router.push(`/dashboard/details/${postId}`);
+          }, 2000);
+        } else {
+          // Fallback para página de gestão se não conseguir obter o ID
+          setTimeout(() => {
+            router.push("/dashboard/management");
+          }, 2000);
+        }
       } else {
         setError(result.error || "Erro desconhecido ao criar post");
       }

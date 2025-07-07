@@ -6,7 +6,7 @@ import CMSLayout from "@/components/CMSLayout";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { getPost, deletePost, togglePostPublication, updatePost, Post } from "@/services/posts";
 import { getFileUrl, getSignedUrl } from "@/services/storage";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 import { DeleteConfirmationModal, PublishToggleModal } from "@/components/modals";
 
 const emotionTags = [

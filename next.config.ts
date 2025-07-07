@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  experimental: {
+    optimizePackageImports: ['@supabase/supabase-js', '@supabase/auth-helpers-nextjs']
+  },
   async redirects() {
     return [
       {
@@ -17,6 +20,24 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Otimizações para melhorar performance
+  compress: true,
+  poweredByHeader: false,
+  generateEtags: false,
+  // Configurações para resolver problemas de fontes
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on'
+          }
+        ]
+      }
+    ]
+  }
 };
 
 export default nextConfig;

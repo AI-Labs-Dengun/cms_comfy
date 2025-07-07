@@ -12,7 +12,7 @@ export async function middleware(req: NextRequest) {
 
   // Proteger rotas do dashboard
   if (pathname.startsWith('/dashboard')) {
-    // Verificar se há cookies de autenticação primeiro
+    // Verificação rápida de cookies de autenticação primeiro
     const cookies = req.cookies.toString();
     const hasAuthCookie = cookies.includes('sb-') || cookies.includes('supabase');
     
@@ -22,66 +22,44 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(redirectUrl)
     }
     
-    let session;
+    // Verificação simples de sessão (sem verificação de role)
+    // O AuthGuard fará a verificação completa de permissões usando cache
     try {
       const {
-        data: { session: sessionData },
+        data: { session },
         error: sessionError
       } = await supabase.auth.getSession()
 
-      session = sessionData;
+      // Se não há sessão válida, redirecionar para login
+      if (sessionError || !session) {
+        const redirectUrl = req.nextUrl.clone()
+        redirectUrl.pathname = '/login'
+        return NextResponse.redirect(redirectUrl)
+      }
+
+      // Não fazer verificação de role aqui - deixar para o AuthGuard
+      // que usa cache e é mais eficiente
       
-      if (sessionError) {
-        const redirectUrl = req.nextUrl.clone()
-        redirectUrl.pathname = '/login'
-        return NextResponse.redirect(redirectUrl)
-      }
-
-      // Se não há sessão, redirecionar para login
-      if (!session) {
-        const redirectUrl = req.nextUrl.clone()
-        redirectUrl.pathname = '/login'
-        return NextResponse.redirect(redirectUrl)
-      }
     } catch {
-      const redirectUrl = req.nextUrl.clone()
-      redirectUrl.pathname = '/login'
-      return NextResponse.redirect(redirectUrl)
-    }
-
-    // Verificação adicional de role usando a função do banco
-    // Apenas se a sessão existe e tem email
-    if (session?.user?.email) {
-      try {
-        const { data: roleCheck } = await supabase.rpc('can_user_login_with_role', {
-          user_email: session.user.email,
-          required_role: 'cms'
-        })
-
-        // Se o usuário não tem acesso CMS, fazer logout e redirecionar
-        if (!roleCheck?.success) {
-          await supabase.auth.signOut()
-          const redirectUrl = req.nextUrl.clone()
-          redirectUrl.pathname = '/login'
-          return NextResponse.redirect(redirectUrl)
-        }
-              } catch {
-          // Em caso de erro, permitir acesso e deixar o AuthGuard fazer a verificação
-          // Isso evita loops de redirecionamento
-        }
+      // Em caso de erro de rede, permitir acesso e deixar o AuthGuard lidar
+      // Isso evita loops de redirecionamento em problemas de conectividade
     }
   }
 
   // Redirecionar usuários logados que tentam acessar a página de login ou signup
   if (pathname === '/login' || pathname === '/signup') {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
 
-    if (session) {
-      const redirectUrl = req.nextUrl.clone()
-      redirectUrl.pathname = '/dashboard/create'
-      return NextResponse.redirect(redirectUrl)
+      if (session) {
+        const redirectUrl = req.nextUrl.clone()
+        redirectUrl.pathname = '/dashboard/create'
+        return NextResponse.redirect(redirectUrl)
+      }
+    } catch {
+      // Em caso de erro, permitir acesso às páginas de login/signup
     }
   }
 

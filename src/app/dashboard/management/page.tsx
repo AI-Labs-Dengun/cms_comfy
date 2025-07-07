@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import { getUserPosts, togglePostPublication, deletePost, Post } from "@/services/posts";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 import { DeleteConfirmationModal, PublishToggleModal, NotificationModal } from "@/components/modals";
 
 export default function Management() {

@@ -1,5 +1,5 @@
-import { supabase, supabaseAdmin } from '@/lib/supabase'
-import { uploadFile, UploadResult } from './storage'
+import { supabase } from '@/lib/supabase'
+import { uploadFile } from './storage'
 
 // Tipos para os posts
 export interface CreatePostData {
@@ -37,7 +37,7 @@ export interface Post {
   published_at?: string
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean
   message?: string
   error?: string
@@ -108,7 +108,6 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       message: 'Post criado com sucesso!',
       data: {
         id: data.post_id,
-        title: postData.title,
         ...postData
       } as Post
     }
