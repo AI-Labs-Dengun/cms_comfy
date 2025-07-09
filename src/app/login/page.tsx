@@ -9,13 +9,13 @@ import Image from 'next/image';
 export default function LoginPage() {
   const router = useRouter();
   const { 
+    refreshAuth, 
     loading: authLoading, 
     isAuthenticated, 
     canAccessCMS, 
     user, 
     profile,
-    authInfo,
-    refreshAuth
+    authInfo 
   } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -44,16 +44,22 @@ export default function LoginPage() {
       timestamp: new Date().toISOString()
     });
 
-    // Se está carregando, aguardar
+    // Se está carregando, resetar o flag de redirecionamento e não fazer nada
     if (authLoading) {
-      console.log('⏳ LoginPage - Ainda carregando, aguardando...');
+      console.log('⏳ LoginPage - Ainda carregando, resetando flag e aguardando...');
+      hasTriedRedirect.current = false;
       return;
     }
 
-    // Verificação simplificada - apenas verificar se está autenticado e tem acesso CMS
+    // Verificações rigorosas antes de redirecionar
     const shouldRedirect = !authLoading && 
                           isAuthenticated && 
                           canAccessCMS && 
+                          user && 
+                          profile && 
+                          profile.user_role === 'cms' && 
+                          profile.authorized === true &&
+                          authInfo?.success === true &&
                           !hasTriedRedirect.current && 
                           !redirecting;
 
@@ -63,37 +69,46 @@ export default function LoginPage() {
         notLoading: !authLoading,
         isAuthenticated,
         canAccessCMS,
+        hasUser: !!user,
+        hasProfile: !!profile,
+        isCMSUser: profile?.user_role === 'cms',
+        isAuthorized: profile?.authorized === true,
+        authSuccess: authInfo?.success === true,
         notTriedYet: !hasTriedRedirect.current,
         notRedirecting: !redirecting
       }
     });
 
-    // Se está autenticado e tem acesso CMS, redirecionar
+    // Se já está autenticado e tem acesso CMS, e ainda não tentou redirecionar
     if (shouldRedirect) {
-      console.log('✅ LoginPage - Condições atendidas, redirecionando...');
+      console.log('✅ LoginPage - TODAS as condições atendidas, redirecionando...');
       
       hasTriedRedirect.current = true;
       setRedirecting(true);
-      setSuccessMessage('Redirecionando...');
+      setSuccessMessage('Já autenticado! Aguardando sincronização...');
       
       // Limpar timer anterior se existir
       if (redirectTimer.current) {
         clearTimeout(redirectTimer.current);
       }
       
-      // Redirecionamento mais direto
+      // Delay maior para permitir sincronização entre middleware e React Context
       redirectTimer.current = setTimeout(() => {
-        console.log('🔄 LoginPage - Executando redirecionamento...');
-        router.replace('/');
+        console.log('🔄 LoginPage - Executando redirecionamento após sincronização...');
+        setSuccessMessage('Redirecionando para dashboard...');
         
-        // Fallback de segurança após 2 segundos
         setTimeout(() => {
-          if (window.location.pathname === '/login') {
-            console.log('🔄 LoginPage - Fallback: usando window.location...');
-            window.location.href = '/';
-          }
-        }, 2000);
-      }, 500);
+          router.replace('/dashboard/create');
+          
+          // Fallback de segurança
+          setTimeout(() => {
+            if (window.location.pathname === '/login') {
+              console.log('🔄 LoginPage - Fallback: usando window.location...');
+              window.location.href = '/dashboard/create';
+            }
+          }, 1000);
+        }, 500);
+      }, 1500); // Aumentado de 200ms para 1500ms
       
     } else {
       console.log('❌ LoginPage - Condições não atendidas, não redirecionando');
@@ -106,7 +121,7 @@ export default function LoginPage() {
         redirectTimer.current = null;
       }
     };
-  }, [authLoading, isAuthenticated, canAccessCMS, redirecting, router]);
+  }, [authLoading, isAuthenticated, canAccessCMS, user, profile, authInfo, redirecting, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,42 +147,28 @@ export default function LoginPage() {
         
         console.log('✅ LoginPage - Login bem-sucedido, atualizando contexto...');
         
+        // Aguardar processamento do Supabase Auth
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         // Forçar atualização do contexto de autenticação
-        try {
-          await refreshAuth();
-          console.log('✅ LoginPage - Contexto atualizado com sucesso');
-        } catch (error) {
-          console.error('❌ LoginPage - Erro ao atualizar contexto:', error);
-        }
+        console.log('🔄 LoginPage - Chamando refreshAuth...');
+        await refreshAuth();
         
-        setSuccessMessage('Redirecionando...');
+        setSuccessMessage('Sessão atualizada! Redirecionando...');
+        console.log('🔄 LoginPage - Preparando redirecionamento...');
         
-        // Redirecionamento com múltiplas tentativas
-        const redirectToHome = () => {
-          console.log('🔄 LoginPage - Tentando redirecionamento...');
-          
-          // Tentativa 1: router.replace
-          router.replace('/');
-          
-          // Tentativa 2: window.location após 1 segundo
-          setTimeout(() => {
-            if (window.location.pathname === '/login') {
-              console.log('🔄 LoginPage - Fallback 1: usando window.location...');
-              window.location.href = '/';
-            }
-          }, 1000);
-          
-          // Tentativa 3: window.location.replace após 2 segundos
-          setTimeout(() => {
-            if (window.location.pathname === '/login') {
-              console.log('🔄 LoginPage - Fallback 2: usando window.location.replace...');
-              window.location.replace('/');
-            }
-          }, 2000);
-        };
+        // Aguardar um pouco mais para sincronização e deixar o useEffect detectar
+        await new Promise(resolve => setTimeout(resolve, 300));
         
-        // Executar redirecionamento após 500ms
-        setTimeout(redirectToHome, 500);
+        // Se por algum motivo o useEffect não detectou, fazer redirecionamento manual
+        setTimeout(() => {
+          if (!hasTriedRedirect.current) {
+            console.log('🔄 LoginPage - Fallback manual: forçando redirecionamento...');
+            hasTriedRedirect.current = true;
+            setRedirecting(true);
+            router.replace('/dashboard/create');
+          }
+        }, 1000);
         
       } else {
         // LOGIN FALHOU - Mostrar erro específico baseado no código
@@ -259,28 +260,12 @@ export default function LoginPage() {
               Comfy CMS
             </h1>
           </div>
-{/* Subtitle */}
-<div className="mb-6 text-center">
-  <p className="text-sm sm:text-base text-gray-600">
-    Inicie sessão para acessar o CMS
-  </p>
-</div>
 
-{/* Success Message */}
-{successMessage && (
-  <div className="w-full mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
-    <p className="text-green-700 text-sm">{successMessage}</p>
-    {successMessage.includes('Redirecionando') && (
-      <button
-        type="button"
-        onClick={() => window.location.href = '/'}
-        className="mt-2 w-full bg-green-600 text-white py-2 rounded font-medium hover:bg-green-700 transition-colors"
-      >
-        Clique aqui se não foi redirecionado automaticamente
-      </button>
-    )}
-  </div>
-)}
+          {/* Subtitle */}
+          <div className="mb-6 text-center">
+            <p className="text-sm sm:text-base text-gray-600">
+              Inicie sessão para acessar o CMS
+            </p>
           </div>
           
           {/* Error Message */}
