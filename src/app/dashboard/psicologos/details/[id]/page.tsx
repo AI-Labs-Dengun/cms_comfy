@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Pencil, Eye } from "lucide-react";
 
 // Mock de dados
@@ -18,9 +18,10 @@ function formatDate(dateStr: string) {
 }
 
 export default function PsicologoDetailsPage() {
-  const params = useParams();
   const router = useRouter();
-  // Aqui você buscaria o psicólogo pelo params.id
+  // TODO: Implementar busca do psicólogo pelo id quando conectar com backend
+  // const { id } = useParams();
+  // const psicologo = await buscarPsicologoPorId(id);
   const [nome, setNome] = useState(MOCK_PSICOLOGO.nome);
   const [email, setEmail] = useState(MOCK_PSICOLOGO.email);
   const [passwordVisible, setPasswordVisible] = useState(false);

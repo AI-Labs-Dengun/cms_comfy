@@ -5,7 +5,15 @@ import { useRouter } from 'next/navigation';
 
 const STORAGE_KEY = "psicologos";
 
-function getPsicologos() {
+interface Psicologo {
+  id: string;
+  nome: string;
+  email: string;
+  dataRegisto: string;
+  password: string;
+}
+
+function getPsicologos(): Psicologo[] {
   if (typeof window === "undefined") return [];
   const data = localStorage.getItem(STORAGE_KEY);
   return data ? JSON.parse(data) : [];
@@ -13,7 +21,7 @@ function getPsicologos() {
 
 export default function GerirPsicologosPage() {
   const [search, setSearch] = useState("");
-  const [psicologos, setPsicologos] = useState<any[]>([]);
+  const [psicologos, setPsicologos] = useState<Psicologo[]>([]);
   const router = useRouter();
 
   useEffect(() => {

@@ -5,7 +5,15 @@ import { useRouter } from 'next/navigation';
 
 const STORAGE_KEY = "psicologos";
 
-function savePsicologo(psicologo: any) {
+interface Psicologo {
+  id: string;
+  nome: string;
+  email: string;
+  dataRegisto: string;
+  password: string;
+}
+
+function savePsicologo(psicologo: Psicologo) {
   if (typeof window === "undefined") return;
   const data = localStorage.getItem(STORAGE_KEY);
   const arr = data ? JSON.parse(data) : [];
@@ -37,7 +45,7 @@ const CreatePsicologoPage = () => {
     }
     setLoading(true);
     try {
-      const novoPsicologo = {
+      const novoPsicologo: Psicologo = {
         id: Date.now().toString(),
         nome,
         email,
@@ -49,7 +57,7 @@ const CreatePsicologoPage = () => {
       setTimeout(() => {
         router.push('/dashboard/psicologos');
       }, 800);
-    } catch (err) {
+    } catch {
       setError('Erro ao criar perfil.');
     } finally {
       setLoading(false);
