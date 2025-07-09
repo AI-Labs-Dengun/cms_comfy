@@ -2,14 +2,14 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, ArrowRight, LogOut, User, Menu, X } from 'lucide-react';
+import { Plus, ArrowRight, LogOut, User, Users, PlusCircle, Menu, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
 import Image from 'next/image';
 
 interface CMSLayoutProps {
   children: React.ReactNode;
-  currentPage?: 'create' | 'management';
+  currentPage?: 'create' | 'management' | 'psicologos-create' | 'psicologos';
 }
 
 export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
@@ -134,6 +134,30 @@ export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
             >
               <ArrowRight className="w-4 h-4" />
               <span className="text-sm lg:text-base">Gerir Conteúdo</span>
+            </button>
+            {/* Novo Psicólogo */}
+            <button
+              className={`flex items-center gap-2 px-3 py-3 rounded-lg font-medium cursor-pointer transition-colors ${
+                currentPage === 'psicologos-create'
+                  ? 'bg-black text-white'
+                  : 'text-gray-900 hover:bg-gray-100'
+              }`}
+              onClick={() => handleNavigation('/dashboard/psicologos/create')}
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span className="text-sm lg:text-base">Novo Psicólogo</span>
+            </button>
+            {/* Gerir Psicólogos */}
+            <button
+              className={`flex items-center gap-2 px-3 py-3 rounded-lg font-medium cursor-pointer transition-colors ${
+                currentPage === 'psicologos'
+                  ? 'bg-black text-white'
+                  : 'text-gray-900 hover:bg-gray-100'
+              }`}
+              onClick={() => handleNavigation('/dashboard/psicologos')}
+            >
+              <Users className="w-4 h-4" />
+              <span className="text-sm lg:text-base">Gerir Psicólogos</span>
             </button>
           </nav>
 
