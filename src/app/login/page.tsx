@@ -217,10 +217,10 @@ export default function LoginPage() {
   // Se está carregando inicialmente
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mb-4"></div>
-          <p className="text-gray-600">Verificando autenticação...</p>
+          <p className="text-gray-600 text-center">Verificando autenticação...</p>
         </div>
       </div>
     );
@@ -229,94 +229,121 @@ export default function LoginPage() {
   // Se está redirecionando
   if (redirecting) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mb-4"></div>
-          <p className="text-gray-600">Acesso autorizado! Redirecionando...</p>
-          <p className="text-sm text-gray-400 mt-2">Bem-vindo, {profile?.name || user?.email}</p>
+          <p className="text-gray-600 text-center">Acesso autorizado! Redirecionando...</p>
+          <p className="text-sm text-gray-400 mt-2 text-center">Bem-vindo, {profile?.name || user?.email}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md flex flex-col items-center"
-      >
-        <div className="mb-8 flex flex-col items-center">
-          <Image src="/cms-logo.png" alt="Comfy Content Hub Logo" className="mb-2 w-28 h-auto mx-auto" width={112} height={48} />
-        </div>
-        <div className="mb-6 text-center text-sm text-gray-900">
-          Inicie sessão para acessar o CMS
-        </div>
-        
-        {error && (
-          <div className="w-full mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-red-700 text-sm">{error}</p>
-          </div>
-        )}
-        
-        {successMessage && (
-          <div className="w-full mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
-            <p className="text-green-700 text-sm">{successMessage}</p>
-          </div>
-        )}
-        
-        <div className="w-full mb-4">
-          <label className="block text-sm mb-1 text-gray-900" htmlFor="email">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            placeholder="Introduza o seu email"
-            className="w-full border border-gray-400 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-            disabled={isLoading}
-          />
-        </div>
-        <div className="w-full mb-6">
-          <label className="block text-sm mb-1 text-gray-900" htmlFor="password">
-            Palavra-passe
-          </label>
-          <input
-            id="password"
-            type="password"
-            placeholder="Introduza a sua palavra-passe"
-            className="w-full border border-gray-400 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-            disabled={isLoading}
-          />
-        </div>
-        <button
-          type="submit"
-          className="w-full bg-black text-white py-2 rounded font-medium hover:bg-gray-900 transition-colors disabled:opacity-60 cursor-pointer"
-          disabled={isLoading}
+    <div className="min-h-screen flex items-center justify-center bg-white px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-sm sm:max-w-md lg:max-w-lg">
+        <form
+          onSubmit={handleSubmit}
+          className="w-full flex flex-col items-center"
         >
-          {isLoading ? "A iniciar sessão..." : "Iniciar Sessão"}
-        </button>
-        
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500 mb-4">
-            Apenas utilizadores com role &quot;CMS&quot; podem acessar este sistema
-          </p>
-          <p className="text-sm text-gray-600">
-            Não tem uma conta?{' '}
-            <a
-              href="/signup"
-              className="font-medium text-indigo-600 hover:text-indigo-500"
-            >
-              Criar conta CMS
-            </a>
-          </p>
-        </div>
-      </form>
+          {/* Logo Section */}
+          <div className="mb-6 sm:mb-8 flex flex-col items-center">
+            <Image 
+              src="/cms-logo.png" 
+              alt="Comfy Content Hub Logo" 
+              className="mb-3 w-20 h-auto sm:w-24 lg:w-28 mx-auto" 
+              width={112} 
+              height={48} 
+              priority
+            />
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 text-center">
+              Comfy CMS
+            </h1>
+          </div>
+
+          {/* Subtitle */}
+          <div className="mb-6 text-center">
+            <p className="text-sm sm:text-base text-gray-600">
+              Inicie sessão para acessar o CMS
+            </p>
+          </div>
+          
+          {/* Error Message */}
+          {error && (
+            <div className="w-full mb-4 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-700 text-sm sm:text-base">{error}</p>
+            </div>
+          )}
+          
+          {/* Success Message */}
+          {successMessage && (
+            <div className="w-full mb-4 p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-green-700 text-sm sm:text-base">{successMessage}</p>
+            </div>
+          )}
+          
+          {/* Email Field */}
+          <div className="w-full mb-4">
+            <label className="block text-sm sm:text-base font-medium mb-2 text-gray-900" htmlFor="email">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              placeholder="Introduza o seu email"
+              className="w-full border border-gray-300 rounded-lg px-3 py-3 sm:py-3.5 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent text-gray-900 text-base transition-colors"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+              disabled={isLoading}
+              autoComplete="email"
+            />
+          </div>
+
+          {/* Password Field */}
+          <div className="w-full mb-6">
+            <label className="block text-sm sm:text-base font-medium mb-2 text-gray-900" htmlFor="password">
+              Palavra-passe
+            </label>
+            <input
+              id="password"
+              type="password"
+              placeholder="Introduza a sua palavra-passe"
+              className="w-full border border-gray-300 rounded-lg px-3 py-3 sm:py-3.5 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent text-gray-900 text-base transition-colors"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              disabled={isLoading}
+              autoComplete="current-password"
+            />
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            className="w-full bg-black text-white py-3 sm:py-3.5 rounded-lg font-medium hover:bg-gray-900 transition-colors disabled:opacity-60 disabled:cursor-not-allowed text-base sm:text-lg"
+            disabled={isLoading}
+          >
+            {isLoading ? "A iniciar sessão..." : "Iniciar Sessão"}
+          </button>
+          
+          {/* Footer Links */}
+          <div className="mt-6 sm:mt-8 text-center w-full">
+            <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4 px-4">
+              Apenas utilizadores com role &quot;CMS&quot; podem acessar este sistema
+            </p>
+            <p className="text-sm sm:text-base text-gray-600">
+              Não tem uma conta?{' '}
+              <a
+                href="/signup"
+                className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
+              >
+                Criar conta CMS
+              </a>
+            </p>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
