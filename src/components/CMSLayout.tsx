@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, ArrowRight, LogOut, User } from 'lucide-react';
+import { Plus, ArrowRight, LogOut, User, Menu, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
 import Image from 'next/image';
@@ -15,6 +15,7 @@ interface CMSLayoutProps {
 export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
   const router = useRouter();
   const { signOut, user, profile } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -34,60 +35,131 @@ export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
     }
   };
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleNavigation = (path: string) => {
+    router.push(path);
+    closeMobileMenu();
+  };
+
   return (
     <AuthGuard requiredRole="cms">
-      <div className="h-screen bg-white flex">
+      <div className="h-screen bg-white flex flex-col lg:flex-row">
+        {/* Mobile Header */}
+        <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center">
+            <Image 
+              src="/cms-logo.png" 
+              alt="Comfy Content Hub Logo" 
+              className="w-20 h-auto" 
+              width={80} 
+              height={34} 
+            />
+          </div>
+          <button
+            onClick={toggleMobileMenu}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? (
+              <X className="w-6 h-6 text-gray-700" />
+            ) : (
+              <Menu className="w-6 h-6 text-gray-700" />
+            )}
+          </button>
+        </div>
+
+        {/* Mobile Menu Overlay */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={closeMobileMenu} />
+        )}
+
         {/* Sidebar */}
-        <aside className="w-64 bg-white border-r flex flex-col py-8 px-6 shadow-2xl z-10" style={{ boxShadow: '12px 0 40px 0 rgba(0,0,0,0.18)' }}>
+        <aside className={`
+          fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col py-8 px-6 shadow-2xl transform transition-transform duration-300 ease-in-out
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `} style={{ boxShadow: '12px 0 40px 0 rgba(0,0,0,0.18)' }}>
+          
+          {/* Mobile Close Button */}
+          <div className="lg:hidden flex justify-end mb-4">
+            <button
+              onClick={closeMobileMenu}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="Close menu"
+            >
+              <X className="w-5 h-5 text-gray-700" />
+            </button>
+          </div>
+
+          {/* Logo Section */}
           <div className="flex flex-col items-center justify-center mb-8">
-            <Image src="/cms-logo.png" alt="Comfy Content Hub Logo" className="mb-2 w-28 h-auto" width={112} height={48} />
-            <div className="text-xs text-gray-500 font-medium">Sistema de Administração</div>
+            <Image 
+              src="/cms-logo.png" 
+              alt="Comfy Content Hub Logo" 
+              className="mb-2 w-24 h-auto lg:w-28" 
+              width={112} 
+              height={48} 
+            />
+            <div className="text-xs text-gray-500 font-medium text-center">
+              Sistema de Administração
+            </div>
           </div>
           
+          {/* Navigation */}
           <nav className="flex flex-col gap-2 flex-1">
             <button
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-3 rounded-lg font-medium cursor-pointer transition-colors ${
                 currentPage === 'create' 
                   ? 'bg-black text-white' 
                   : 'text-gray-900 hover:bg-gray-100'
               }`}
-              onClick={() => router.push('/dashboard/create')}
+              onClick={() => handleNavigation('/dashboard/create')}
             >
-              <Plus className="w-4 h-4 mr-1" />
-              Novo Conteúdo
+              <Plus className="w-4 h-4" />
+              <span className="text-sm lg:text-base">Novo Conteúdo</span>
             </button>
             <button
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-3 rounded-lg font-medium cursor-pointer transition-colors ${
                 currentPage === 'management' 
                   ? 'bg-black text-white' 
                   : 'text-gray-900 hover:bg-gray-100'
               }`}
-              onClick={() => router.push('/dashboard/management')}
+              onClick={() => handleNavigation('/dashboard/management')}
             >
-              <ArrowRight className="w-4 h-4 mr-1" />
-              Gerir Conteúdo
+              <ArrowRight className="w-4 h-4" />
+              <span className="text-sm lg:text-base">Gerir Conteúdo</span>
             </button>
           </nav>
 
           {/* User section and logout */}
-          <div className="border-t pt-4">
+          <div className="border-t border-gray-200 pt-4">
             <div className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 mb-2">
-              <User className="w-4 h-4" />
-              <span>{profile?.name || user?.email || 'Administrador CMS'}</span>
+              <User className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate text-sm lg:text-base">
+                {profile?.name || user?.email || 'Administrador CMS'}
+              </span>
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-red-600 hover:bg-red-50 cursor-pointer w-full"
+              className="flex items-center gap-2 px-3 py-3 rounded-lg font-medium text-red-600 hover:bg-red-50 cursor-pointer w-full transition-colors"
             >
-              <LogOut className="w-4 h-4 mr-1" />
-              Terminar Sessão
+              <LogOut className="w-4 h-4" />
+              <span className="text-sm lg:text-base">Terminar Sessão</span>
             </button>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto">
-          {children}
+        <main className="flex-1 overflow-auto bg-gray-50">
+          <div className="p-4 sm:p-6 lg:p-8">
+            {children}
+          </div>
         </main>
       </div>
     </AuthGuard>
