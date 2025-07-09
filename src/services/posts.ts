@@ -180,6 +180,7 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
     let filePath = null
     let fileName = null
     let fileType = null
+    let category = postData.category
 
     if (postData.content_url && postData.content_url.trim() !== '') {
       // Se tem URL, limpar campos de arquivo
@@ -197,7 +198,7 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       // Se nenhum dos dois foi fornecido, buscar o post atual para manter o valor existente
       const { data: currentPost } = await supabase
         .from('posts')
-        .select('content_url, file_path, file_name, file_type')
+        .select('content_url, file_path, file_name, file_type, category')
         .eq('id', postId)
         .single()
       
@@ -206,7 +207,16 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
         filePath = currentPost.file_path
         fileName = currentPost.file_name
         fileType = currentPost.file_type
+        // Se a categoria não foi fornecida, preservar a existente
+        if (!category) {
+          category = currentPost.category
+        }
       }
+    }
+
+    // Se ainda não temos categoria definida, usar 'Vídeo' como padrão apenas neste caso
+    if (!category) {
+      category = 'Vídeo'
     }
 
     // Chamar a função do banco de dados
@@ -215,7 +225,7 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       author_id_param: user.id,
       title_param: postData.title || '',
       description_param: postData.description || '',
-      category_param: postData.category || 'Vídeo',
+      category_param: category,
       content_url_param: contentUrl,
       tags_param: postData.tags || [],
       emotion_tags_param: postData.emotion_tags || [],
