@@ -8,7 +8,7 @@ export async function middleware(req: NextRequest) {
 
   // Para login/signup/home, SEMPRE permitir acesso (mesmo sem sessão)
   if (pathname === '/login' || pathname === '/signup' || pathname === '/') {
-    console.log('🔍 Rota de autenticação - acesso sempre permitido');
+    console.log('🔍 Rota de autenticação/home - acesso sempre permitido');
     return NextResponse.next();
   }
 
