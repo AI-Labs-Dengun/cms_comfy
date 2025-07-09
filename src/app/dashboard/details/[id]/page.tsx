@@ -409,7 +409,8 @@ export default function DetalhesConteudo() {
         description: editDescription.trim(),
         content_url: editContentUrl.trim() || undefined,
         tags: editTags,
-        emotion_tags: editEmotionTags
+        emotion_tags: editEmotionTags,
+        category: post.category as 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' // Preservar a categoria atual do post
       };
 
       const response = await updatePost(post.id, updateData);
@@ -423,6 +424,7 @@ export default function DetalhesConteudo() {
           content_url: updateData.content_url,
           tags: updateData.tags,
           emotion_tags: updateData.emotion_tags,
+          category: updateData.category, // Preservar a categoria
           updated_at: new Date().toISOString()
         } : null);
         
