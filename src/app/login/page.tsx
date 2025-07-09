@@ -23,105 +23,59 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [redirecting, setRedirecting] = useState(false);
-
+  
   // UseRef para controlar se já tentou redirecionar
-  const hasTriedRedirect = useRef(false);
-  const redirectTimer = useRef<NodeJS.Timeout | null>(null);
+  const hasRedirected = useRef(false);
 
   // Monitorar estado de autenticação e redirecionar quando apropriado
   useEffect(() => {
-    console.log('🔍 LoginPage useEffect - Verificando condições:', {
-      authLoading,
-      isAuthenticated,
-      canAccessCMS,
-      userEmail: user?.email,
-      userRole: profile?.user_role,
-      authorized: profile?.authorized,
-      authInfoSuccess: authInfo?.success,
-      hasTriedRedirect: hasTriedRedirect.current,
-      redirecting,
-      timestamp: new Date().toISOString()
-    });
-
-    // Se está carregando, resetar o flag de redirecionamento e não fazer nada
-    if (authLoading) {
-      console.log('⏳ LoginPage - Ainda carregando, resetando flag e aguardando...');
-      hasTriedRedirect.current = false;
+    // Se já redirecionou uma vez, não fazer nada
+    if (hasRedirected.current) {
       return;
     }
 
-    // Verificações rigorosas antes de redirecionar
-    const shouldRedirect = !authLoading && 
-                          isAuthenticated && 
+    // Se ainda está carregando, aguardar
+    if (authLoading) {
+      return;
+    }
+
+    // Verificar se deve redirecionar
+    const shouldRedirect = isAuthenticated && 
                           canAccessCMS && 
                           user && 
                           profile && 
                           profile.user_role === 'cms' && 
                           profile.authorized === true &&
-                          authInfo?.success === true &&
-                          !hasTriedRedirect.current && 
-                          !redirecting;
+                          authInfo?.success === true;
 
-    console.log('🧐 LoginPage - Análise de redirecionamento:', {
+    console.log('🔍 LoginPage - Verificando redirecionamento:', {
       shouldRedirect,
-      condições: {
-        notLoading: !authLoading,
-        isAuthenticated,
-        canAccessCMS,
-        hasUser: !!user,
-        hasProfile: !!profile,
-        isCMSUser: profile?.user_role === 'cms',
-        isAuthorized: profile?.authorized === true,
-        authSuccess: authInfo?.success === true,
-        notTriedYet: !hasTriedRedirect.current,
-        notRedirecting: !redirecting
-      }
+      isAuthenticated,
+      canAccessCMS,
+      hasUser: !!user,
+      hasProfile: !!profile,
+      isCMSUser: profile?.user_role === 'cms',
+      isAuthorized: profile?.authorized === true,
+      authSuccess: authInfo?.success === true
     });
 
-    // Se já está autenticado e tem acesso CMS, e ainda não tentou redirecionar
-    if (shouldRedirect) {
-      console.log('✅ LoginPage - TODAS as condições atendidas, redirecionando...');
-      
-      hasTriedRedirect.current = true;
-      setRedirecting(true);
-      setSuccessMessage('Já autenticado! Aguardando sincronização...');
-      
-      // Limpar timer anterior se existir
-      if (redirectTimer.current) {
-        clearTimeout(redirectTimer.current);
-      }
-      
-      // Delay maior para permitir sincronização entre middleware e React Context
-      redirectTimer.current = setTimeout(() => {
-        console.log('🔄 LoginPage - Executando redirecionamento após sincronização...');
-        setSuccessMessage('Redirecionando para dashboard...');
-        
-        setTimeout(() => {
-          router.replace('/dashboard/create');
-          
-          // Fallback de segurança
-          setTimeout(() => {
-            if (window.location.pathname === '/login') {
-              console.log('🔄 LoginPage - Fallback: usando window.location...');
-              window.location.href = '/dashboard/create';
-            }
-          }, 1000);
-        }, 500);
-      }, 1500); // Aumentado de 200ms para 1500ms
-      
-    } else {
-      console.log('❌ LoginPage - Condições não atendidas, não redirecionando');
-    }
-
-    // Cleanup function
-    return () => {
-      if (redirectTimer.current) {
-        clearTimeout(redirectTimer.current);
-        redirectTimer.current = null;
-      }
-    };
-  }, [authLoading, isAuthenticated, canAccessCMS, user, profile, authInfo, redirecting, router]);
+         if (shouldRedirect) {
+       console.log('✅ LoginPage - Redirecionando para dashboard...');
+       hasRedirected.current = true;
+       setSuccessMessage('Acesso autorizado! Redirecionando...');
+       
+       // Redirecionamento direto sem delay
+       router.replace('/dashboard/create');
+       
+       // Fallback de segurança usando window.location
+       setTimeout(() => {
+         if (window.location.pathname === '/login') {
+           console.log('🔄 LoginPage - Usando fallback window.location...');
+           window.location.href = '/dashboard/create';
+         }
+       }, 1000);
+     }
+  }, [authLoading, isAuthenticated, canAccessCMS, user, profile, authInfo, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,8 +84,7 @@ export default function LoginPage() {
     setIsLoading(true);
     setError("");
     setSuccessMessage("");
-    setRedirecting(false);
-    hasTriedRedirect.current = false; // Reset do flag ao tentar novo login
+    hasRedirected.current = false; // Reset do flag ao tentar novo login
 
     try {
       // Tentar fazer login com role CMS
@@ -141,34 +94,32 @@ export default function LoginPage() {
       console.log('📝 LoginPage - Resultado do login:', result);
 
       if (result.success) {
-        // Limpar erro e mostrar feedback positivo
         setError('');
-        setSuccessMessage('Login bem-sucedido! Atualizando sessão...');
+        setSuccessMessage('Login bem-sucedido! Verificando permissões...');
         
         console.log('✅ LoginPage - Login bem-sucedido, atualizando contexto...');
         
-        // Aguardar processamento do Supabase Auth
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
         // Forçar atualização do contexto de autenticação
-        console.log('🔄 LoginPage - Chamando refreshAuth...');
         await refreshAuth();
         
-        setSuccessMessage('Sessão atualizada! Redirecionando...');
-        console.log('🔄 LoginPage - Preparando redirecionamento...');
+        // Aguardar um pouco para sincronização e deixar o useEffect detectar
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Aguardar um pouco mais para sincronização e deixar o useEffect detectar
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Se por algum motivo o useEffect não detectou, fazer redirecionamento manual
-        setTimeout(() => {
-          if (!hasTriedRedirect.current) {
-            console.log('🔄 LoginPage - Fallback manual: forçando redirecionamento...');
-            hasTriedRedirect.current = true;
-            setRedirecting(true);
-            router.replace('/dashboard/create');
-          }
-        }, 1000);
+                 // Se o useEffect não redirecionou ainda, fazer redirecionamento manual
+         if (!hasRedirected.current) {
+           console.log('🔄 LoginPage - Redirecionamento manual...');
+           hasRedirected.current = true;
+           setSuccessMessage('Redirecionando...');
+           router.replace('/dashboard/create');
+           
+           // Fallback adicional
+           setTimeout(() => {
+             if (window.location.pathname === '/login') {
+               console.log('🔄 LoginPage - Fallback do redirecionamento manual...');
+               window.location.href = '/dashboard/create';
+             }
+           }, 1000);
+         }
         
       } else {
         // LOGIN FALHOU - Mostrar erro específico baseado no código
@@ -208,9 +159,7 @@ export default function LoginPage() {
   // Cleanup ao desmontar componente
   useEffect(() => {
     return () => {
-      if (redirectTimer.current) {
-        clearTimeout(redirectTimer.current);
-      }
+      // No timer para limpar, pois não há mais timeouts complexos
     };
   }, []);
 
@@ -227,7 +176,7 @@ export default function LoginPage() {
   }
 
   // Se está redirecionando
-  if (redirecting) {
+  if (hasRedirected.current) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-4">
         <div className="flex flex-col items-center">
