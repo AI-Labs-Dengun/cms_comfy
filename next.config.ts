@@ -81,7 +81,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/',
-        destination: '/dashboard/create',
+        destination: '/dashboard/management',
         permanent: false,
         has: [
           {
