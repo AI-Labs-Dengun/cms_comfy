@@ -71,13 +71,13 @@ export default function Home() {
       hasRedirected.current = true;
       
       // Redirecionamento simples
-      router.replace('/dashboard/create');
+      router.replace('/dashboard/management');
       
       // Fallback de segurança
       setTimeout(() => {
         if (window.location.pathname === '/') {
           console.log('🔄 HomePage - Fallback: usando window.location...');
-          window.location.href = '/dashboard/create';
+          window.location.href = '/dashboard/management';
         }
       }, 1500);
     } else {
