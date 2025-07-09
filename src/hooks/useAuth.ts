@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 
@@ -25,30 +25,7 @@ export function useAuth() {
     error: null
   })
 
-  useEffect(() => {
-    // Verificar sessão atual
-    checkUser()
-
-    // Escutar mudanças de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          await loadUserProfile(session.user)
-        } else if (event === 'SIGNED_OUT') {
-          setAuthState({
-            user: null,
-            profile: null,
-            loading: false,
-            error: null
-          })
-        }
-      }
-    )
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const checkUser = async () => {
+  const checkUser = useCallback(async () => {
     try {
       const { data: { user }, error } = await supabase.auth.getUser()
       
@@ -75,7 +52,7 @@ export function useAuth() {
         loading: false 
       }))
     }
-  }
+  }, [])
 
   const loadUserProfile = async (user: User) => {
     try {
@@ -112,6 +89,29 @@ export function useAuth() {
       })
     }
   }
+
+  useEffect(() => {
+    // Verificar sessão atual
+    checkUser()
+
+    // Escutar mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          await loadUserProfile(session.user)
+        } else if (event === 'SIGNED_OUT') {
+          setAuthState({
+            user: null,
+            profile: null,
+            loading: false,
+            error: null
+          })
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [checkUser])
 
   const signOut = async () => {
     try {
