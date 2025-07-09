@@ -61,7 +61,8 @@ export default function AuthGuard({
           if (mounted) {
             setAccessDenied(true);
             setErrorMessage('Você precisa fazer login para acessar esta área.');
-            setTimeout(() => router.push(redirectTo), 1500);
+            // Redirecionamento mais rápido para melhorar UX
+            setTimeout(() => router.push(redirectTo), 800);
           }
           return;
         }
@@ -93,7 +94,7 @@ export default function AuthGuard({
               }
               
               setErrorMessage(message);
-              setTimeout(() => router.push(redirectTo), 3000);
+              setTimeout(() => router.push(redirectTo), 2000);
             }
             return;
           }
