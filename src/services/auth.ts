@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin, getCachedQuery, setCachedQuery } from '@/lib/supabase';
+import { supabase, createAdminClient, getCachedQuery, setCachedQuery } from '@/lib/supabase';
 import { AuthResponse } from '@/types/auth';
 
 interface CachedUser {
@@ -11,7 +11,7 @@ export class AuthService {
   /**
    * Faz login verificando se o usuário tem o role correto para acessar o CMS
    */
-  static async loginWithRole(email: string, password: string, requiredRole: 'cms' | 'app' = 'cms'): Promise<AuthResponse> {
+  static async loginWithRole(email: string, password: string, requiredRole: 'cms' | 'app' | 'psicologo' = 'cms'): Promise<AuthResponse> {
     try {
       // Primeiro, verificar se o usuário pode fazer login com o role requerido
       const roleCheck = await this.canUserLoginWithRole(email, requiredRole);
@@ -65,7 +65,7 @@ export class AuthService {
    * Verifica se um usuário pode fazer login com o role específico
    * Usa cache para evitar múltiplas consultas
    */
-  static async canUserLoginWithRole(email: string, requiredRole: 'cms' | 'app'): Promise<AuthResponse> {
+  static async canUserLoginWithRole(email: string, requiredRole: 'cms' | 'app' | 'psicologo'): Promise<AuthResponse> {
     const cacheKey = `role_check_${email}_${requiredRole}`;
     
     // Tentar cache primeiro
@@ -223,65 +223,43 @@ export class AuthService {
         };
       }
 
-      // 2. Criar perfil na tabela profiles com role CMS
-      const { data: profileData, error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          name: name,
-          username: email.split('@')[0], // Usar parte do email como username
-          avatar_path: '/default-avatar.png', // Avatar padrão
-          guardian_email: email, // Para CMS, usar o próprio email como guardian
-          authorized: true, // CMS users são autorizados automaticamente
-          user_role: 'cms',
-          authorized_at: new Date().toISOString(),
-          authorized_by: 'system'
-        })
-        .select()
-        .single();
+      // 2. Criar perfil na tabela profiles usando função SQL (contorna RLS)
+      const { data: profileResult, error: profileError } = await supabase
+        .rpc('create_cms_profile', {
+          user_id_param: authData.user.id,
+          name_param: name,
+          email_param: email,
+          username_param: email.split('@')[0]
+        });
 
-      if (profileError) {
+      if (profileError || !profileResult?.success) {
+        console.error('Erro ao criar perfil:', profileError || profileResult?.error);
+        
         // Se falhou ao criar perfil, tentar deletar o usuário criado
         try {
-          await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+          const adminClient = createAdminClient();
+          await adminClient.auth.admin.deleteUser(authData.user.id);
         } catch {
           // Ignorar erro de deleção
         }
         
         return {
           success: false,
-          error: 'Erro ao criar perfil de usuário',
+          error: 'Erro ao criar perfil de usuário: ' + (profileResult?.error || profileError?.message),
           code: 'PROFILE_CREATION_ERROR'
         };
-      }
-
-      // 3. Log da criação da conta
-      try {
-        await supabaseAdmin
-          .from('authorization_logs')
-          .insert({
-            user_id: authData.user.id,
-            action: 'account_created',
-            guardian_email: email,
-            additional_data: {
-              username: profileData.username,
-              user_role: 'cms',
-              created_via: 'cms_signup'
-            }
-          });
-      } catch {
-        // Ignorar erro de log (não crítico)
       }
 
       return {
         success: true,
         user_id: authData.user.id,
-        username: profileData.username,
+        username: profileResult.username,
         user_role: 'cms',
-        name: profileData.name
+        name: profileResult.name
       };
 
-    } catch {
+    } catch (error) {
+      console.error('Erro no signup:', error);
       return {
         success: false,
         error: 'Erro interno do servidor',
@@ -298,7 +276,8 @@ export class AuthService {
     try {
       // Verificar se existe um usuário com este email na tabela auth.users
       // Usando uma query mais simples que não requer permissões admin
-      const { data, error } = await supabaseAdmin
+      const adminClient = createAdminClient();
+      const { data, error } = await adminClient
         .from('profiles')
         .select('id')
         .eq('guardian_email', email)
@@ -319,7 +298,8 @@ export class AuthService {
    */
   static async checkUsernameExists(username: string): Promise<boolean> {
     try {
-      const { data, error } = await supabaseAdmin
+      const adminClient = createAdminClient();
+      const { data, error } = await adminClient
         .from('profiles')
         .select('username')
         .eq('username', username)

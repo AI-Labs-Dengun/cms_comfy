@@ -2,7 +2,7 @@ export interface AuthResponse {
   success: boolean;
   user_id?: string;
   username?: string;
-  user_role?: 'app' | 'cms';
+  user_role?: 'app' | 'cms' | 'psicologo';
   name?: string;
   error?: string;
   code?: string;
@@ -20,7 +20,7 @@ export interface UserProfile {
   postal_code?: string;
   guardian_email: string;
   authorized: boolean | null;
-  user_role: 'app' | 'cms';
+  user_role: 'app' | 'cms' | 'psicologo';
   approval_token: string;
   approval_email_sent: boolean;
   approval_email_sent_at?: string;

@@ -7,7 +7,7 @@ import LoadingSpinner from './LoadingSpinner';
 
 interface AuthGuardProps {
   children: React.ReactNode;
-  requiredRole?: 'cms' | 'app';
+  requiredRole?: 'cms' | 'app' | 'psicologo';
   redirectTo?: string;
 }
 
