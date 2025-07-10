@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Pencil, Eye, Save, X, Key, Trash2 } from "lucide-react";
+import { Pencil, Save, X, Key, Trash2 } from "lucide-react";
 import { supabase } from '@/lib/supabase';
 
 interface Psicologo {
