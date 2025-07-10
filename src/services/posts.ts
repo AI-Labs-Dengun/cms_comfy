@@ -6,6 +6,7 @@ export interface CreatePostData {
   title: string
   description: string
   category: 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts'
+  content?: string // ✅ ADICIONANDO CAMPO CONTENT
   content_url?: string
   file_path?: string
   file_name?: string
@@ -20,6 +21,7 @@ export interface Post {
   title: string
   description: string
   category: string
+  content?: string // ✅ ADICIONANDO CAMPO CONTENT
   content_url?: string
   file_path?: string
   file_name?: string
@@ -79,6 +81,7 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       title_param: postData.title,
       description_param: postData.description,
       category_param: postData.category,
+      content_param: postData.content || null, // Adicionado content_param
       content_url_param: postData.content_url || null,
       tags_param: postData.tags || [],
       emotion_tags_param: postData.emotion_tags || [],
@@ -226,6 +229,7 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       title_param: postData.title || '',
       description_param: postData.description || '',
       category_param: category,
+      content_param: postData.content || null, // Adicionado content_param
       content_url_param: contentUrl,
       tags_param: postData.tags || [],
       emotion_tags_param: postData.emotion_tags || [],
