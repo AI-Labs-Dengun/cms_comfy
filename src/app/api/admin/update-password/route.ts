@@ -142,7 +142,7 @@ export async function GET() {
     try {
       const { data, error } = await supabaseAdmin.rpc('test_password_update_config');
       functionExists = !error && !!data;
-    } catch (err) {
+    } catch {
       functionExists = false;
     }
 
