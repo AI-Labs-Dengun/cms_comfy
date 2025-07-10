@@ -254,6 +254,7 @@ export default function DetalhesConteudo() {
   // Estados para os campos editáveis
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editContent, setEditContent] = useState(""); // ✅ ADICIONANDO ESTADO PARA CONTENT
   const [editContentUrl, setEditContentUrl] = useState("");
   const [editTags, setEditTags] = useState<string[]>([]);
   const [editEmotionTags, setEditEmotionTags] = useState<string[]>([]);
@@ -375,6 +376,7 @@ export default function DetalhesConteudo() {
   const initializeEditValues = (postData: Post) => {
     setEditTitle(postData.title);
     setEditDescription(postData.description);
+    setEditContent(postData.content || ""); // Inicializar o novo estado
     setEditContentUrl(postData.content_url || "");
     setEditTags(postData.tags);
     setEditEmotionTags(postData.emotion_tags);
@@ -404,9 +406,17 @@ export default function DetalhesConteudo() {
     try {
       setSaving(true);
 
+      // Validar que Shorts não pode ter conteúdo textual
+      if (post.category === "Shorts" && editContent.trim()) {
+        alert("Posts da categoria Shorts não podem ter conteúdo textual");
+        setSaving(false);
+        return;
+      }
+
       const updateData = {
         title: editTitle.trim(),
         description: editDescription.trim(),
+        content: editContent.trim(), // Adicionar o novo campo ao updateData
         content_url: editContentUrl.trim() || undefined,
         tags: editTags,
         emotion_tags: editEmotionTags,
@@ -421,6 +431,7 @@ export default function DetalhesConteudo() {
           ...prev,
           title: updateData.title,
           description: updateData.description,
+          content: updateData.content, // Atualizar o novo campo
           content_url: updateData.content_url,
           tags: updateData.tags,
           emotion_tags: updateData.emotion_tags,
@@ -826,6 +837,7 @@ export default function DetalhesConteudo() {
                   const hasChanges = 
                     editTitle !== post?.title ||
                     editDescription !== post?.description ||
+                    editContent !== post?.content || // Adicionar a nova comparação
                     editContentUrl !== (post?.content_url || "") ||
                     JSON.stringify(editTags) !== JSON.stringify(post?.tags) ||
                     JSON.stringify(editEmotionTags) !== JSON.stringify(post?.emotion_tags);
@@ -1048,6 +1060,33 @@ export default function DetalhesConteudo() {
                     )}
                   </div>
 
+                  {post.category !== "Shorts" && (
+                    <div className="mb-4">
+                      <label className="block text-xs text-gray-500 font-bold mb-1">
+                        Conteúdo
+                        <span className="text-xs text-gray-500 ml-2">(não disponível para Shorts)</span>
+                      </label>
+                      <MarkdownEditor
+                        value={editContent}
+                        onChange={setEditContent}
+                        placeholder="Conteúdo do post usando markdown..."
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Use os botões acima para formatar o texto ou digite diretamente em markdown
+                      </p>
+                      
+                      {/* Prévia do Markdown */}
+                      {editContent.trim() && (
+                        <div className="mt-4 p-4 bg-gray-50 rounded-md border">
+                          <div className="text-xs text-gray-500 font-bold mb-2">Prévia da formatação:</div>
+                          <div className="bg-white p-3 rounded border">
+                            <MarkdownRenderer content={editContent} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="mb-4">
                     <label className="block text-xs text-gray-500 font-bold mb-1">URL do Conteúdo (opcional)</label>
                     <div className="relative">
@@ -1080,6 +1119,15 @@ export default function DetalhesConteudo() {
                       <MarkdownRenderer content={post.description} />
                     </div>
                   </div>
+
+                                     {post.content && (
+                     <div className="mb-2">
+                       <div className="text-xs text-gray-500 font-bold">Conteúdo</div>
+                                            <div className="text-gray-900">
+                       <MarkdownRenderer content={post.content || ""} />
+                     </div>
+                     </div>
+                   )}
                 </>
               )}
 

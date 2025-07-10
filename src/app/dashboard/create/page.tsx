@@ -239,6 +239,7 @@ export default function CreateContent() {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [content, setContent] = useState(""); // ✅ ADICIONANDO ESTADO PARA CONTENT
   const [category, setCategory] = useState<"Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts">("Vídeo");
   const [contentUrl, setContentUrl] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -281,6 +282,7 @@ export default function CreateContent() {
         return;
       }
 
+      // Validar conteúdo (URL ou arquivo)
       if (!contentUrl.trim() && !file) {
         setError("É necessário fornecer uma URL ou fazer upload de um arquivo");
         return;
@@ -288,6 +290,12 @@ export default function CreateContent() {
 
       if (contentUrl.trim() && file) {
         setError("Escolha apenas uma opção: URL ou arquivo, não ambos");
+        return;
+      }
+
+      // Validar que Shorts não pode ter conteúdo textual
+      if (category === "Shorts" && content.trim()) {
+        setError("Posts da categoria Shorts não podem ter conteúdo textual");
         return;
       }
 
@@ -299,6 +307,11 @@ export default function CreateContent() {
         tags,
         emotion_tags: emotions
       };
+
+      // Adicionar conteúdo se fornecido
+      if (content.trim()) { // ✅ ADICIONANDO CONTEÚDO AO POST DATA
+        postData.content = content.trim();
+      }
 
       // Adicionar URL se fornecida
       if (contentUrl.trim()) {
@@ -352,6 +365,7 @@ export default function CreateContent() {
         // Limpar formulário
         setTitle("");
         setDescription("");
+        setContent(""); // ✅ LIMPAR ESTADO PARA CONTENT
         setContentUrl("");
         setCategory("Vídeo");
         setTags([]);
@@ -597,6 +611,34 @@ export default function CreateContent() {
                 </div>
               )}
             </div>
+
+            {/* Conteúdo Textual (não disponível para Shorts) */}
+            {category !== "Shorts" && (
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-900">
+                  Conteúdo Textual
+                  <span className="text-xs text-gray-500 ml-2">(não disponível para Shorts)</span>
+                </label>
+                <MarkdownEditor
+                  value={content}
+                  onChange={setContent}
+                  placeholder="Escreva aqui o conteúdo completo do post usando markdown..."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Este campo é para o conteúdo textual completo do post. Use markdown para formatação.
+                </p>
+                
+                {/* Prévia do Conteúdo */}
+                {content.trim() && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-md border">
+                    <div className="text-xs text-gray-500 font-bold mb-2">Prévia do conteúdo:</div>
+                    <div className="bg-white p-3 rounded border">
+                      <MarkdownRenderer content={content} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {/* Tags */}
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-900">Tags</label>
