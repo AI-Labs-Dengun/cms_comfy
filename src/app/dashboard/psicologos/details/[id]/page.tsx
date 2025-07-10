@@ -377,20 +377,7 @@ export default function PsicologoDetailsPage() {
               <X className="w-4 h-4" />
               Cancelar
             </button>
-            <button
-              onClick={async () => {
-                try {
-                  const response = await fetch('/api/admin/update-password', { method: 'GET' });
-                  const result = await response.json();
-                  alert(`Teste de conectividade:\n${JSON.stringify(result, null, 2)}`);
-                } catch (err) {
-                  alert(`Erro no teste: ${err}`);
-                }
-              }}
-              className="bg-blue-600 text-white px-4 py-2 rounded font-semibold hover:bg-blue-700 transition-colors text-xs"
-            >
-              🧪 Testar API
-            </button>
+
           </div>
         ) : (
           <button
