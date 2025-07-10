@@ -43,7 +43,18 @@ export function createServerClientWithServiceRole() {
 }
 
 // Cliente admin para uso direto (compatibilidade com código existente)
+// ⚠️ ATENÇÃO: Este cliente deve ser usado apenas server-side
+// Para client-side, use o supabase normal com service role quando necessário
 export const supabaseAdmin = createServerClientWithServiceRole()
+
+// Cliente admin para uso client-side (quando necessário)
+export function createAdminClient() {
+  if (!supabaseServiceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY não está definida para operações admin')
+  }
+  
+  return createBrowserClient(supabaseUrl, supabaseServiceRoleKey)
+}
 
 // Cache simples em memória para queries frequentes (apenas no cliente)
 const queryCache = new Map<string, { data: unknown; timestamp: number }>()

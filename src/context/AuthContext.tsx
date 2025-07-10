@@ -10,7 +10,7 @@ interface UserProfile {
   id: string;
   name: string;
   username: string;
-  user_role: 'app' | 'cms';
+  user_role: 'app' | 'cms' | 'psicologo';
   authorized: boolean | null;
 }
 
@@ -26,7 +26,7 @@ interface AuthContextType {
   canAccessCMS: boolean;
   signOut: () => Promise<{ success: boolean; error?: string }>;
   refreshAuth: () => Promise<void>;
-  checkRoleAccess: (requiredRole: 'cms' | 'app') => Promise<boolean>;
+  checkRoleAccess: (requiredRole: 'cms' | 'app' | 'psicologo') => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -104,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Função simplificada para verificar acesso por role - SEM cache para login
-  const checkRoleAccess = useCallback(async (requiredRole: 'cms' | 'app'): Promise<boolean> => {
+  const checkRoleAccess = useCallback(async (requiredRole: 'cms' | 'app' | 'psicologo'): Promise<boolean> => {
     if (!user?.email) {
       console.log('❌ AuthContext - Sem email do usuário para verificar role');
       return false;
