@@ -240,7 +240,7 @@ export default function CreateContent() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState(""); // ✅ ADICIONANDO ESTADO PARA CONTENT
-  const [category, setCategory] = useState<"Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts">("Vídeo");
+  const [category, setCategory] = useState<"Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura">("Vídeo");
   const [contentUrl, setContentUrl] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -480,7 +480,7 @@ export default function CreateContent() {
               <select
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium cursor-pointer"
                 value={category}
-                onChange={(e) => setCategory(e.target.value as "Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts")}
+                onChange={(e) => setCategory(e.target.value as "Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura")}
               >
                 <option value="Vídeo">Vídeo</option>
                 <option value="Podcast">Podcast</option>
@@ -488,6 +488,7 @@ export default function CreateContent() {
                 <option value="Livro">Livro</option>
                 <option value="Áudio">Áudio</option>
                 <option value="Shorts">Shorts</option>
+                <option value="Leitura">Leitura</option>
               </select>
             </div>
             {/* Conteúdo dividido em URL ou Ficheiro */}

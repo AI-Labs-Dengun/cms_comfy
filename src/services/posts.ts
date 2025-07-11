@@ -5,7 +5,7 @@ import { uploadFile } from './storage'
 export interface CreatePostData {
   title: string
   description: string
-  category: 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts'
+  category: 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura'
   content?: string // ✅ ADICIONANDO CAMPO CONTENT
   content_url?: string
   file_path?: string

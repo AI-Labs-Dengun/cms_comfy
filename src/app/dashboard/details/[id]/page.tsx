@@ -420,7 +420,7 @@ export default function DetalhesConteudo() {
         content_url: editContentUrl.trim() || undefined,
         tags: editTags,
         emotion_tags: editEmotionTags,
-        category: post.category as 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' // Preservar a categoria atual do post
+        category: post.category as 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura' // Preservar a categoria atual do post
       };
 
       const response = await updatePost(post.id, updateData);
