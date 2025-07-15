@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CloudUpload } from "lucide-react";
 import CMSLayout from "@/components/CMSLayout";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { createPost, CreatePostData, uploadFileForPost } from "@/services/posts";
+import { createPost, CreatePostData, uploadFileForPost, getAllReadingTags, associateTagWithPost } from "@/services/posts";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
@@ -249,6 +249,14 @@ export default function CreateContent() {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [readingTags, setReadingTags] = useState<{id: string, name: string, color?: string}[]>([]);
+  const [selectedReadingTags, setSelectedReadingTags] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (category === 'Leitura') {
+      getAllReadingTags().then(setReadingTags).catch(() => setReadingTags([]));
+    }
+  }, [category]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -304,7 +312,7 @@ export default function CreateContent() {
         title: title.trim(),
         description: description.trim(),
         category,
-        tags,
+        tags: category !== 'Leitura' ? tags : undefined,
         emotion_tags: emotions
       };
 
@@ -359,6 +367,19 @@ export default function CreateContent() {
       // Criar o post
       const result = await createPost(postData);
 
+      if (result.success && result.data?.id && category === 'Leitura' && selectedReadingTags.length > 0) {
+        // Associar tags de leitura ao post
+        if (category === 'Leitura' && selectedReadingTags.length > 0) {
+          for (const tagId of selectedReadingTags) {
+            try {
+              await associateTagWithPost(result.data.id, tagId);
+            } catch (error) {
+              console.error('Erro ao associar tag:', error);
+            }
+          }
+        }
+      }
+
       if (result.success) {
         setSuccess(result.message || "Post criado com sucesso!");
         
@@ -372,6 +393,7 @@ export default function CreateContent() {
         setEmotions([]);
         setFile(null);
         setTagInput("");
+        setSelectedReadingTags([]); // Limpar tags de leitura selecionadas
 
         // Redirecionar para página de detalhes do post criado após 2 segundos
         if (result.data?.id) {
@@ -640,35 +662,61 @@ export default function CreateContent() {
                 )}
               </div>
             )}
-            {/* Tags */}
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-900">Tags</label>
-              <input
-                type="text"
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
-                placeholder="Adicione tags e pressione Enter"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleTagKeyDown}
-              />
-              {/* Exibir tags abaixo do input */}
-              <div className="flex flex-wrap gap-2 mt-2">
-                {tags.length === 0 ? (
-                  <span className="bg-gray-100 text-gray-400 px-3 py-1 rounded-full flex items-center text-sm font-medium opacity-80 select-none pointer-events-none">
-                    Exemplo
-                  </span>
-                ) : (
-                  tags.map((tag) => (
-                    <span key={tag} className="bg-gray-200 text-gray-800 px-3 py-1 rounded-full flex items-center text-sm font-medium">
-                      {tag}
-                      <button type="button" className="ml-2 text-gray-500 hover:text-red-500" onClick={() => removeTag(tag)}>
-                        ×
-                      </button>
-                    </span>
-                  ))
-                )}
+            {/* Tags de Leitura (apenas para categoria Leitura) */}
+            {category === 'Leitura' && (
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-900">Tags de Leitura</label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {readingTags.length === 0 ? (
+                    <span className="text-gray-400">Nenhuma tag cadastrada. <a href='/dashboard/leitura/tags' className='underline'>Gerenciar tags</a></span>
+                  ) : (
+                    readingTags.map(tag => (
+                      <label key={tag.id} className="flex items-center gap-2 text-sm cursor-pointer" style={{ background: selectedReadingTags.includes(tag.id) ? (tag.color || '#3B82F6') : '#f3f4f6', color: selectedReadingTags.includes(tag.id) ? '#fff' : '#222', borderRadius: '9999px', padding: '0.25rem 0.75rem' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedReadingTags.includes(tag.id)}
+                          onChange={() => setSelectedReadingTags(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
+                          className="accent-black cursor-pointer"
+                        />
+                        {tag.name}
+                      </label>
+                    ))
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Selecione as tags que melhor representam o post de leitura.</p>
               </div>
-            </div>
+            )}
+            {/* Campo de tags antigo para outras categorias */}
+            {category !== 'Leitura' && (
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-900">Tags</label>
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                  placeholder="Adicione tags e pressione Enter"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                />
+                {/* Exibir tags abaixo do input */}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {tags.length === 0 ? (
+                    <span className="bg-gray-100 text-gray-400 px-3 py-1 rounded-full flex items-center text-sm font-medium opacity-80 select-none pointer-events-none">
+                      Exemplo
+                    </span>
+                  ) : (
+                    tags.map((tag) => (
+                      <span key={tag} className="bg-gray-200 text-gray-800 px-3 py-1 rounded-full flex items-center text-sm font-medium">
+                        {tag}
+                        <button type="button" className="ml-2 text-gray-500 hover:text-red-500" onClick={() => removeTag(tag)}>
+                          ×
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
             {/* Emotion Tags */}
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-900">Tags de Emoção</label>
