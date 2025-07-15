@@ -2,14 +2,14 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, ArrowRight, LogOut, User, Users, PlusCircle, Menu, X } from 'lucide-react';
+import { Plus, ArrowRight, LogOut, User, Users, PlusCircle, Menu, X, Tags } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
 import Image from 'next/image';
 
 interface CMSLayoutProps {
   children: React.ReactNode;
-  currentPage?: 'create' | 'management' | 'psicologos-create' | 'psicologos';
+  currentPage?: 'create' | 'management' | 'psicologos-create' | 'psicologos' | 'tags-leitura';
 }
 
 export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
@@ -59,7 +59,8 @@ export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
               alt="Comfy Content Hub Logo" 
               className="w-20 h-auto" 
               width={80} 
-              height={34} 
+              height={34}
+              style={{ width: 'auto', height: 'auto' }}
             />
           </div>
           <button
@@ -104,7 +105,8 @@ export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
               alt="Comfy Content Hub Logo" 
               className="mb-2 w-24 h-auto lg:w-28" 
               width={112} 
-              height={48} 
+              height={48}
+              style={{ width: 'auto', height: 'auto' }}
             />
             <div className="text-xs text-gray-500 font-medium text-center">
               Sistema de Administração
@@ -134,6 +136,18 @@ export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
             >
               <ArrowRight className="w-4 h-4" />
               <span className="text-sm lg:text-base">Gerir Conteúdo</span>
+            </button>
+            {/* Gestão de Tags de Leitura */}
+            <button
+              className={`flex items-center gap-2 px-3 py-3 rounded-lg font-medium cursor-pointer transition-colors ${
+                currentPage === 'tags-leitura' 
+                  ? 'bg-black text-white' 
+                  : 'text-gray-900 hover:bg-gray-100'
+              }`}
+              onClick={() => handleNavigation('/dashboard/leitura/tags')}
+            >
+              <Tags className="w-4 h-4" />
+              <span className="text-sm lg:text-base">Tags de Leitura</span>
             </button>
             {/* Novo Psicólogo */}
             <button
