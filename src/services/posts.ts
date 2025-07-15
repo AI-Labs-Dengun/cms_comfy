@@ -433,3 +433,58 @@ export async function getPost(postId: string): Promise<ApiResponse<Post>> {
     }
   }
 } 
+
+// Funções para tags de leitura
+export async function getAllReadingTags() {
+  const { data, error } = await supabase.rpc('get_all_reading_tags');
+  if (error) throw new Error(error.message);
+  return data.tags || [];
+}
+
+export async function createReadingTag({ name, description, color }: { name: string, description?: string, color?: string }) {
+  const { error } = await supabase.rpc('create_reading_tag', {
+    tag_name: name,
+    tag_description: description,
+    tag_color: color || '#3B82F6',
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateReadingTag({ id, name, description, color }: { id: string, name: string, description?: string, color?: string }) {
+  const { error } = await supabase.rpc('update_reading_tag', {
+    tag_id_param: id,
+    tag_name: name,
+    tag_description: description,
+    tag_color: color || '#3B82F6',
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteReadingTag(id: string) {
+  const { error } = await supabase.rpc('delete_reading_tag', {
+    tag_id_param: id,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function getTagsForPost(postId: string) {
+  const { data, error } = await supabase.rpc('get_tags_for_post', { post_id_param: postId });
+  if (error) throw new Error(error.message);
+  return data.tags || [];
+}
+
+export async function associateTagWithPost(postId: string, tagId: string) {
+  const { error } = await supabase.rpc('associate_tag_with_post', {
+    post_id_param: postId,
+    tag_id_param: tagId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function removeTagFromPost(postId: string, tagId: string) {
+  const { error } = await supabase.rpc('remove_tag_from_post', {
+    post_id_param: postId,
+    tag_id_param: tagId,
+  });
+  if (error) throw new Error(error.message);
+} 
