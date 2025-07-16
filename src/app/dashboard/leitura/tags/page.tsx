@@ -38,17 +38,17 @@ export default function TagsLeituraPage() {
       console.log("Resposta da função get_all_reading_tags:", { data, error });
       
       if (error) {
-        setError("Erro ao buscar tags: " + error.message);
+        setError("Erro ao buscar categorias: " + error.message);
         setTags([]);
       } else {
         // Verificar se data.tags existe, senão usar data diretamente
         const tagsData = data?.tags || data || [];
-        console.log("Tags encontradas:", tagsData);
+        console.log("Categorias encontradas:", tagsData);
         setTags(tagsData);
       }
     } catch (err) {
       console.error("Erro na função fetchTags:", err);
-      setError("Erro inesperado ao buscar tags");
+      setError("Erro inesperado ao buscar categorias");
       setTags([]);
     }
     setLoading(false);
@@ -63,10 +63,10 @@ export default function TagsLeituraPage() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
-    if (!name.trim()) {
-      setError("O nome da tag é obrigatório.");
-      return;
-    }
+          if (!name.trim()) {
+        setError("O nome da categoria é obrigatório.");
+        return;
+      }
     if (editingTag) {
       // Editar
       const { error } = await supabase.rpc("update_reading_tag", {
@@ -76,9 +76,9 @@ export default function TagsLeituraPage() {
         tag_color: color,
       });
       if (error) {
-        setError("Erro ao editar tag: " + error.message);
+        setError("Erro ao editar categoria: " + error.message);
       } else {
-        setSuccess("Tag editada com sucesso!");
+        setSuccess("Categoria editada com sucesso!");
         setEditingTag(null);
         setName("");
         setDescription("");
@@ -93,9 +93,9 @@ export default function TagsLeituraPage() {
         tag_color: color,
       });
       if (error) {
-        setError("Erro ao criar tag: " + error.message);
+        setError("Erro ao criar categoria: " + error.message);
       } else {
-        setSuccess("Tag criada com sucesso!");
+        setSuccess("Categoria criada com sucesso!");
         setName("");
         setDescription("");
         setColor("#3B82F6");
@@ -130,9 +130,9 @@ export default function TagsLeituraPage() {
       tag_id_param: showDelete.id,
     });
     if (error) {
-      setError("Erro ao deletar tag: " + error.message);
+      setError("Erro ao deletar categoria: " + error.message);
     } else {
-      setSuccess("Tag deletada com sucesso!");
+      setSuccess("Categoria deletada com sucesso!");
       fetchTags();
     }
     setShowDelete(null);
@@ -142,10 +142,10 @@ export default function TagsLeituraPage() {
   return (
     <CMSLayout currentPage="tags-leitura">
       <div className="max-w-2xl mx-auto py-10 px-4">
-        <h1 className="text-2xl font-bold mb-6 text-gray-900">Gestão de Tags de Leitura</h1>
+        <h1 className="text-2xl font-bold mb-6 text-gray-900">Gestão de Categorias de Leitura</h1>
         {/* Formulário de criação/edição */}
         <form onSubmit={handleSubmit} className="mb-8 bg-white p-4 rounded shadow space-y-4">
-          <h2 className="text-lg font-semibold mb-2 text-gray-900">{editingTag ? "Editar Tag" : "Nova Tag"}</h2>
+          <h2 className="text-lg font-semibold mb-2 text-gray-900">{editingTag ? "Editar Categoria" : "Nova Categoria"}</h2>
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-900">Nome</label>
             <input
@@ -176,7 +176,7 @@ export default function TagsLeituraPage() {
           </div>
           <div className="flex gap-2 mt-2">
             <button type="submit" className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition-colors">
-              {editingTag ? "Salvar Alterações" : "Criar Tag"}
+              {editingTag ? "Salvar Alterações" : "Criar Categoria"}
             </button>
             {editingTag && (
               <button type="button" className="text-gray-600 px-4 py-2 hover:text-gray-800 transition-colors" onClick={handleCancelEdit}>
@@ -189,11 +189,11 @@ export default function TagsLeituraPage() {
         </form>
         {/* Listagem de tags */}
         <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-lg font-semibold mb-4 text-gray-900">Tags Cadastradas</h2>
+          <h2 className="text-lg font-semibold mb-4 text-gray-900">Categorias Cadastradas</h2>
           {loading ? (
             <div className="flex justify-center py-8"><LoadingSpinner /></div>
           ) : tags.length === 0 ? (
-            <div className="text-gray-600 font-medium">Nenhuma tag cadastrada.</div>
+            <div className="text-gray-600 font-medium">Nenhuma categoria cadastrada.</div>
           ) : (
             <ul className="space-y-2">
               {tags.map(tag => (
@@ -218,7 +218,7 @@ export default function TagsLeituraPage() {
           <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
             <div className="bg-white rounded shadow-lg p-6 max-w-sm w-full">
               <h3 className="text-lg font-semibold mb-4 text-gray-900">Confirmar deleção</h3>
-              <p className="text-gray-700">Tem certeza que deseja deletar a tag <span className="font-bold text-gray-900">{showDelete.name}</span>?</p>
+              <p className="text-gray-700">Tem certeza que deseja deletar a categoria <span className="font-bold text-gray-900">{showDelete.name}</span>?</p>
               <div className="flex gap-2 mt-6 justify-end">
                 <button className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors" onClick={() => setShowDelete(null)} disabled={deleting}>Cancelar</button>
                 <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors" onClick={handleDelete} disabled={deleting}>
