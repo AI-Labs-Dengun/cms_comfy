@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
-import { getUserPosts, togglePostPublication, deletePost, Post } from "@/services/posts";
+import { getUserPosts, togglePostPublication, deletePost, Post, getTagsForPost } from "@/services/posts";
 import { useAuth } from "@/context/AuthContext";
 import { DeleteConfirmationModal, PublishToggleModal, NotificationModal } from "@/components/modals";
 
@@ -104,6 +104,8 @@ export default function Management() {
     message: ""
   });
 
+  const [readingTagsMap, setReadingTagsMap] = useState<{[postId: string]: {id: string, name: string, color?: string}[]}>({});
+
   // Buscar posts ao carregar o componente
   useEffect(() => {
     if (!authLoading && canAccessCMS) {
@@ -130,6 +132,45 @@ export default function Management() {
       setLoading(false);
     }
   };
+
+  // Buscar categorias de leitura para posts de leitura
+  useEffect(() => {
+    const fetchReadingTags = async () => {
+      const readingPosts = posts.filter(post => post.category === 'Leitura');
+      console.log('📚 Posts de leitura encontrados:', readingPosts.length);
+      
+      const tagsMap: {[postId: string]: {id: string, name: string, color?: string}[]} = {};
+      
+      for (const post of readingPosts) {
+        try {
+          console.log(`🔍 Buscando tags para post ${post.id}: ${post.title}`);
+          const tags = await getTagsForPost(post.id);
+          console.log(`✅ Tags encontradas para post ${post.id}:`, tags);
+          tagsMap[post.id] = tags;
+        } catch (error) {
+          console.error(`❌ Erro ao buscar tags para post ${post.id}:`, error);
+          // Fallback: usar categoria_leitura do post se disponível
+          if (post.categoria_leitura && post.categoria_leitura.length > 0) {
+            console.log(`📝 Usando categoria_leitura como fallback para post ${post.id}:`, post.categoria_leitura);
+            tagsMap[post.id] = post.categoria_leitura.map((cat, index) => ({
+              id: `fallback-${index}`,
+              name: cat,
+              color: '#3B82F6'
+            }));
+          } else {
+            tagsMap[post.id] = [];
+          }
+        }
+      }
+      
+      console.log('🗂️ Mapa final de tags:', tagsMap);
+      setReadingTagsMap(tagsMap);
+    };
+
+    if (posts.length > 0) {
+      fetchReadingTags();
+    }
+  }, [posts]);
 
   // Função para limpar todos os filtros
   const clearAllFilters = () => {
@@ -535,6 +576,23 @@ export default function Management() {
                   </svg>
                   <span className="hidden sm:inline">{showGroupedView ? 'Vista Normal' : 'Agrupar por Tag'}</span>
                   <span className="sm:hidden">{showGroupedView ? 'Normal' : 'Agrupar'}</span>
+                </button>
+                
+                {/* Botão de debug temporário */}
+                <button
+                  onClick={() => {
+                    console.log('🔍 DEBUG: Estado atual das categorias de leitura');
+                    console.log('📚 Posts de leitura:', posts.filter(p => p.category === 'Leitura'));
+                    console.log('🗂️ ReadingTagsMap:', readingTagsMap);
+                    console.log('📊 Posts com categoria_leitura:', posts.filter(p => p.categoria_leitura && p.categoria_leitura.length > 0));
+                  }}
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-purple-600 bg-purple-50 border border-purple-300 rounded-lg hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+                >
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 1 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547Z"/>
+                  </svg>
+                  <span className="hidden sm:inline">Debug</span>
+                  <span className="sm:hidden">Debug</span>
                 </button>
                 
                 {hasActiveFilters() && (
@@ -1033,6 +1091,9 @@ export default function Management() {
                                     {getSortIcon('emotion_tags')}
                                   </button>
                                 </th>
+                                <th className="text-left px-6 py-3 font-semibold text-gray-900">
+                                  Categorias de Leitura
+                                </th>
                                 <th className="text-left px-6 py-3 font-semibold text-gray-900">Ações</th>
                               </tr>
                             </thead>
@@ -1094,6 +1155,36 @@ export default function Management() {
                                         </span>
                                       )}
                                     </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    {post.category === 'Leitura' ? (
+                                      readingTagsMap[post.id] && readingTagsMap[post.id].length > 0 ? (
+                                        <div className="flex flex-wrap gap-1 max-w-xs">
+                                          {readingTagsMap[post.id].slice(0, 3).map((tag) => (
+                                            <span 
+                                              key={tag.id} 
+                                              className="px-2 py-1 rounded text-xs font-medium"
+                                              style={{ 
+                                                background: tag.color || '#3B82F6', 
+                                                color: '#fff',
+                                                textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                              }}
+                                            >
+                                              {tag.name}
+                                            </span>
+                                          ))}
+                                          {readingTagsMap[post.id].length > 3 && (
+                                            <span className="text-gray-600 text-xs font-medium">
+                                              +{readingTagsMap[post.id].length - 3}
+                                            </span>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-400 text-xs italic">Sem categorias</span>
+                                      )
+                                    ) : (
+                                      <span className="text-gray-400 text-xs">-</span>
+                                    )}
                                   </td>
                                   <td className="px-6 py-4">
                                     <div className="flex gap-2 flex-wrap">
@@ -1226,6 +1317,38 @@ export default function Management() {
                                         <span className="text-gray-600 text-xs font-medium self-center">
                                           +{post.emotion_tags.length - 4}
                                         </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {post.category === 'Leitura' && (
+                                  <div className="flex items-start gap-2">
+                                    <span className="font-medium mt-1">Categorias de Leitura:</span>
+                                    <div className="flex flex-wrap gap-1 flex-1">
+                                      {readingTagsMap[post.id] && readingTagsMap[post.id].length > 0 ? (
+                                        <>
+                                          {readingTagsMap[post.id].slice(0, 4).map((tag) => (
+                                            <span 
+                                              key={tag.id} 
+                                              className="px-2 py-1 rounded text-xs font-medium"
+                                              style={{ 
+                                                background: tag.color || '#3B82F6', 
+                                                color: '#fff',
+                                                textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                              }}
+                                            >
+                                              {tag.name}
+                                            </span>
+                                          ))}
+                                          {readingTagsMap[post.id].length > 4 && (
+                                            <span className="text-gray-600 text-xs font-medium self-center">
+                                              +{readingTagsMap[post.id].length - 4}
+                                            </span>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <span className="text-gray-400 text-xs italic">Sem categorias</span>
                                       )}
                                     </div>
                                   </div>
