@@ -14,6 +14,7 @@ export interface CreatePostData {
   file_size?: number
   tags?: string[]
   emotion_tags?: string[]
+  categoria_leitura?: string[] // ✅ ADICIONANDO CAMPO CATEGORIA_LEITURA
 }
 
 export interface Post {
@@ -29,6 +30,7 @@ export interface Post {
   file_type?: string
   tags: string[]
   emotion_tags: string[]
+  categoria_leitura?: string[] // ✅ ADICIONANDO CAMPO CATEGORIA_LEITURA
   is_published: boolean
   is_featured: boolean
   view_count: number
@@ -85,6 +87,7 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       content_url_param: postData.content_url || null,
       tags_param: postData.tags || [],
       emotion_tags_param: postData.emotion_tags || [],
+      // categoria_leitura_param será preenchido automaticamente pelo trigger
       file_path_param: postData.file_path || null,
       file_name_param: postData.file_name || null,
       file_type_param: postData.file_type || null
@@ -124,8 +127,9 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
   }
 }
 
-// Função para buscar posts do usuário (CMS)
-export async function getUserPosts(): Promise<ApiResponse<Post[]>> {
+// Função para buscar todos os posts (CMS)
+// NOTA: Todos os usuários do CMS podem ver e gerenciar todos os posts, independentemente do autor
+export async function getAllPosts(): Promise<ApiResponse<Post[]>> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
@@ -136,11 +140,10 @@ export async function getUserPosts(): Promise<ApiResponse<Post[]>> {
       }
     }
 
-    // Buscar posts do usuário
+    // Buscar todos os posts (sem filtrar por autor)
     const { data, error } = await supabase
       .from('posts')
       .select('*')
-      .eq('author_id', user.id)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -149,6 +152,22 @@ export async function getUserPosts(): Promise<ApiResponse<Post[]>> {
         success: false,
         error: 'Erro ao buscar posts: ' + error.message
       }
+    }
+
+    // Log para verificar se o campo categoria_leitura está presente
+    if (data && data.length > 0) {
+      console.log('📊 Posts carregados:', data.length);
+      const readingPosts = data.filter(post => post.category === 'Leitura');
+      console.log('📚 Posts de leitura encontrados:', readingPosts.length);
+      
+      readingPosts.forEach(post => {
+        console.log(`📖 Post "${post.title}":`, {
+          id: post.id,
+          categoria_leitura: post.categoria_leitura,
+          has_categoria_leitura: !!post.categoria_leitura,
+          categoria_leitura_length: post.categoria_leitura?.length || 0
+        });
+      });
     }
 
     return {
@@ -163,6 +182,12 @@ export async function getUserPosts(): Promise<ApiResponse<Post[]>> {
       error: 'Erro inesperado ao buscar posts'
     }
   }
+}
+
+// Função para buscar posts do usuário (CMS) - mantida para compatibilidade
+// NOTA: Agora retorna todos os posts, não apenas os do usuário atual
+export async function getUserPosts(): Promise<ApiResponse<Post[]>> {
+  return getAllPosts();
 }
 
 // Função para atualizar um post
@@ -233,6 +258,7 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       content_url_param: contentUrl,
       tags_param: postData.tags || [],
       emotion_tags_param: postData.emotion_tags || [],
+      // categoria_leitura_param será preenchido automaticamente pelo trigger
       file_path_param: filePath,
       file_name_param: fileName,
       file_type_param: fileType
@@ -393,6 +419,7 @@ export async function deletePost(postId: string): Promise<ApiResponse> {
 }
 
 // Função para buscar um post específico
+// NOTA: Qualquer usuário do CMS pode visualizar qualquer post, independentemente do autor
 export async function getPost(postId: string): Promise<ApiResponse<Post>> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -404,12 +431,11 @@ export async function getPost(postId: string): Promise<ApiResponse<Post>> {
       }
     }
 
-    // Buscar post específico
+    // Buscar post específico (sem filtrar por autor)
     const { data, error } = await supabase
       .from('posts')
       .select('*')
       .eq('id', postId)
-      .eq('author_id', user.id)
       .single()
 
     if (error) {
@@ -419,6 +445,9 @@ export async function getPost(postId: string): Promise<ApiResponse<Post>> {
         error: 'Post não encontrado ou acesso negado'
       }
     }
+
+    console.log('📄 Post carregado:', data);
+    console.log('📋 Categoria de leitura do post:', data.categoria_leitura);
 
     return {
       success: true,
@@ -468,9 +497,33 @@ export async function deleteReadingTag(id: string) {
 }
 
 export async function getTagsForPost(postId: string) {
-  const { data, error } = await supabase.rpc('get_tags_for_post', { post_id_param: postId });
-  if (error) throw new Error(error.message);
-  return data.tags || [];
+  try {
+    console.log(`🔍 Buscando tags para post: ${postId}`);
+    
+    const { data, error } = await supabase.rpc('get_tags_for_post', { post_id_param: postId });
+    
+    if (error) {
+      console.error('❌ Erro na função get_tags_for_post:', error);
+      throw new Error(error.message);
+    }
+    
+    console.log('📊 Dados retornados da função get_tags_for_post:', data);
+    
+    // Verificar se data existe e tem a estrutura esperada
+    if (!data) {
+      console.log('⚠️ Nenhum dado retornado da função get_tags_for_post');
+      return [];
+    }
+    
+    // Verificar se data.tags existe, senão usar data diretamente
+    const tags = data.tags || data || [];
+    console.log('🏷️ Tags processadas:', tags);
+    
+    return tags;
+  } catch (error) {
+    console.error('❌ Erro ao buscar tags para post:', error);
+    throw error;
+  }
 }
 
 export async function associateTagWithPost(postId: string, tagId: string) {
