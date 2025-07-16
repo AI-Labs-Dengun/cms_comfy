@@ -7,6 +7,7 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { createPost, CreatePostData, uploadFileForPost, getAllReadingTags, associateTagWithPost } from "@/services/posts";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const emotionTags = [
   "Raiva",
@@ -241,6 +242,7 @@ export default function CreateContent() {
   const [description, setDescription] = useState("");
   const [content, setContent] = useState(""); // ✅ ADICIONANDO ESTADO PARA CONTENT
   const [category, setCategory] = useState<"Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura">("Vídeo");
+  // Removido readingCategory pois não é mais necessário
   const [contentUrl, setContentUrl] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -312,14 +314,17 @@ export default function CreateContent() {
         title: title.trim(),
         description: description.trim(),
         category,
-        tags: category !== 'Leitura' ? tags : undefined,
-        emotion_tags: emotions
+        tags: tags, // ✅ TODAS AS CATEGORIAS AGORA TÊM TAGS
+        emotion_tags: emotions,
+        // categoria_leitura será preenchida automaticamente pelo trigger quando as tags forem associadas
       };
 
       // Adicionar conteúdo se fornecido
       if (content.trim()) { // ✅ ADICIONANDO CONTEÚDO AO POST DATA
         postData.content = content.trim();
       }
+
+      // Removido código de reading_category pois não é mais necessário
 
       // Adicionar URL se fornecida
       if (contentUrl.trim()) {
@@ -378,6 +383,13 @@ export default function CreateContent() {
             }
           }
         }
+        
+        // Garantir que a coluna categoria_leitura seja preenchida corretamente
+        try {
+          await supabase.rpc('sync_categoria_leitura', { post_id_param: result.data.id });
+        } catch (error) {
+          console.error('Erro ao sincronizar categoria_leitura:', error);
+        }
       }
 
       if (result.success) {
@@ -387,6 +399,7 @@ export default function CreateContent() {
         setTitle("");
         setDescription("");
         setContent(""); // ✅ LIMPAR ESTADO PARA CONTENT
+        // Removido setReadingCategory pois não é mais necessário
         setContentUrl("");
         setCategory("Vídeo");
         setTags([]);
@@ -513,6 +526,8 @@ export default function CreateContent() {
                 <option value="Leitura">Leitura</option>
               </select>
             </div>
+
+            {/* Removido campo de categoria de leitura pois não é mais necessário */}
             {/* Conteúdo dividido em URL ou Ficheiro */}
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-900">Conteúdo</label>
@@ -662,13 +677,13 @@ export default function CreateContent() {
                 )}
               </div>
             )}
-            {/* Tags de Leitura (apenas para categoria Leitura) */}
+            {/* Categorias de Leitura (apenas para categoria Leitura) */}
             {category === 'Leitura' && (
               <div>
-                <label className="block text-sm font-medium mb-1 text-gray-900">Tags de Leitura</label>
+                <label className="block text-sm font-medium mb-1 text-gray-900">Categorias de Leitura</label>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {readingTags.length === 0 ? (
-                    <span className="text-gray-400">Nenhuma tag cadastrada. <a href='/dashboard/leitura/tags' className='underline'>Gerenciar tags</a></span>
+                    <span className="text-gray-400">Nenhuma categoria cadastrada. <a href='/dashboard/leitura/tags' className='underline'>Gerenciar categorias</a></span>
                   ) : (
                     readingTags.map(tag => (
                       <label key={tag.id} className="flex items-center gap-2 text-sm cursor-pointer" style={{ background: selectedReadingTags.includes(tag.id) ? (tag.color || '#3B82F6') : '#f3f4f6', color: selectedReadingTags.includes(tag.id) ? '#fff' : '#222', borderRadius: '9999px', padding: '0.25rem 0.75rem' }}>
@@ -683,40 +698,44 @@ export default function CreateContent() {
                     ))
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Selecione as tags que melhor representam o post de leitura.</p>
+                <p className="text-xs text-gray-500 mt-1">Selecione as categorias que melhor representam o post de leitura.</p>
               </div>
             )}
-            {/* Campo de tags antigo para outras categorias */}
-            {category !== 'Leitura' && (
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-900">Tags</label>
-                <input
-                  type="text"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
-                  placeholder="Adicione tags e pressione Enter"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                />
-                {/* Exibir tags abaixo do input */}
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {tags.length === 0 ? (
-                    <span className="bg-gray-100 text-gray-400 px-3 py-1 rounded-full flex items-center text-sm font-medium opacity-80 select-none pointer-events-none">
-                      Exemplo
+            {/* Campo de tags para todas as categorias */}
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-900">Tags</label>
+              <input
+                type="text"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                placeholder="Adicione tags e pressione Enter"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+              />
+              {/* Exibir tags abaixo do input */}
+              <div className="flex flex-wrap gap-2 mt-2">
+                {tags.length === 0 ? (
+                  <span className="bg-gray-100 text-gray-400 px-3 py-1 rounded-full flex items-center text-sm font-medium opacity-80 select-none pointer-events-none">
+                    Exemplo
+                  </span>
+                ) : (
+                  tags.map((tag) => (
+                    <span key={tag} className="bg-gray-200 text-gray-800 px-3 py-1 rounded-full flex items-center text-sm font-medium">
+                      {tag}
+                      <button type="button" className="ml-2 text-gray-500 hover:text-red-500" onClick={() => removeTag(tag)}>
+                        ×
+                      </button>
                     </span>
-                  ) : (
-                    tags.map((tag) => (
-                      <span key={tag} className="bg-gray-200 text-gray-800 px-3 py-1 rounded-full flex items-center text-sm font-medium">
-                        {tag}
-                        <button type="button" className="ml-2 text-gray-500 hover:text-red-500" onClick={() => removeTag(tag)}>
-                          ×
-                        </button>
-                      </span>
-                    ))
-                  )}
-                </div>
+                  ))
+                )}
               </div>
-            )}
+              <p className="text-xs text-gray-500 mt-1">
+                {category === 'Leitura' 
+                  ? 'Tags gerais para o post (além das categorias de leitura específicas)' 
+                  : 'Adicione tags que descrevam o conteúdo'
+                }
+              </p>
+            </div>
             {/* Emotion Tags */}
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-900">Tags de Emoção</label>
