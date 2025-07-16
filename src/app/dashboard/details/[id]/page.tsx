@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { getPost, deletePost, togglePostPublication, updatePost, Post } from "@/services/posts";
+import { getPost, deletePost, togglePostPublication, updatePost, Post, getTagsForPost } from "@/services/posts";
 import { getFileUrl, getSignedUrl } from "@/services/storage";
 import { useAuth } from "@/context/AuthContext";
 import { DeleteConfirmationModal, PublishToggleModal } from "@/components/modals";
@@ -259,6 +259,7 @@ export default function DetalhesConteudo() {
   const [editTags, setEditTags] = useState<string[]>([]);
   const [editEmotionTags, setEditEmotionTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [readingTags, setReadingTags] = useState<{id: string, name: string, color?: string}[]>([]);
 
   const postId = params.id as string;
 
@@ -294,6 +295,28 @@ export default function DetalhesConteudo() {
       loadPost();
     }
   }, [authLoading, canAccessCMS, postId, loadPost]);
+
+  // Carregar categorias de leitura se for post de leitura
+  useEffect(() => {
+    if (post && post.category === 'Leitura') {
+      console.log('🔍 Carregando categorias de leitura para post:', post.id);
+      console.log('📋 Categoria de leitura do post:', post.categoria_leitura);
+      
+      // Tentar carregar tags associadas
+      getTagsForPost(post.id)
+        .then((tags) => {
+          console.log('🏷️ Tags carregadas:', tags);
+          setReadingTags(tags);
+        })
+        .catch((error) => {
+          console.error('❌ Erro ao carregar tags:', error);
+          console.log('📝 Usando categoria_leitura do post como fallback');
+          setReadingTags([]);
+        });
+    } else {
+      setReadingTags([]);
+    }
+  }, [post]);
 
   // Função para carregar URL assinada do arquivo
   const loadFileUrl = async (filePath: string) => {
@@ -420,7 +443,8 @@ export default function DetalhesConteudo() {
         content_url: editContentUrl.trim() || undefined,
         tags: editTags,
         emotion_tags: editEmotionTags,
-        category: post.category as 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura' // Preservar a categoria atual do post
+        category: post.category as 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura', // Preservar a categoria atual do post
+        // categoria_leitura será preenchida automaticamente pelo trigger quando as tags forem associadas
       };
 
       const response = await updatePost(post.id, updateData);
@@ -1145,6 +1169,32 @@ export default function DetalhesConteudo() {
                   <div className="text-gray-900 font-medium">{post.category}</div>
                 </div>
                 
+                {/* Categoria de Leitura (apenas para posts de leitura) */}
+                {post.category === 'Leitura' && (
+                  <div>
+                    <div className="text-xs text-gray-500 font-bold">Categoria de Leitura</div>
+                    <div className="text-gray-900 font-medium">
+                      {readingTags.length > 0 ? (
+                        readingTags.map((tag, index) => (
+                          <span key={tag.id}>
+                            {index > 0 && ', '}
+                            <span style={{ color: tag.color || '#3B82F6' }}>{tag.name}</span>
+                          </span>
+                        ))
+                      ) : post.categoria_leitura && post.categoria_leitura.length > 0 ? (
+                        post.categoria_leitura.map((cat, index) => (
+                          <span key={index}>
+                            {index > 0 && ', '}
+                            {cat}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 italic">Nenhuma categoria definida</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
                 <div>
                   <div className="text-xs text-gray-500 font-bold">Data de Criação</div>
                   <div className="text-gray-900 font-medium">{formatDate(post.created_at)}</div>
@@ -1305,6 +1355,26 @@ export default function DetalhesConteudo() {
                     </>
                   )}
                 </>
+              )}
+
+              {/* Categorias de Leitura (apenas para posts de leitura) */}
+              {post.category === 'Leitura' && (
+                <div className="mb-4">
+                  <div className="text-xs text-gray-500 font-bold">Categorias de Leitura</div>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {readingTags.length > 0 ? (
+                      readingTags.map((tag) => (
+                        <span key={tag.id} className="px-2 py-1 rounded text-xs font-medium" style={{ background: tag.color || '#3B82F6', color: '#fff' }}>{tag.name}</span>
+                      ))
+                    ) : post.categoria_leitura && post.categoria_leitura.length > 0 ? (
+                      post.categoria_leitura.map((cat, index) => (
+                        <span key={index} className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">{cat}</span>
+                      ))
+                    ) : (
+                      <span className="text-gray-400 italic text-xs">Nenhuma categoria definida</span>
+                    )}
+                  </div>
+                </div>
               )}
 
               {/* Informação sobre Storage */}
