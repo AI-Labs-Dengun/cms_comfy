@@ -147,7 +147,7 @@ export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
               onClick={() => handleNavigation('/dashboard/leitura/tags')}
             >
               <Tags className="w-4 h-4" />
-              <span className="text-sm lg:text-base">Tags de Leitura</span>
+              <span className="text-sm lg:text-base">Categorias de Leitura</span>
             </button>
             {/* Novo Psicólogo */}
             <button
