@@ -4,10 +4,11 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { getPost, deletePost, togglePostPublication, updatePost, Post, getTagsForPost } from "@/services/posts";
+import { getPost, deletePost, togglePostPublication, updatePost, Post, getTagsForPost, getAllReadingTags, associateTagWithPost, removeTagFromPost } from "@/services/posts";
 import { getFileUrl, getSignedUrl } from "@/services/storage";
 import { useAuth } from "@/context/AuthContext";
 import { DeleteConfirmationModal, PublishToggleModal, NotificationModal } from "@/components/modals";
+import { supabase } from "@/lib/supabase";
 import Image from 'next/image';
 
 const emotionTags = [
@@ -261,6 +262,11 @@ export default function DetalhesConteudo() {
   const [editEmotionTags, setEditEmotionTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [readingTags, setReadingTags] = useState<{id: string, name: string, color?: string}[]>([]);
+  
+  // ✅ NOVOS ESTADOS PARA GERENCIAR TAGS DE LEITURA
+  const [allReadingTags, setAllReadingTags] = useState<{id: string, name: string, color?: string}[]>([]);
+  const [selectedReadingTagIds, setSelectedReadingTagIds] = useState<string[]>([]);
+  const [loadingReadingTags, setLoadingReadingTags] = useState(false);
 
   const postId = params.id as string;
 
@@ -308,16 +314,39 @@ export default function DetalhesConteudo() {
         .then((tags) => {
           console.log('🏷️ Tags carregadas:', tags);
           setReadingTags(tags);
+          // ✅ INICIALIZAR TAG SELECIONADA (apenas a primeira)
+          setSelectedReadingTagIds(tags.length > 0 ? [tags[0].id] : []);
         })
         .catch((error) => {
           console.error('❌ Erro ao carregar tags:', error);
           console.log('📝 Usando categoria_leitura do post como fallback');
           setReadingTags([]);
+          setSelectedReadingTagIds([]);
         });
     } else {
       setReadingTags([]);
+      setSelectedReadingTagIds([]);
     }
   }, [post]);
+
+  // ✅ CARREGAR TODAS AS CATEGORIAS DE LEITURA DISPONÍVEIS
+  useEffect(() => {
+    if (post && post.category === 'Leitura' && isEditing) {
+      setLoadingReadingTags(true);
+      getAllReadingTags()
+        .then((tags) => {
+          console.log('📚 Todas as categorias de leitura carregadas:', tags);
+          setAllReadingTags(tags);
+        })
+        .catch((error) => {
+          console.error('❌ Erro ao carregar todas as categorias:', error);
+          setAllReadingTags([]);
+        })
+        .finally(() => {
+          setLoadingReadingTags(false);
+        });
+    }
+  }, [post, isEditing]);
 
   // Função para carregar URL assinada do arquivo
   const loadFileUrl = async (filePath: string) => {
@@ -404,6 +433,16 @@ export default function DetalhesConteudo() {
     setEditContentUrl(postData.content_url || "");
     setEditTags(postData.tags);
     setEditEmotionTags(postData.emotion_tags);
+    // ✅ INICIALIZAR TAG DE LEITURA SELECIONADA (apenas a primeira)
+    if (postData.category === 'Leitura') {
+      getTagsForPost(postData.id)
+        .then((tags) => {
+          setSelectedReadingTagIds(tags.length > 0 ? [tags[0].id] : []);
+        })
+        .catch(() => {
+          setSelectedReadingTagIds([]);
+        });
+    }
   };
 
   // Função para entrar em modo de edição
@@ -421,6 +460,21 @@ export default function DetalhesConteudo() {
     }
     setIsEditing(false);
     setTagInput("");
+    // ✅ RESETAR TAG DE LEITURA (apenas a primeira)
+    if (post && post.category === 'Leitura') {
+      getTagsForPost(post.id)
+        .then((tags) => {
+          setSelectedReadingTagIds(tags.length > 0 ? [tags[0].id] : []);
+        })
+        .catch(() => {
+          setSelectedReadingTagIds([]);
+        });
+    }
+  };
+
+  // ✅ FUNÇÃO PARA SELECIONAR UMA ÚNICA TAG DE LEITURA
+  const handleReadingTagSelect = (tagId: string) => {
+    setSelectedReadingTagIds([tagId]); // Apenas uma tag selecionada
   };
 
   // Função para salvar alterações
@@ -451,6 +505,39 @@ export default function DetalhesConteudo() {
       const response = await updatePost(post.id, updateData);
 
       if (response.success) {
+        // ✅ ATUALIZAR TAG DE LEITURA SE FOR POST DE LEITURA
+        if (post.category === 'Leitura') {
+          try {
+            // Obter tags atuais do post
+            const currentTags = await getTagsForPost(post.id);
+            const currentTagIds = currentTags.map((tag: {id: string, name: string, color?: string}) => tag.id);
+            
+            // Remover todas as tags atuais (garantir apenas uma)
+            for (const tagId of currentTagIds) {
+              await removeTagFromPost(post.id, tagId);
+            }
+            
+            // Adicionar apenas a tag selecionada (se houver)
+            if (selectedReadingTagIds.length > 0) {
+              await associateTagWithPost(post.id, selectedReadingTagIds[0]);
+            }
+            
+            // Sincronizar categoria_leitura (se a função existir)
+            try {
+              await supabase.rpc('sync_categoria_leitura', { post_id_param: post.id });
+            } catch {
+              console.log('Função sync_categoria_leitura não disponível, continuando...');
+            }
+            
+            // Recarregar tags para atualizar o estado
+            const updatedTags = await getTagsForPost(post.id);
+            setReadingTags(updatedTags);
+          } catch (error) {
+            console.error('Erro ao atualizar tag de leitura:', error);
+            // Continuar mesmo se houver erro nas tags
+          }
+        }
+
         // Atualizar o estado local
         setPost((prev: Post | null) => prev ? {
           ...prev,
@@ -1065,24 +1152,13 @@ export default function DetalhesConteudo() {
                   
                   <div className="mb-4">
                     <label className="block text-xs text-gray-500 font-bold mb-1">Descrição</label>
-                    <MarkdownEditor
+                    <textarea
                       value={editDescription}
-                      onChange={setEditDescription}
-                      placeholder="Descrição do post usando markdown..."
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditDescription(e.target.value)}
+                      placeholder="Descrição do post..."
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium resize-none"
+                      rows={4}
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Use os botões acima para formatar o texto ou digite diretamente em markdown
-                    </p>
-                    
-                    {/* Prévia do Markdown */}
-                    {editDescription.trim() && (
-                      <div className="mt-4 p-4 bg-gray-50 rounded-md border">
-                        <div className="text-xs text-gray-500 font-bold mb-2">Prévia da formatação:</div>
-                        <div className="bg-white p-3 rounded border">
-                          <MarkdownRenderer content={editDescription} />
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {post.category !== "Shorts" && (
@@ -1176,19 +1252,9 @@ export default function DetalhesConteudo() {
                     <div className="text-xs text-gray-500 font-bold">Categoria de Leitura</div>
                     <div className="text-gray-900 font-medium">
                       {readingTags.length > 0 ? (
-                        readingTags.map((tag, index) => (
-                          <span key={tag.id}>
-                            {index > 0 && ', '}
-                            <span style={{ color: tag.color || '#3B82F6' }}>{tag.name}</span>
-                          </span>
-                        ))
+                        <span style={{ color: readingTags[0].color || '#3B82F6' }}>{readingTags[0].name}</span>
                       ) : post.categoria_leitura && post.categoria_leitura.length > 0 ? (
-                        post.categoria_leitura.map((cat, index) => (
-                          <span key={index}>
-                            {index > 0 && ', '}
-                            {cat}
-                          </span>
-                        ))
+                        <span>{post.categoria_leitura[0]}</span>
                       ) : (
                         <span className="text-gray-400 italic">Nenhuma categoria definida</span>
                       )}
@@ -1327,6 +1393,36 @@ export default function DetalhesConteudo() {
                       ))}
                     </div>
                   </div>
+
+                  {/* ✅ SEÇÃO PARA EDITAR CATEGORIAS DE LEITURA */}
+                  {post.category === 'Leitura' && (
+                    <div className="mb-4">
+                      <label className="block text-xs text-gray-500 font-bold mb-1">Categoria de Leitura</label>
+                      {loadingReadingTags ? (
+                        <div className="text-gray-500 text-sm">Carregando categorias disponíveis...</div>
+                      ) : allReadingTags.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          {allReadingTags.map((tag) => (
+                            <label key={tag.id} className="flex items-center gap-2 text-sm text-gray-900 font-medium">
+                              <input
+                                type="radio"
+                                name="reading-category"
+                                checked={selectedReadingTagIds.includes(tag.id)}
+                                onChange={() => handleReadingTagSelect(tag.id)}
+                                className="accent-blue-600 cursor-pointer"
+                              />
+                              <span style={{ color: tag.color || '#3B82F6' }}>{tag.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 text-sm">Nenhuma categoria de leitura disponível</div>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">
+                        Selecione a categoria que melhor representa este post de leitura.
+                      </p>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -1358,19 +1454,15 @@ export default function DetalhesConteudo() {
                 </>
               )}
 
-              {/* Categorias de Leitura (apenas para posts de leitura) */}
+              {/* Categoria de Leitura (apenas para posts de leitura) */}
               {post.category === 'Leitura' && (
                 <div className="mb-4">
-                  <div className="text-xs text-gray-500 font-bold">Categorias de Leitura</div>
+                  <div className="text-xs text-gray-500 font-bold">Categoria de Leitura</div>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {readingTags.length > 0 ? (
-                      readingTags.map((tag) => (
-                        <span key={tag.id} className="px-2 py-1 rounded text-xs font-medium" style={{ background: tag.color || '#3B82F6', color: '#fff' }}>{tag.name}</span>
-                      ))
+                      <span className="px-2 py-1 rounded text-xs font-medium" style={{ background: readingTags[0].color || '#3B82F6', color: '#fff' }}>{readingTags[0].name}</span>
                     ) : post.categoria_leitura && post.categoria_leitura.length > 0 ? (
-                      post.categoria_leitura.map((cat, index) => (
-                        <span key={index} className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">{cat}</span>
-                      ))
+                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">{post.categoria_leitura[0]}</span>
                     ) : (
                       <span className="text-gray-400 italic text-xs">Nenhuma categoria definida</span>
                     )}
