@@ -7,7 +7,7 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { getPost, deletePost, togglePostPublication, updatePost, Post, getTagsForPost } from "@/services/posts";
 import { getFileUrl, getSignedUrl } from "@/services/storage";
 import { useAuth } from "@/context/AuthContext";
-import { DeleteConfirmationModal, PublishToggleModal } from "@/components/modals";
+import { DeleteConfirmationModal, PublishToggleModal, NotificationModal } from "@/components/modals";
 import Image from 'next/image';
 
 const emotionTags = [
@@ -250,6 +250,7 @@ export default function DetalhesConteudo() {
   const [saving, setSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   
   // Estados para os campos editáveis
   const [editTitle, setEditTitle] = useState("");
@@ -464,7 +465,7 @@ export default function DetalhesConteudo() {
         } : null);
         
         setIsEditing(false);
-        alert('Post atualizado com sucesso!');
+        setShowSuccessModal(true);
       } else {
         alert(response.error || 'Erro ao atualizar post');
       }
@@ -1415,6 +1416,16 @@ export default function DetalhesConteudo() {
         isPublished={post?.is_published || false}
         title={post?.title || ""}
         isLoading={publishing}
+      />
+
+      <NotificationModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        type="success"
+        title="Post Atualizado com Sucesso!"
+        message="As alterações foram salvas e o post foi atualizado com sucesso."
+        autoClose={true}
+        autoCloseDelay={3000}
       />
     </CMSLayout>
   );
