@@ -591,8 +591,8 @@ export default function CreateContent() {
         // Garantir que a coluna categoria_leitura seja preenchida corretamente
         try {
           await supabase.rpc('sync_categoria_leitura', { post_id_param: result.data.id });
-        } catch (error) {
-          console.error('Erro ao sincronizar categoria_leitura:', error);
+        } catch {
+          console.log('Função sync_categoria_leitura não disponível, continuando...');
         }
       }
 
