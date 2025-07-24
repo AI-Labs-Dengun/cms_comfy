@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 
@@ -25,7 +25,27 @@ export function useAuth() {
     error: null
   })
 
-  const checkUser = useCallback(async () => {
+  const lastCheckRef = useRef<number>(0)
+  const isCheckingRef = useRef<boolean>(false)
+
+  const checkUser = useCallback(async (forceRefresh: boolean = false) => {
+    // Evitar verificações muito frequentes
+    const now = Date.now()
+    const timeSinceLastCheck = now - lastCheckRef.current
+    
+    if (!forceRefresh && timeSinceLastCheck < 15000) { // 15 segundos
+      console.log('⏭️ useAuth - Verificação recente, pulando...')
+      return
+    }
+
+    if (isCheckingRef.current) {
+      console.log('⏳ useAuth - Verificação já em andamento...')
+      return
+    }
+
+    isCheckingRef.current = true
+    lastCheckRef.current = now
+
     try {
       const { data: { user }, error } = await supabase.auth.getUser()
       
@@ -51,6 +71,8 @@ export function useAuth() {
         error: 'Erro ao verificar autenticação', 
         loading: false 
       }))
+    } finally {
+      isCheckingRef.current = false
     }
   }, [])
 
@@ -92,7 +114,7 @@ export function useAuth() {
 
   useEffect(() => {
     // Verificar sessão atual
-    checkUser()
+    checkUser(true)
 
     // Escutar mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -110,7 +132,24 @@ export function useAuth() {
       }
     )
 
-    return () => subscription.unsubscribe()
+    // Listener para visibilidade da página - otimizado
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Só verificar se a página ficou oculta por mais de 30 segundos
+        const timeHidden = Date.now() - lastCheckRef.current
+        if (timeHidden > 30000) {
+          console.log('👁️ useAuth - Página visível novamente após', Math.round(timeHidden / 1000), 'segundos')
+          checkUser(false) // Não forçar refresh
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [checkUser])
 
   const signOut = async () => {
@@ -140,6 +179,6 @@ export function useAuth() {
     isCMSUser,
     canAccessCMS,
     signOut,
-    refetch: checkUser
+    refetch: () => checkUser(true)
   }
 } 

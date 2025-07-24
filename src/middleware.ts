@@ -12,9 +12,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Para rotas do dashboard, fazer verificação básica mas deixar AuthGuard fazer a verificação detalhada
+  // Para rotas do dashboard, fazer verificação mais robusta
   if (pathname.startsWith('/dashboard')) {
-    console.log('🔍 Verificando acesso básico ao dashboard...');
+    console.log('🔍 Verificando acesso ao dashboard...');
     
     let response = NextResponse.next({
       request: {
@@ -78,8 +78,7 @@ export async function middleware(req: NextRequest) {
         pathname
       });
 
-      // Apenas redirecionar se realmente não há sessão alguma
-      // Deixar o AuthGuard fazer verificações mais específicas (role, authorization, etc.)
+      // Se não há sessão alguma, redirecionar para login
       if (error && error.message === 'Auth session missing!') {
         console.log('❌ Nenhuma sessão de auth encontrada, redirecionando para login');
         const redirectUrl = req.nextUrl.clone()
@@ -87,14 +86,15 @@ export async function middleware(req: NextRequest) {
         return NextResponse.redirect(redirectUrl)
       }
 
+      // Se há usuário autenticado, permitir acesso e deixar AuthGuard fazer verificação detalhada
       if (user) {
-        console.log('✅ Usuário encontrado no middleware, permitindo acesso - AuthGuard fará verificação detalhada');
-      } else if (!error) {
-        console.log('⚠️ Nenhum usuário mas sem erro, permitindo acesso - pode ser sessão em processo');
-      } else {
-        console.log('⚠️ Erro na verificação mas não é "session missing", permitindo acesso:', error.message);
+        console.log('✅ Usuário autenticado encontrado, permitindo acesso - AuthGuard fará verificação detalhada');
+        return response
       }
 
+      // Se não há usuário mas também não há erro de sessão, pode ser um estado intermediário
+      // Permitir acesso e deixar AuthGuard lidar
+      console.log('⚠️ Estado intermediário detectado, permitindo acesso - AuthGuard verificará');
       return response
 
     } catch (error) {

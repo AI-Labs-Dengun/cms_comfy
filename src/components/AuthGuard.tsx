@@ -20,6 +20,8 @@ export default function AuthGuard({
   const [isChecking, setIsChecking] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [verificationAttempts, setVerificationAttempts] = useState(0);
   
   const { 
     authInfo, 
@@ -27,15 +29,28 @@ export default function AuthGuard({
     error, 
     isAuthenticated, 
     canAccessCMS,
-    checkRoleAccess 
+    checkRoleAccess,
+    user,
+    profile
   } = useAuth();
 
   useEffect(() => {
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
+    let retryTimeoutId: NodeJS.Timeout;
+    const maxRetries = 5; // Aumentado para 5 tentativas
+    const retryDelay = 1500; // 1.5 segundos entre tentativas
 
     const handleAuthCheck = async () => {
-      console.log('🛡️ AuthGuard - Iniciando verificação de acesso...');
+      console.log('🛡️ AuthGuard - Iniciando verificação de acesso...', {
+        attempt: verificationAttempts + 1,
+        maxRetries,
+        isAuthenticated,
+        canAccessCMS,
+        loading,
+        hasUser: !!user,
+        hasProfile: !!profile
+      });
       
       // Se ainda está carregando, aguardar
       if (loading) {
@@ -44,25 +59,44 @@ export default function AuthGuard({
         return;
       }
 
-      // Timeout de segurança de 10 segundos
+      // Marcar que o carregamento inicial foi concluído
+      if (!initialLoadComplete) {
+        setInitialLoadComplete(true);
+      }
+
+      // Timeout de segurança aumentado para 12 segundos
       timeoutId = setTimeout(() => {
         if (mounted && isChecking) {
           console.warn('⚠️ AuthGuard - Timeout na verificação, redirecionando...');
           setAccessDenied(true);
           setErrorMessage('Verificação de acesso demorou muito. Redirecionando...');
-          setTimeout(() => router.push(redirectTo), 2000);
+          setTimeout(() => router.push(redirectTo), 1000);
         }
-      }, 10000);
+      }, 12000);
 
       try {
         // Verificar autenticação básica
         if (!isAuthenticated) {
           console.log('❌ AuthGuard - Usuário não autenticado');
+          
+          // Se não está autenticado mas ainda não tentamos o suficiente, aguardar
+          if (verificationAttempts < maxRetries) {
+            console.log(`⏳ AuthGuard - Aguardando autenticação... (tentativa ${verificationAttempts + 1}/${maxRetries})`);
+            
+            retryTimeoutId = setTimeout(() => {
+              if (mounted) {
+                setVerificationAttempts(prev => prev + 1);
+                handleAuthCheck();
+              }
+            }, retryDelay);
+            return;
+          }
+          
+          // Só mostrar acesso negado após todas as tentativas
           if (mounted) {
             setAccessDenied(true);
             setErrorMessage('Você precisa fazer login para acessar esta área.');
-            // Redirecionamento mais rápido para melhorar UX
-            setTimeout(() => router.push(redirectTo), 800);
+            setTimeout(() => router.push(redirectTo), 500);
           }
           return;
         }
@@ -71,11 +105,27 @@ export default function AuthGuard({
         if (requiredRole === 'cms') {
           console.log('🔍 AuthGuard - Verificando acesso CMS...');
           
+          // Se ainda não temos informações completas mas o usuário está autenticado,
+          // aguardar mais tempo antes de negar acesso
+          if (!canAccessCMS && verificationAttempts < maxRetries) {
+            console.log(`⏳ AuthGuard - Aguardando dados completos... (tentativa ${verificationAttempts + 1}/${maxRetries})`);
+            
+            // Aguardar mais um pouco e tentar novamente
+            retryTimeoutId = setTimeout(() => {
+              if (mounted) {
+                setVerificationAttempts(prev => prev + 1);
+                handleAuthCheck();
+              }
+            }, retryDelay);
+            return;
+          }
+          
           if (!canAccessCMS) {
-            console.log('❌ AuthGuard - Acesso CMS negado:', {
+            console.log('❌ AuthGuard - Acesso CMS negado após todas as tentativas:', {
               canAccessCMS,
               authInfo,
-              isAuthenticated
+              isAuthenticated,
+              verificationAttempts
             });
             
             if (mounted) {
@@ -94,7 +144,7 @@ export default function AuthGuard({
               }
               
               setErrorMessage(message);
-              setTimeout(() => router.push(redirectTo), 2000);
+              setTimeout(() => router.push(redirectTo), 1500);
             }
             return;
           }
@@ -116,7 +166,7 @@ export default function AuthGuard({
             if (mounted) {
               setAccessDenied(true);
               setErrorMessage(`Você não tem permissão para acessar esta área (role ${requiredRole} requerido).`);
-              setTimeout(() => router.push(redirectTo), 2000);
+              setTimeout(() => router.push(redirectTo), 1500);
             }
             return;
           }
@@ -130,7 +180,7 @@ export default function AuthGuard({
           if (mounted) {
             setAccessDenied(true);
             setErrorMessage('Erro ao verificar permissões. Tente novamente.');
-            setTimeout(() => router.push(redirectTo), 2000);
+            setTimeout(() => router.push(redirectTo), 1500);
           }
         }
         
@@ -139,27 +189,29 @@ export default function AuthGuard({
         if (mounted) {
           setAccessDenied(true);
           setErrorMessage('Erro inesperado na verificação de acesso.');
-          setTimeout(() => router.push(redirectTo), 2000);
+          setTimeout(() => router.push(redirectTo), 1500);
         }
       }
     };
 
+    // Executar verificação
     handleAuthCheck();
 
     return () => {
       mounted = false;
       if (timeoutId) clearTimeout(timeoutId);
+      if (retryTimeoutId) clearTimeout(retryTimeoutId);
     };
-  }, [loading, isAuthenticated, canAccessCMS, requiredRole, authInfo, checkRoleAccess, router, redirectTo, isChecking]);
+  }, [loading, isAuthenticated, canAccessCMS, requiredRole, authInfo, checkRoleAccess, router, redirectTo, verificationAttempts, initialLoadComplete, user, profile]);
 
-  // Estado de carregamento
+  // Estado de carregamento - melhorado para evitar flash de "acesso negado"
   if (loading || (isChecking && !accessDenied)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <LoadingSpinner 
           size="lg" 
-          text="Verificando acesso..." 
-          className="text-center"
+          text={verificationAttempts > 0 ? `Verificando acesso... (${verificationAttempts}/5)` : "Verificando acesso..."}
+          color="black"
         />
       </div>
     );
@@ -198,8 +250,8 @@ export default function AuthGuard({
     );
   }
 
-  // Acesso negado
-  if (accessDenied) {
+  // Acesso negado - só mostrar se o carregamento inicial foi concluído E todas as tentativas foram esgotadas
+  if (accessDenied && initialLoadComplete && verificationAttempts >= 5) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center max-w-md mx-auto px-4">

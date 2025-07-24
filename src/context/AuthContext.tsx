@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
 import { AuthResponse } from '@/types/auth';
 import { AuthService } from '@/services/auth';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 
 interface UserProfile {
   id: string;
@@ -54,6 +55,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Usar useRef para evitar re-renders desnecessários
   const initializingRef = useRef(false);
   const initializedRef = useRef(false);
+  const lastAuthCheckRef = useRef<number>(0);
+  const authStateChangeRef = useRef<boolean>(false);
+
+  // Hook de visibilidade da página otimizado
+  usePageVisibility({
+    onVisible: () => {
+      console.log('👁️ AuthContext - Página visível, verificando se precisa atualizar auth...');
+      // Só verificar se houve mudanças significativas ou se passou muito tempo
+      const timeSinceLastCheck = Date.now() - lastAuthCheckRef.current;
+      if (timeSinceLastCheck > 60000) { // 1 minuto
+        console.log('⏰ AuthContext - Passou muito tempo, atualizando auth...');
+        refreshAuth(false);
+      }
+    },
+    onHidden: () => {
+      console.log('👁️ AuthContext - Página oculta');
+    },
+    minHiddenTime: 10000 // 10 segundos
+  });
 
   // Função para salvar no cache
   const saveToCache = useCallback((data: CachedAuthData) => {
@@ -171,17 +191,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearCache]);
 
-  // Função principal para atualizar autenticação - SIMPLIFICADA
-  const refreshAuth = useCallback(async (): Promise<void> => {
+  // Função principal para atualizar autenticação - OTIMIZADA
+  const refreshAuth = useCallback(async (forceRefresh: boolean = false): Promise<void> => {
     if (initializingRef.current) {
       console.log('⏳ AuthContext - refreshAuth já está executando, ignorando...');
       return;
     }
+
+    // Verificar se já fizemos uma verificação recente (dentro de 10 segundos para login)
+    const now = Date.now();
+    const timeSinceLastCheck = now - lastAuthCheckRef.current;
     
-    console.log('🔄 AuthContext - Iniciando refreshAuth...');
+    if (!forceRefresh && timeSinceLastCheck < 10000) {
+      console.log('⏭️ AuthContext - Verificação recente, pulando... (última verificação há', Math.round(timeSinceLastCheck / 1000), 'segundos)');
+      return;
+    }
+    
+    console.log('🔄 AuthContext - Iniciando refreshAuth...', { forceRefresh, timeSinceLastCheck });
     setLoading(true);
     setError(null);
     initializingRef.current = true;
+    lastAuthCheckRef.current = now;
     
     try {
       // Verificar usuário atual
@@ -263,7 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [loadUserProfile, saveToCache, clearCache]);
 
-  // Inicialização simplificada
+  // Inicialização otimizada
   useEffect(() => {
     if (initializedRef.current) return;
     
@@ -276,16 +306,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🚀 AuthContext - Inicializando autenticação...');
       
       // Verificação direta sem depender muito de cache
-      await refreshAuth();
+      await refreshAuth(true);
     };
 
     initAuth();
 
-    // Listener para mudanças de autenticação
+    // Listener para mudanças de autenticação - OTIMIZADO
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       
       console.log('🔔 AuthContext - Auth state change:', event, !!session);
+      
+      // Marcar que houve mudança de estado
+      authStateChangeRef.current = true;
       
       if (event === 'SIGNED_OUT' || !session) {
         console.log('🚪 AuthContext - Usuário deslogado, limpando estado...');
@@ -308,7 +341,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && !initializingRef.current) {
         console.log('🔑 AuthContext - Usuário logado/token atualizado, atualizando auth...');
-        await refreshAuth();
+        // Forçar refresh para mudanças de estado
+        await refreshAuth(true);
       }
     });
 
