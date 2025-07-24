@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Pencil, Save, X, Key, Trash2 } from "lucide-react";
 import { supabase } from '@/lib/supabase';
@@ -77,13 +77,7 @@ export default function PsicologoDetailsPage() {
 
   const passwordStrength = getPasswordStrength(newPassword);
 
-  useEffect(() => {
-    if (id) {
-      fetchPsicologo();
-    }
-  }, [id]);
-
-  const fetchPsicologo = async () => {
+  const fetchPsicologo = useCallback(async () => {
     try {
       setLoading(true);
       console.log('🔍 Buscando psicólogo com ID:', id);
@@ -118,7 +112,13 @@ export default function PsicologoDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      fetchPsicologo();
+    }
+  }, [id, fetchPsicologo]);
 
   const handleSave = async () => {
     if (!psicologo) return;
