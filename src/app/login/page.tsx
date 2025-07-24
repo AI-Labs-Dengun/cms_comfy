@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AuthService } from "@/services/auth";
 import { useAuth } from "@/context/AuthContext";
 import Image from 'next/image';
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,6 +27,8 @@ export default function LoginPage() {
   
   // UseRef para controlar se já tentou redirecionar
   const hasRedirected = useRef(false);
+  const loginSuccessRef = useRef(false);
+  const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Monitorar estado de autenticação e redirecionar quando apropriado
   useEffect(() => {
@@ -36,6 +39,11 @@ export default function LoginPage() {
 
     // Se ainda está carregando, aguardar
     if (authLoading) {
+      return;
+    }
+
+    // Só verificar redirecionamento se o login foi bem-sucedido
+    if (!loginSuccessRef.current) {
       return;
     }
 
@@ -56,25 +64,31 @@ export default function LoginPage() {
       hasProfile: !!profile,
       isCMSUser: profile?.user_role === 'cms',
       isAuthorized: profile?.authorized === true,
-      authSuccess: authInfo?.success === true
+      authSuccess: authInfo?.success === true,
+      loginSuccess: loginSuccessRef.current
     });
 
-         if (shouldRedirect) {
-       console.log('✅ LoginPage - Redirecionando para dashboard...');
-       hasRedirected.current = true;
-       setSuccessMessage('Acesso autorizado! Redirecionando...');
-       
-       // Redirecionamento direto sem delay
-       router.replace('/dashboard/create');
-       
-       // Fallback de segurança usando window.location
-       setTimeout(() => {
-         if (window.location.pathname === '/login') {
-           console.log('🔄 LoginPage - Usando fallback window.location...');
-           window.location.href = '/dashboard/create';
-         }
-       }, 1000);
-     }
+    if (shouldRedirect) {
+      console.log('✅ LoginPage - Redirecionando para dashboard...');
+      hasRedirected.current = true;
+      setSuccessMessage('Acesso autorizado! Redirecionando...');
+      
+      // Limpar timeout anterior se existir
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+      
+      // Redirecionamento direto sem delay
+      router.replace('/dashboard/create');
+      
+      // Fallback de segurança usando window.location
+      redirectTimeoutRef.current = setTimeout(() => {
+        if (window.location.pathname === '/login') {
+          console.log('🔄 LoginPage - Usando fallback window.location...');
+          window.location.href = '/dashboard/create';
+        }
+      }, 1500);
+    }
   }, [authLoading, isAuthenticated, canAccessCMS, user, profile, authInfo, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -85,6 +99,13 @@ export default function LoginPage() {
     setError("");
     setSuccessMessage("");
     hasRedirected.current = false; // Reset do flag ao tentar novo login
+    loginSuccessRef.current = false; // Reset do flag de sucesso
+    
+    // Limpar timeout anterior se existir
+    if (redirectTimeoutRef.current) {
+      clearTimeout(redirectTimeoutRef.current);
+      redirectTimeoutRef.current = null;
+    }
 
     try {
       // Tentar fazer login com role CMS
@@ -96,30 +117,31 @@ export default function LoginPage() {
       if (result.success) {
         setError('');
         setSuccessMessage('Login bem-sucedido! Verificando permissões...');
+        loginSuccessRef.current = true; // Marcar que o login foi bem-sucedido
         
         console.log('✅ LoginPage - Login bem-sucedido, atualizando contexto...');
         
-        // Forçar atualização do contexto de autenticação
-        await refreshAuth();
+        // Forçar atualização do contexto de autenticação (forceRefresh = true)
+        await refreshAuth(true);
         
         // Aguardar um pouco para sincronização e deixar o useEffect detectar
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
-                 // Se o useEffect não redirecionou ainda, fazer redirecionamento manual
-         if (!hasRedirected.current) {
-           console.log('🔄 LoginPage - Redirecionamento manual...');
-           hasRedirected.current = true;
-           setSuccessMessage('Redirecionando...');
-           router.replace('/dashboard/create');
-           
-           // Fallback adicional
-           setTimeout(() => {
-             if (window.location.pathname === '/login') {
-               console.log('🔄 LoginPage - Fallback do redirecionamento manual...');
-               window.location.href = '/dashboard/create';
-             }
-           }, 1000);
-         }
+        // Se o useEffect não redirecionou ainda, fazer redirecionamento manual
+        if (!hasRedirected.current) {
+          console.log('🔄 LoginPage - Redirecionamento manual...');
+          hasRedirected.current = true;
+          setSuccessMessage('Redirecionando...');
+          router.replace('/dashboard/create');
+          
+          // Fallback adicional
+          redirectTimeoutRef.current = setTimeout(() => {
+            if (window.location.pathname === '/login') {
+              console.log('🔄 LoginPage - Fallback do redirecionamento manual...');
+              window.location.href = '/dashboard/create';
+            }
+          }, 1500);
+        }
         
       } else {
         // LOGIN FALHOU - Mostrar erro específico baseado no código
@@ -159,7 +181,9 @@ export default function LoginPage() {
   // Cleanup ao desmontar componente
   useEffect(() => {
     return () => {
-      // No timer para limpar, pois não há mais timeouts complexos
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -167,10 +191,11 @@ export default function LoginPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-4">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mb-4"></div>
-          <p className="text-gray-600 text-center">Verificando autenticação...</p>
-        </div>
+        <LoadingSpinner 
+          size="lg" 
+          text="Verificando autenticação..." 
+          color="black"
+        />
       </div>
     );
   }
@@ -179,11 +204,14 @@ export default function LoginPage() {
   if (hasRedirected.current) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-4">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mb-4"></div>
-          <p className="text-gray-600 text-center">Acesso autorizado! Redirecionando...</p>
-          <p className="text-sm text-gray-400 mt-2 text-center">Bem-vindo, {profile?.name || user?.email}</p>
-        </div>
+        <LoadingSpinner 
+          size="lg" 
+          text="Acesso autorizado! Redirecionando..." 
+          color="green"
+        />
+        <p className="text-sm text-gray-400 mt-4 text-center">
+          Bem-vindo, {profile?.name || user?.email}
+        </p>
       </div>
     );
   }
