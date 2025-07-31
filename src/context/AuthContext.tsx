@@ -26,7 +26,7 @@ interface AuthContextType {
   isCMSUser: boolean;
   canAccessCMS: boolean;
   signOut: () => Promise<{ success: boolean; error?: string }>;
-  refreshAuth: () => Promise<void>;
+  refreshAuth: (forceRefresh?: boolean) => Promise<void>;
   checkRoleAccess: (requiredRole: 'cms' | 'app' | 'psicologo') => Promise<boolean>;
 }
 
