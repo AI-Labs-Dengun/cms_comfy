@@ -202,7 +202,7 @@ export default function AuthGuard({
       if (timeoutId) clearTimeout(timeoutId);
       if (retryTimeoutId) clearTimeout(retryTimeoutId);
     };
-  }, [loading, isAuthenticated, canAccessCMS, requiredRole, authInfo, checkRoleAccess, router, redirectTo, verificationAttempts, initialLoadComplete, user, profile]);
+  }, [loading, isAuthenticated, canAccessCMS, requiredRole, authInfo, checkRoleAccess, router, redirectTo, verificationAttempts, initialLoadComplete, user, profile, isChecking]);
 
   // Estado de carregamento - melhorado para evitar flash de "acesso negado"
   if (loading || (isChecking && !accessDenied)) {
