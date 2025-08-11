@@ -501,6 +501,15 @@ export default function CreateContent() {
         return;
       }
 
+      // Validar URL para Shorts (deve ser de plataformas suportadas)
+      if (category === "Shorts" && contentUrl.trim()) {
+        const contentType = detectContentType(contentUrl);
+        if (!contentType || contentType === 'external') {
+          setError("Para Shorts, use URLs do YouTube, Instagram Reels ou TikTok");
+          return;
+        }
+      }
+
       // Validar que Shorts não pode ter conteúdo textual
       if (category === "Shorts" && content.trim()) {
         setError("Posts da categoria Shorts não podem ter conteúdo textual");
@@ -650,6 +659,90 @@ export default function CreateContent() {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
+  // Função para detectar tipo de conteúdo baseado na URL
+  const detectContentType = (url: string) => {
+    if (!url.trim()) return null;
+    
+    // YouTube Shorts
+    if (url.includes('youtube.com/shorts/') || url.includes('youtu.be/')) {
+      return 'youtube-shorts';
+    }
+    
+    // Instagram Reels
+    if (url.includes('instagram.com/reel/') || url.includes('instagram.com/tv/')) {
+      return 'instagram-reel';
+    }
+    
+    // TikTok
+    if (url.includes('tiktok.com/')) {
+      return 'tiktok';
+    }
+    
+    // YouTube normal
+    if (url.includes('youtube.com/watch')) {
+      return 'youtube';
+    }
+    
+    return 'external';
+  };
+
+  // Função para renderizar prévia do conteúdo
+  const renderContentPreview = () => {
+    if (!contentUrl.trim() || category !== 'Shorts') return null;
+    
+    const contentType = detectContentType(contentUrl);
+    
+    if (!contentType) return null;
+    
+    return (
+      <div className="mt-4 p-4 bg-gray-50 rounded-md border">
+        <div className="text-xs text-gray-500 font-bold mb-2">Prévia do conteúdo:</div>
+        <div className="bg-white p-3 rounded border">
+          <div className="flex items-center gap-2 mb-2">
+            {contentType === 'youtube-shorts' && (
+              <>
+                <span className="text-red-500">▶️</span>
+                <span className="text-sm font-medium">YouTube Shorts</span>
+              </>
+            )}
+            {contentType === 'instagram-reel' && (
+              <>
+                <span className="text-pink-500">📱</span>
+                <span className="text-sm font-medium">Instagram Reel</span>
+              </>
+            )}
+            {contentType === 'tiktok' && (
+              <>
+                <span className="text-black">🎵</span>
+                <span className="text-sm font-medium">TikTok</span>
+              </>
+            )}
+            {contentType === 'youtube' && (
+              <>
+                <span className="text-red-500">▶️</span>
+                <span className="text-sm font-medium">YouTube</span>
+              </>
+            )}
+            {contentType === 'external' && (
+              <>
+                <span className="text-blue-500">🔗</span>
+                <span className="text-sm font-medium">Link Externo</span>
+              </>
+            )}
+          </div>
+          <div className="text-xs text-gray-600 break-all">{contentUrl}</div>
+          <div className="mt-2 text-xs text-gray-500">
+            {contentType === 'youtube-shorts' && "Este conteúdo será exibido como um YouTube Shorts."}
+            {contentType === 'instagram-reel' && "Este conteúdo será exibido como um Instagram Reel."}
+            {contentType === 'tiktok' && "Este conteúdo será exibido como um TikTok."}
+            {contentType === 'youtube' && "Este conteúdo será exibido como um vídeo do YouTube."}
+            {contentType === 'external' && "Este link será exibido como conteúdo externo."}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Verificar carregamento de autenticação
   if (authLoading) {
     return (
@@ -749,7 +842,13 @@ export default function CreateContent() {
                 Conteúdo
                 <span className="text-red-500 ml-1">*</span>
               </label>
-              <p className="text-xs text-gray-500 mb-2">Insira uma URL ou faça upload de um ficheiro para o seu post. <span className="text-red-500 font-medium">* Obrigatório</span></p>
+              <p className="text-xs text-gray-500 mb-2">
+                Insira uma URL ou faça upload de um ficheiro para o seu post. 
+                {category === 'Shorts' && (
+                  <span className="text-blue-600 font-medium"> Para Shorts, use URLs do YouTube Shorts, Instagram Reels ou TikTok.</span>
+                )}
+                <span className="text-red-500 font-medium"> * Obrigatório</span>
+              </p>
               <div className="mb-4">
                 <label className="block text-xs font-medium mb-1 text-gray-900">
                   URL do Conteúdo: {contentUrl.trim() ? contentUrl : "(nenhum url inserido)"}
@@ -759,7 +858,13 @@ export default function CreateContent() {
                   <input
                     type="url"
                     className="flex-1 bg-transparent outline-none text-gray-900 disabled:cursor-not-allowed"
-                    placeholder={file ? "Remova o ficheiro para inserir URL" : "www.exemplo.com/conteudo"}
+                    placeholder={
+                      file 
+                        ? "Remova o ficheiro para inserir URL" 
+                        : category === 'Shorts'
+                          ? "https://youtube.com/shorts/... ou https://instagram.com/reel/... ou https://tiktok.com/..."
+                          : "www.exemplo.com/conteudo"
+                    }
                     value={contentUrl}
                     onChange={(e) => setContentUrl(e.target.value)}
                     disabled={!!file}
@@ -832,6 +937,9 @@ export default function CreateContent() {
                   )}
                 </div>
               </div>
+              
+              {/* Prévia do conteúdo para Shorts */}
+              {renderContentPreview()}
             </div>
             {/* Título */}
             <div>
