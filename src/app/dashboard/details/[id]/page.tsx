@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
@@ -18,6 +18,167 @@ const emotionTags = [
   "Medo",
   "Tristeza",
 ];
+
+// Componente para embed do TikTok
+const TikTokEmbed = ({ url, videoId }: { url: string; videoId: string }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [embedMethod, setEmbedMethod] = useState<'official' | 'iframe' | 'fallback'>('official');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    console.log('🎵 TikTokEmbed iniciado:', { url, videoId });
+    
+    const loadTikTokEmbed = async () => {
+      try {
+        // Método 1: Embed oficial do TikTok
+        console.log('🔗 Tentando embed oficial do TikTok...');
+        
+        // Carregar script do TikTok se ainda não estiver carregado
+        if (!document.querySelector('script[src="https://www.tiktok.com/embed.js"]')) {
+          const script = document.createElement('script');
+          script.src = 'https://www.tiktok.com/embed.js';
+          script.async = true;
+          document.head.appendChild(script);
+          console.log('📜 Script do TikTok carregado');
+        }
+
+        // Aguardar um pouco para o script carregar
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Criar o embed usando o método oficial do TikTok
+        if (containerRef.current) {
+          // Limpar container
+          containerRef.current.innerHTML = '';
+          
+          // Criar blockquote com a estrutura oficial do TikTok
+          const blockquote = document.createElement('blockquote');
+          blockquote.className = 'tiktok-embed';
+          blockquote.setAttribute('cite', url);
+          blockquote.setAttribute('data-video-id', videoId);
+          
+          // Definir estilos para o embed
+          blockquote.style.maxWidth = '325px';
+          blockquote.style.minWidth = '325px';
+          blockquote.style.width = '100%';
+          
+          // Criar seção interna
+          const section = document.createElement('section');
+          const link = document.createElement('a');
+          link.target = '_blank';
+          link.href = url;
+          section.appendChild(link);
+          blockquote.appendChild(section);
+          
+          // Adicionar ao container
+          containerRef.current.appendChild(blockquote);
+          
+          console.log('✅ Embed oficial do TikTok criado com sucesso');
+          setEmbedMethod('official');
+          setIsLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.error('❌ Embed oficial falhou, tentando iframe:', error);
+        
+        // Método 2: Iframe direto
+        try {
+          console.log('🔗 Tentando iframe direto...');
+          setEmbedMethod('iframe');
+          setIsLoading(false);
+          return;
+        } catch (iframeError) {
+          console.error('❌ Iframe também falhou:', iframeError);
+          setEmbedMethod('fallback');
+          setHasError(true);
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadTikTokEmbed();
+  }, [url, videoId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-96 bg-gray-100 rounded-lg">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-sm text-gray-600">Carregando TikTok...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError || embedMethod === 'fallback') {
+    return (
+      <div className="bg-black rounded-lg p-4 text-white">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-blue-500 rounded-full flex items-center justify-center">
+            <span className="text-white font-bold text-lg">♪</span>
+          </div>
+          <div>
+            <div className="font-semibold">TikTok</div>
+            <div className="text-sm text-gray-300">Vídeo #{videoId}</div>
+          </div>
+        </div>
+        
+        <div className="bg-gray-900 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-center h-32 bg-gradient-to-br from-pink-500/20 to-blue-500/20 rounded-lg">
+            <div className="text-center">
+              <div className="text-4xl mb-2">🎵</div>
+              <div className="text-sm text-gray-300">Clique para ver no TikTok</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-gray-300">
+            <span>♪</span>
+            <span>TikTok Video</span>
+          </div>
+          <a 
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-200 transition-colors"
+          >
+            Ver no TikTok
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Método 2: Iframe direto
+  if (embedMethod === 'iframe') {
+    return (
+      <iframe
+        src={`https://www.tiktok.com/embed/${videoId}`}
+        className="w-full h-full min-h-[600px]"
+        title="TikTok Video"
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        onLoad={() => console.log('✅ TikTok iframe carregado com sucesso')}
+        onError={() => {
+          console.error('❌ Erro no TikTok iframe');
+          setHasError(true);
+          setEmbedMethod('fallback');
+        }}
+      />
+    );
+  }
+
+  // Método 1: Embed oficial (container)
+  return (
+    <div 
+      ref={containerRef}
+      className="w-full flex justify-center"
+      style={{ minHeight: '600px' }}
+    />
+  );
+};
 
 // Componente do Editor Markdown
 const MarkdownEditor = ({ value, onChange, placeholder }: { 
@@ -800,14 +961,17 @@ export default function DetalhesConteudo() {
       // Tentar detectar se é um link do YouTube, Vimeo, etc.
       const url = post.content_url;
       
-      // YouTube
-      const youtubeMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+      // YouTube (incluindo Shorts)
+      const youtubeMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&\n?#]+)/);
       if (youtubeMatch) {
         const videoId = youtubeMatch[1];
+        const isShorts = url.includes('/shorts/') || post.category === 'Shorts';
         return (
           <div className="mb-6">
-            <div className="text-xs text-gray-500 font-bold mb-2">Vídeo do YouTube</div>
-            <div className="border rounded-lg overflow-hidden aspect-video">
+            <div className="text-xs text-gray-500 font-bold mb-2">
+              {isShorts ? 'YouTube Shorts' : 'Vídeo do YouTube'}
+            </div>
+            <div className={`border rounded-lg overflow-hidden ${isShorts ? 'aspect-[9/16] max-w-md mx-auto' : 'aspect-video'}`}>
               <iframe
                 src={`https://www.youtube.com/embed/${videoId}`}
                 className="w-full h-full"
@@ -816,6 +980,77 @@ export default function DetalhesConteudo() {
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
+            </div>
+            {isShorts && (
+              <div className="text-center mt-2">
+                <a 
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800 underline text-sm"
+                >
+                  Ver no YouTube
+                </a>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // Instagram (Reels e Posts)
+      const instagramMatch = url.match(/instagram\.com\/(?:p|reel|tv)\/([^\/\n?#]+)/);
+      if (instagramMatch) {
+        const postId = instagramMatch[1];
+        const isReel = url.includes('/reel/') || url.includes('/tv/');
+        return (
+          <div className="mb-6">
+            <div className="text-xs text-gray-500 font-bold mb-2">
+              {isReel ? 'Instagram Reel' : 'Post do Instagram'}
+            </div>
+            <div className="border rounded-lg overflow-hidden aspect-[9/16] max-w-md mx-auto">
+              <iframe
+                src={`https://www.instagram.com/p/${postId}/embed/`}
+                className="w-full h-full min-h-[500px]"
+                title={post.title}
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+            <div className="text-center mt-2">
+              <a 
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 underline text-sm"
+              >
+                Ver no Instagram
+              </a>
+            </div>
+          </div>
+        );
+      }
+
+      // TikTok - Detecção unificada
+      const tiktokMatch = url.match(/tiktok\.com\/(?:@[^\/]+\/)?video\/(\d+)/);
+      if (tiktokMatch) {
+        const videoId = tiktokMatch[1];
+        console.log('🎵 TikTok detectado:', { url, videoId });
+        return (
+          <div className="mb-6">
+            <div className="text-xs text-gray-500 font-bold mb-2">TikTok</div>
+            <div className="border rounded-lg overflow-hidden aspect-[9/16] max-w-md mx-auto">
+              <TikTokEmbed url={url} videoId={videoId} />
+            </div>
+            <div className="text-center mt-2">
+              <a 
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 underline text-sm"
+              >
+                Ver no TikTok
+              </a>
             </div>
           </div>
         );
