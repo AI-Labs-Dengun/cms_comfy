@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { CloudUpload, X, Plus } from "lucide-react";
+import { CloudUpload, X, Plus, Image } from "lucide-react";
 import CMSLayout from "@/components/CMSLayout";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { createPost, CreatePostData, uploadFileForPost, getAllReadingTags, associateTagWithPost, createReadingTag } from "@/services/posts";
@@ -405,6 +405,7 @@ export default function CreateContent() {
   const router = useRouter();
   const { canAccessCMS, loading: authLoading, error: authError } = useAuth();
   const [file, setFile] = useState<File | null>(null);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState(""); // ✅ ADICIONANDO ESTADO PARA CONTENT
@@ -444,6 +445,27 @@ export default function CreateContent() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+    }
+  };
+
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0];
+      
+      // Validar se é uma imagem
+      if (!selectedFile.type.startsWith('image/')) {
+        setError("Por favor, selecione apenas arquivos de imagem para a thumbnail");
+        return;
+      }
+      
+      // Validar tamanho (máximo 5MB)
+      if (selectedFile.size > 5 * 1024 * 1024) {
+        setError("A thumbnail deve ter no máximo 5MB");
+        return;
+      }
+      
+      setThumbnailFile(selectedFile);
+      setError(null);
     }
   };
 
@@ -602,6 +624,24 @@ export default function CreateContent() {
         }
       }
 
+      // Upload de thumbnail se fornecida (apenas para Podcast)
+      if (category === "Podcast" && thumbnailFile) {
+        try {
+          const thumbnailUploadResult = await uploadFileForPost(thumbnailFile);
+          
+          if (thumbnailUploadResult.success && thumbnailUploadResult.data) {
+            postData.thumbnail_url = thumbnailUploadResult.data.url;
+          } else {
+            setError(thumbnailUploadResult.error || "Erro no upload da thumbnail");
+            return;
+          }
+        } catch (thumbnailError) {
+          console.error("Erro no upload da thumbnail:", thumbnailError);
+          setError("Erro inesperado no upload da thumbnail");
+          return;
+        }
+      }
+
       // Criar o post
       const result = await createPost(postData);
 
@@ -638,6 +678,7 @@ export default function CreateContent() {
         setTags([]);
         setEmotions([]);
         setFile(null);
+        setThumbnailFile(null);
         setTagInput("");
         setSelectedReadingTags([]); // Limpar tags de leitura selecionadas
 
@@ -961,6 +1002,50 @@ export default function CreateContent() {
               {/* Prévia do conteúdo para Shorts */}
               {renderContentPreview()}
             </div>
+
+            {/* Upload de Thumbnail (apenas para Podcast) */}
+            {category === "Podcast" && (
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-900">
+                  Thumbnail do Podcast
+                  <span className="text-xs text-gray-500 ml-2">(opcional)</span>
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Faça upload de uma imagem para servir como thumbnail do podcast. 
+                  Formatos aceitos: JPG, PNG, GIF. Máximo: 5MB.
+                </p>
+                <div className="border-2 border-gray-300 border-dashed rounded-lg flex flex-col items-center justify-center py-6 transition-colors relative bg-black cursor-pointer hover:border-gray-400">
+                  <input
+                    type="file"
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    onChange={handleThumbnailChange}
+                    accept="image/*"
+                    disabled={isUploading}
+                  />
+                  <Image className="w-8 h-8 mb-2 text-white" />
+                  <span className="text-white">
+                    {isUploading ? "A fazer upload..." : 
+                     thumbnailFile ? thumbnailFile.name : "Escolher uma imagem para thumbnail"}
+                  </span>
+                  {thumbnailFile && (
+                    <div className="mt-2 text-center">
+                      <span className="text-xs text-gray-200 block">{thumbnailFile.name}</span>
+                      <span className="text-xs text-gray-400 block">
+                        {(thumbnailFile.size / (1024 * 1024)).toFixed(2)} MB
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setThumbnailFile(null)}
+                        className="mt-1 text-red-400 hover:text-red-300 text-xs font-medium"
+                      >
+                        Remover thumbnail
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Título */}
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-900">
