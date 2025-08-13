@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import { uploadFile } from './storage'
+import { uploadFile, getMediaDuration } from './storage'
 
 // Tipos para os posts
 export interface CreatePostData {
@@ -12,6 +12,7 @@ export interface CreatePostData {
   file_name?: string
   file_type?: string
   file_size?: number
+  duration?: number // ✅ ADICIONANDO CAMPO DURATION
   tags?: string[]
   emotion_tags?: string[]
   categoria_leitura?: string[] // ✅ ADICIONANDO CAMPO CATEGORIA_LEITURA
@@ -28,6 +29,7 @@ export interface Post {
   file_name?: string
   file_size?: number
   file_type?: string
+  duration?: number // ✅ ADICIONANDO CAMPO DURATION
   tags: string[]
   emotion_tags: string[]
   categoria_leitura?: string[] // ✅ ADICIONANDO CAMPO CATEGORIA_LEITURA
@@ -77,6 +79,22 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       }
     }
 
+    // Obter duração para posts de vídeo e áudio
+    let duration = postData.duration;
+    if ((postData.category === 'Vídeo' || postData.category === 'Podcast' || postData.category === 'Áudio') && !duration) {
+      try {
+        if (postData.content_url) {
+          const durationResult = await getMediaDuration(postData.content_url);
+          if (durationResult.success && durationResult.duration) {
+            duration = durationResult.duration;
+          }
+        }
+      } catch (error) {
+        console.warn('Erro ao obter duração da URL:', error);
+        // Não falhar se não conseguir obter a duração
+      }
+    }
+
     // Chamar a função do banco de dados
     const { data, error } = await supabase.rpc('create_post', {
       author_id_param: user.id,
@@ -90,7 +108,8 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       // categoria_leitura_param será preenchido automaticamente pelo trigger
       file_path_param: postData.file_path || null,
       file_name_param: postData.file_name || null,
-      file_type_param: postData.file_type || null
+      file_type_param: postData.file_type || null,
+      duration_param: duration || null // ✅ ADICIONANDO DURATION_PARAM
     })
 
     if (error) {
@@ -209,6 +228,7 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
     let fileName = null
     let fileType = null
     let category = postData.category
+    let duration = postData.duration
 
     if (postData.content_url && postData.content_url.trim() !== '') {
       // Se tem URL, limpar campos de arquivo
@@ -216,6 +236,18 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       filePath = null
       fileName = null
       fileType = null
+      
+      // Obter duração para posts de vídeo e áudio com URL
+      if ((category === 'Vídeo' || category === 'Podcast' || category === 'Áudio') && !duration) {
+        try {
+          const durationResult = await getMediaDuration(postData.content_url);
+          if (durationResult.success && durationResult.duration) {
+            duration = durationResult.duration;
+          }
+        } catch (error) {
+          console.warn('Erro ao obter duração da URL:', error);
+        }
+      }
     } else if (postData.file_path && postData.file_path.trim() !== '') {
       // Se tem arquivo, limpar campo de URL
       contentUrl = null
@@ -226,7 +258,7 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       // Se nenhum dos dois foi fornecido, buscar o post atual para manter o valor existente
       const { data: currentPost } = await supabase
         .from('posts')
-        .select('content_url, file_path, file_name, file_type, category')
+        .select('content_url, file_path, file_name, file_type, category, duration')
         .eq('id', postId)
         .single()
       
@@ -238,6 +270,10 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
         // Se a categoria não foi fornecida, preservar a existente
         if (!category) {
           category = currentPost.category
+        }
+        // Se a duração não foi fornecida, preservar a existente
+        if (!duration) {
+          duration = currentPost.duration
         }
       }
     }
@@ -261,7 +297,8 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       // categoria_leitura_param será preenchido automaticamente pelo trigger
       file_path_param: filePath,
       file_name_param: fileName,
-      file_type_param: fileType
+      file_type_param: fileType,
+      duration_param: duration || null // ✅ ADICIONANDO DURATION_PARAM
     })
 
     if (error) {
@@ -341,7 +378,7 @@ export async function togglePostPublication(postId: string, publish: boolean): P
 }
 
 // Função para upload de arquivo usando Supabase Storage
-export async function uploadFileForPost(file: File): Promise<ApiResponse<{ path: string; url: string; file_name: string; file_size: number; file_type: string }>> {
+export async function uploadFileForPost(file: File): Promise<ApiResponse<{ path: string; url: string; file_name: string; file_size: number; file_type: string; duration?: number }>> {
   try {
     const result = await uploadFile(file)
     
@@ -352,6 +389,20 @@ export async function uploadFileForPost(file: File): Promise<ApiResponse<{ path:
       }
     }
 
+    // Obter duração para arquivos de mídia
+    let duration: number | undefined;
+    if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
+      try {
+        const durationResult = await getMediaDuration(file);
+        if (durationResult.success && durationResult.duration) {
+          duration = durationResult.duration;
+        }
+      } catch (error) {
+        console.warn('Erro ao obter duração do arquivo:', error);
+        // Não falhar se não conseguir obter a duração
+      }
+    }
+
     return {
       success: true,
       data: {
@@ -359,7 +410,8 @@ export async function uploadFileForPost(file: File): Promise<ApiResponse<{ path:
         url: result.url!,
         file_name: result.file_name!,
         file_size: result.file_size!,
-        file_type: result.file_type!
+        file_type: result.file_type!,
+        duration: duration
       }
     }
   } catch (error) {
