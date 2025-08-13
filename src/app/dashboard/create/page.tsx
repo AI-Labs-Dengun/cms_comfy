@@ -5,6 +5,7 @@ import { CloudUpload, X, Plus } from "lucide-react";
 import CMSLayout from "@/components/CMSLayout";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { createPost, CreatePostData, uploadFileForPost, getAllReadingTags, associateTagWithPost, createReadingTag } from "@/services/posts";
+import { getMediaDuration } from "@/services/storage";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -542,6 +543,19 @@ export default function CreateContent() {
       // Adicionar URL se fornecida
       if (contentUrl.trim()) {
         postData.content_url = contentUrl.trim();
+        
+        // Obter duração para posts de vídeo e áudio com URL
+        if ((category === 'Vídeo' || category === 'Podcast' || category === 'Áudio')) {
+          try {
+            const durationResult = await getMediaDuration(contentUrl.trim());
+            if (durationResult.success && durationResult.duration) {
+              postData.duration = durationResult.duration;
+            }
+          } catch (error) {
+            console.warn('Erro ao obter duração da URL:', error);
+            // Não falhar se não conseguir obter a duração
+          }
+        }
       }
 
       // Upload de arquivo se fornecido
@@ -568,6 +582,12 @@ export default function CreateContent() {
             postData.file_name = uploadResult.data.file_name;
             postData.file_type = uploadResult.data.file_type;
             postData.file_size = uploadResult.data.file_size;
+            
+            // Adicionar duração se obtida
+            if (uploadResult.data.duration) {
+              postData.duration = uploadResult.data.duration;
+            }
+            
             setUploadProgress(100);
           } else {
             setError(uploadResult.error || "Erro no upload do arquivo");
