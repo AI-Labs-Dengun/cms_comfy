@@ -13,6 +13,7 @@ export interface CreatePostData {
   file_type?: string
   file_size?: number
   duration?: number // ✅ ADICIONANDO CAMPO DURATION
+  thumbnail_url?: string // ✅ ADICIONANDO CAMPO THUMBNAIL_URL
   tags?: string[]
   emotion_tags?: string[]
   categoria_leitura?: string[] // ✅ ADICIONANDO CAMPO CATEGORIA_LEITURA
@@ -30,6 +31,7 @@ export interface Post {
   file_size?: number
   file_type?: string
   duration?: number // ✅ ADICIONANDO CAMPO DURATION
+  thumbnail_url?: string // ✅ ADICIONANDO CAMPO THUMBNAIL_URL
   tags: string[]
   emotion_tags: string[]
   categoria_leitura?: string[] // ✅ ADICIONANDO CAMPO CATEGORIA_LEITURA
@@ -109,7 +111,8 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       file_path_param: postData.file_path || null,
       file_name_param: postData.file_name || null,
       file_type_param: postData.file_type || null,
-      duration_param: duration || null // ✅ ADICIONANDO DURATION_PARAM
+      duration_param: duration || null, // ✅ ADICIONANDO DURATION_PARAM
+      thumbnail_url_param: postData.thumbnail_url || null // ✅ ADICIONANDO THUMBNAIL_URL_PARAM
     })
 
     if (error) {
