@@ -280,4 +280,181 @@ export async function getSignedUrl(filePath: string, expiresIn: number = 3600): 
       error: 'Erro inesperado ao gerar URL assinada'
     }
   }
+}
+
+// Função para obter duração de arquivos de mídia
+export async function getMediaDuration(file: File | string): Promise<{ success: boolean; duration?: number; error?: string }> {
+  try {
+    // Se for uma string (URL), tratar como URL
+    if (typeof file === 'string') {
+      return await getMediaDurationFromUrl(file);
+    }
+    
+    // Se for um File, tratar como arquivo local
+    return await getMediaDurationFromFile(file);
+  } catch (error) {
+    console.error('Erro ao obter duração da mídia:', error);
+    return {
+      success: false,
+      error: 'Erro inesperado ao obter duração da mídia'
+    };
+  }
+}
+
+// Função para obter duração de arquivo local
+async function getMediaDurationFromFile(file: File): Promise<{ success: boolean; duration?: number; error?: string }> {
+  return new Promise((resolve) => {
+    // Verificar se é um arquivo de mídia
+    if (!file.type.startsWith('video/') && !file.type.startsWith('audio/')) {
+      resolve({
+        success: false,
+        error: 'Arquivo não é um arquivo de mídia válido'
+      });
+      return;
+    }
+
+    const video = document.createElement('video');
+    const audio = document.createElement('audio');
+    const mediaElement = file.type.startsWith('video/') ? video : audio;
+    
+    mediaElement.preload = 'metadata';
+    
+    mediaElement.onloadedmetadata = () => {
+      const duration = Math.round(mediaElement.duration);
+      resolve({
+        success: true,
+        duration: duration
+      });
+    };
+    
+    mediaElement.onerror = () => {
+      resolve({
+        success: false,
+        error: 'Erro ao carregar metadados do arquivo'
+      });
+    };
+    
+    // Criar URL do arquivo
+    const url = URL.createObjectURL(file);
+    mediaElement.src = url;
+    
+    // Limpar URL após um tempo
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 10000);
+  });
+}
+
+// Função para obter duração de URL de mídia
+async function getMediaDurationFromUrl(url: string): Promise<{ success: boolean; duration?: number; error?: string }> {
+  return new Promise((resolve) => {
+    // Verificar se é uma URL de mídia válida
+    const mediaExtensions = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.mp3', '.wav', '.ogg', '.aac', '.flac'];
+    const isMediaUrl = mediaExtensions.some(ext => url.toLowerCase().includes(ext)) || 
+                      url.includes('youtube.com') || 
+                      url.includes('youtu.be') ||
+                      url.includes('vimeo.com') ||
+                      url.includes('soundcloud.com');
+    
+    if (!isMediaUrl) {
+      resolve({
+        success: false,
+        error: 'URL não parece ser um arquivo de mídia válido'
+      });
+      return;
+    }
+
+    // Para URLs do YouTube, tentar extrair duração via API (se disponível)
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      resolve({
+        success: false,
+        error: 'Duração de vídeos do YouTube requer API key'
+      });
+      return;
+    }
+
+    // Para outras URLs, tentar carregar como elemento de mídia
+    const video = document.createElement('video');
+    const audio = document.createElement('audio');
+    
+    // Tentar primeiro como vídeo
+    video.preload = 'metadata';
+    video.crossOrigin = 'anonymous';
+    
+    video.onloadedmetadata = () => {
+      const duration = Math.round(video.duration);
+      resolve({
+        success: true,
+        duration: duration
+      });
+    };
+    
+    video.onerror = () => {
+      // Se falhar como vídeo, tentar como áudio
+      audio.preload = 'metadata';
+      audio.crossOrigin = 'anonymous';
+      
+      audio.onloadedmetadata = () => {
+        const duration = Math.round(audio.duration);
+        resolve({
+          success: true,
+          duration: duration
+        });
+      };
+      
+      audio.onerror = () => {
+        resolve({
+          success: false,
+          error: 'Não foi possível carregar a duração da mídia'
+        });
+      };
+      
+      audio.src = url;
+    };
+    
+    video.src = url;
+  });
+}
+
+// Função para detectar tipo de conteúdo baseado na URL
+export function detectContentType(url: string): string | null {
+  if (!url.trim()) return null;
+  
+  // YouTube Shorts
+  if (url.includes('youtube.com/shorts/') || url.includes('youtu.be/')) {
+    return 'youtube-shorts';
+  }
+  
+  // Instagram Reels
+  if (url.includes('instagram.com/reel/') || url.includes('instagram.com/tv/')) {
+    return 'instagram-reel';
+  }
+  
+  // TikTok
+  if (url.includes('tiktok.com/')) {
+    return 'tiktok';
+  }
+  
+  // YouTube normal
+  if (url.includes('youtube.com/watch')) {
+    return 'youtube';
+  }
+  
+  // Vimeo
+  if (url.includes('vimeo.com/')) {
+    return 'vimeo';
+  }
+  
+  // SoundCloud
+  if (url.includes('soundcloud.com/')) {
+    return 'soundcloud';
+  }
+  
+  // Arquivos de mídia diretos
+  const mediaExtensions = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.mp3', '.wav', '.ogg', '.aac', '.flac'];
+  if (mediaExtensions.some(ext => url.toLowerCase().includes(ext))) {
+    return 'direct-media';
+  }
+  
+  return 'external';
 } 
