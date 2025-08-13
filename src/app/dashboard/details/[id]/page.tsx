@@ -1469,6 +1469,49 @@ export default function DetalhesConteudo() {
 
               <div className="my-6 border-b border-gray-200" />
 
+              {/* Thumbnail do Podcast */}
+              {post.category === "Podcast" && post.thumbnail_url && (
+                <div className="mb-6">
+                  <div className="text-xs text-gray-500 font-bold mb-2">Thumbnail do Podcast</div>
+                  <div className="border rounded-lg overflow-hidden max-w-md">
+                    <Image 
+                      src={post.thumbnail_url} 
+                      alt={`Thumbnail do podcast: ${post.title}`}
+                      className="w-full h-auto object-cover"
+                      width={400}
+                      height={300}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        // Mostrar informações de erro
+                        const parent = target.parentElement;
+                        if (parent) {
+                          parent.innerHTML = `
+                            <div class="p-8 text-center text-gray-500">
+                              <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                              </svg>
+                              <p class="text-sm font-medium mb-2">Erro ao carregar thumbnail</p>
+                              <p class="text-xs text-gray-400 mb-4">A thumbnail pode estar temporariamente indisponível</p>
+                              <div class="space-y-2">
+                                <a href="${post.thumbnail_url}" target="_blank" class="text-blue-600 text-xs hover:underline block">Tentar abrir em nova aba</a>
+                                <button onclick="window.location.reload()" class="text-blue-600 text-xs hover:underline block">Recarregar página</button>
+                              </div>
+                            </div>
+                          `;
+                        }
+                      }}
+                      onLoad={() => {
+                        console.log('✅ Thumbnail do podcast carregada com sucesso:', post.thumbnail_url);
+                      }}
+                    />
+                  </div>
+                  <div className="mt-2 text-xs text-gray-500">
+                    Imagem representativa do podcast
+                  </div>
+                </div>
+              )}
+
               {/* Renderizar conteúdo do post */}
               {renderContent()}
 
@@ -1565,6 +1608,24 @@ export default function DetalhesConteudo() {
                     )}
                   </div>
                 </>
+              )}
+
+              {/* Thumbnail Info - apenas para posts de podcast */}
+              {post.category === "Podcast" && post.thumbnail_url && (
+                <div className="mb-4">
+                  <div className="text-xs text-gray-500 font-bold">Thumbnail do Podcast</div>
+                  <div className="text-gray-600 text-sm break-all">{post.thumbnail_url}</div>
+                  <div className="mt-1">
+                    <a 
+                      href={post.thumbnail_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 underline text-xs"
+                    >
+                      Ver thumbnail em nova aba
+                    </a>
+                  </div>
+                </div>
               )}
 
               {/* URL externa - apenas para referência */}
