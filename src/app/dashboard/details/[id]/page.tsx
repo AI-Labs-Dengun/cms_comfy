@@ -428,6 +428,9 @@ export default function DetalhesConteudo() {
   const [allReadingTags, setAllReadingTags] = useState<{id: string, name: string, color?: string}[]>([]);
   const [selectedReadingTagIds, setSelectedReadingTagIds] = useState<string[]>([]);
   const [loadingReadingTags, setLoadingReadingTags] = useState(false);
+  
+  // ✅ ESTADO PARA IDADE MÍNIMA
+  const [editMinAge, setEditMinAge] = useState<number>(12);
 
   const postId = params.id as string;
 
@@ -594,6 +597,7 @@ export default function DetalhesConteudo() {
     setEditContentUrl(postData.content_url || "");
     setEditTags(postData.tags);
     setEditEmotionTags(postData.emotion_tags);
+    setEditMinAge(postData.min_age || 12); // ✅ INICIALIZAR IDADE MÍNIMA
     // ✅ INICIALIZAR TAG DE LEITURA SELECIONADA (apenas a primeira)
     if (postData.category === 'Leitura') {
       getTagsForPost(postData.id)
@@ -652,6 +656,13 @@ export default function DetalhesConteudo() {
         return;
       }
 
+      // Validar idade mínima
+      if (editMinAge !== 12 && editMinAge !== 16) {
+        alert("Idade mínima deve ser 12 ou 16");
+        setSaving(false);
+        return;
+      }
+
       const updateData = {
         title: editTitle.trim(),
         description: editDescription.trim(),
@@ -659,6 +670,7 @@ export default function DetalhesConteudo() {
         content_url: editContentUrl.trim() || undefined,
         tags: editTags,
         emotion_tags: editEmotionTags,
+        min_age: editMinAge, // ✅ ADICIONAR IDADE MÍNIMA
         category: post.category as 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura', // Preservar a categoria atual do post
         // categoria_leitura será preenchida automaticamente pelo trigger quando as tags forem associadas
       };
@@ -708,6 +720,7 @@ export default function DetalhesConteudo() {
           content_url: updateData.content_url,
           tags: updateData.tags,
           emotion_tags: updateData.emotion_tags,
+          min_age: updateData.min_age, // ✅ ATUALIZAR IDADE MÍNIMA
           category: updateData.category, // Preservar a categoria
           updated_at: new Date().toISOString()
         } : null);
@@ -1186,6 +1199,7 @@ export default function DetalhesConteudo() {
                     editDescription !== post?.description ||
                     editContent !== post?.content || // Adicionar a nova comparação
                     editContentUrl !== (post?.content_url || "") ||
+                    editMinAge !== (post?.min_age || 12) || // ✅ ADICIONAR COMPARAÇÃO DA IDADE MÍNIMA
                     JSON.stringify(editTags) !== JSON.stringify(post?.tags) ||
                     JSON.stringify(editEmotionTags) !== JSON.stringify(post?.emotion_tags);
                   
@@ -1226,7 +1240,7 @@ export default function DetalhesConteudo() {
                     
                     <button 
                       onClick={handleSaveEdit}
-                      disabled={saving || !editTitle.trim() || !editDescription.trim()}
+                      disabled={saving || !editTitle.trim() || !editDescription.trim() || (editMinAge !== 12 && editMinAge !== 16)}
                       className="bg-green-600 text-white px-4 py-2 rounded-md font-medium hover:bg-green-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       title="Salvar alterações"
                     >
@@ -1441,6 +1455,47 @@ export default function DetalhesConteudo() {
                       )}
                     </div>
                   </div>
+
+                  {/* Idade Mínima */}
+                  <div className="mb-4">
+                    <label className="block text-xs text-gray-500 font-bold mb-1">
+                      Idade Mínima
+                      <span className="text-red-500 ml-1">*</span>
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1 mb-4">
+                      Selecione a idade mínima recomendada para visualizar este conteúdo
+                    </p>
+                    <div className="grid grid-cols-2 gap-4 mt-2">
+                      <label className="flex items-center gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                        <input
+                          type="radio"
+                          name="editMinAge"
+                          value="12"
+                          checked={editMinAge === 12}
+                          onChange={() => setEditMinAge(12)}
+                          className="accent-blue-600 cursor-pointer"
+                        />
+                        <div>
+                          <div className="font-medium text-gray-900">12+</div>
+                          <div className="text-xs text-gray-500">Conteúdo adequado para 12 anos ou mais</div>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                        <input
+                          type="radio"
+                          name="editMinAge"
+                          value="16"
+                          checked={editMinAge === 16}
+                          onChange={() => setEditMinAge(16)}
+                          className="accent-blue-600 cursor-pointer"
+                        />
+                        <div>
+                          <div className="font-medium text-gray-900">16+</div>
+                          <div className="text-xs text-gray-500">Conteúdo adequado para 16 anos ou mais</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
                 </>
               ) : (
                 <>
@@ -1522,6 +1577,13 @@ export default function DetalhesConteudo() {
                 <div>
                   <div className="text-xs text-gray-500 font-bold">Categoria</div>
                   <div className="text-gray-900 font-medium">{post.category}</div>
+                </div>
+                
+                <div>
+                  <div className="text-xs text-gray-500 font-bold">Idade Mínima</div>
+                  <div className="text-gray-900 font-medium">
+                    {post.min_age ? `${post.min_age}+` : '12+'}
+                  </div>
                 </div>
                 
                 {/* Categoria de Leitura (apenas para posts de leitura) */}
