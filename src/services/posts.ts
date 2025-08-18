@@ -14,6 +14,7 @@ export interface CreatePostData {
   file_size?: number
   duration?: number // ✅ ADICIONANDO CAMPO DURATION
   thumbnail_url?: string // ✅ ADICIONANDO CAMPO THUMBNAIL_URL
+  min_age?: number // ✅ ADICIONANDO CAMPO MIN_AGE
   tags?: string[]
   emotion_tags?: string[]
   categoria_leitura?: string[] // ✅ ADICIONANDO CAMPO CATEGORIA_LEITURA
@@ -32,6 +33,7 @@ export interface Post {
   file_type?: string
   duration?: number // ✅ ADICIONANDO CAMPO DURATION
   thumbnail_url?: string // ✅ ADICIONANDO CAMPO THUMBNAIL_URL
+  min_age?: number // ✅ ADICIONANDO CAMPO MIN_AGE
   tags: string[]
   emotion_tags: string[]
   categoria_leitura?: string[] // ✅ ADICIONANDO CAMPO CATEGORIA_LEITURA
@@ -112,7 +114,8 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       file_name_param: postData.file_name || null,
       file_type_param: postData.file_type || null,
       duration_param: duration || null, // ✅ ADICIONANDO DURATION_PARAM
-      thumbnail_url_param: postData.thumbnail_url || null // ✅ ADICIONANDO THUMBNAIL_URL_PARAM
+      thumbnail_url_param: postData.thumbnail_url || null, // ✅ ADICIONANDO THUMBNAIL_URL_PARAM
+      min_age_param: postData.min_age || 12 // ✅ ADICIONANDO MIN_AGE_PARAM
     })
 
     if (error) {
@@ -301,7 +304,8 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       file_path_param: filePath,
       file_name_param: fileName,
       file_type_param: fileType,
-      duration_param: duration || null // ✅ ADICIONANDO DURATION_PARAM
+      duration_param: duration || null, // ✅ ADICIONANDO DURATION_PARAM
+      min_age_param: postData.min_age || 12 // ✅ ADICIONANDO MIN_AGE_PARAM
     })
 
     if (error) {
