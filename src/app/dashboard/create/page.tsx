@@ -422,6 +422,7 @@ export default function CreateContent() {
   const [readingTags, setReadingTags] = useState<{id: string, name: string, color?: string}[]>([]);
   const [selectedReadingTags, setSelectedReadingTags] = useState<string[]>([]);
   const [showCreateTagModal, setShowCreateTagModal] = useState(false);
+  const [minAge, setMinAge] = useState<12 | 16>(12); // ✅ ADICIONANDO ESTADO PARA IDADE MÍNIMA
 
   // Função para recarregar as categorias de leitura
   const reloadReadingTags = async () => {
@@ -545,6 +546,12 @@ export default function CreateContent() {
         return;
       }
 
+      // Validar idade mínima
+      if (minAge !== 12 && minAge !== 16) {
+        setError("Idade mínima deve ser 12 ou 16");
+        return;
+      }
+
       // Preparar dados do post
       const postData: CreatePostData = {
         title: title.trim(),
@@ -552,6 +559,7 @@ export default function CreateContent() {
         category,
         tags: tags, // ✅ TODAS AS CATEGORIAS AGORA TÊM TAGS
         emotion_tags: emotions,
+        min_age: minAge, // ✅ ADICIONANDO IDADE MÍNIMA
         // categoria_leitura será preenchida automaticamente pelo trigger quando as tags forem associadas
       };
 
@@ -681,6 +689,7 @@ export default function CreateContent() {
         setThumbnailFile(null);
         setTagInput("");
         setSelectedReadingTags([]); // Limpar tags de leitura selecionadas
+        setMinAge(12); // ✅ LIMPAR IDADE MÍNIMA
 
         // Redirecionar para página de detalhes do post criado após 2 segundos
         if (result.data?.id) {
@@ -1231,6 +1240,47 @@ export default function CreateContent() {
                 ))}
               </div>
             </div>
+
+            {/* Idade Mínima */}
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-900">
+                Idade Mínima
+                <span className="text-red-500 ml-1">*</span>
+              </label>
+              <p className="text-xs text-gray-500 mt-1 mb-4">
+                Selecione a idade mínima recomendada para visualizar este conteúdo
+              </p>
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <label className="flex items-center gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="minAge"
+                    value="12"
+                    checked={minAge === 12}
+                    onChange={() => setMinAge(12)}
+                    className="accent-black cursor-pointer"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900">12+</div>
+                    <div className="text-xs text-gray-500">Conteúdo adequado para 12 anos ou mais</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="minAge"
+                    value="16"
+                    checked={minAge === 16}
+                    onChange={() => setMinAge(16)}
+                    className="accent-black cursor-pointer"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900">16+</div>
+                    <div className="text-xs text-gray-500">Conteúdo adequado para 16 anos ou mais</div>
+                  </div>
+                </label>
+              </div>
+            </div>
             {/* Upload Button */}
             <div className="flex justify-center">
               <button
@@ -1245,7 +1295,8 @@ export default function CreateContent() {
                   (category !== "Shorts" && !content.trim()) ||
                   tags.length === 0 ||
                   emotions.length === 0 ||
-                  (category === "Leitura" && selectedReadingTags.length === 0)
+                  (category === "Leitura" && selectedReadingTags.length === 0) ||
+                  (minAge !== 12 && minAge !== 16)
                 }
                               >
                   {isUploading 
@@ -1266,8 +1317,10 @@ export default function CreateContent() {
                                 ? "Adicione pelo menos uma tag"
                                 : emotions.length === 0
                                   ? "Selecione uma tag de emoção"
-                                  : category === "Leitura" && selectedReadingTags.length === 0
-                                    ? "Selecione uma categoria de leitura"
+                                                                  : category === "Leitura" && selectedReadingTags.length === 0
+                                  ? "Selecione uma categoria de leitura"
+                                  : (minAge !== 12 && minAge !== 16)
+                                    ? "Selecione uma idade mínima"
                                     : "Enviar Conteúdo"
                   }
                 </button>
