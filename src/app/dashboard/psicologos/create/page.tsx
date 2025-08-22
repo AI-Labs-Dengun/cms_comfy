@@ -11,6 +11,7 @@ const CreatePsicologoPage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [passwordCopied, setPasswordCopied] = useState(false);
   const router = useRouter();
 
   // Função para gerar password aleatória de até 5 dígitos
@@ -38,8 +39,27 @@ const CreatePsicologoPage = () => {
     setPassword(generateRandomPassword());
   }, []);
 
+  // Reset do estado de passwordCopied quando a password muda
+  useEffect(() => {
+    setPasswordCopied(false);
+  }, [password]);
+
   const handleGenerateNewPassword = () => {
     setPassword(generateRandomPassword());
+  };
+
+  const handleCopyPassword = async () => {
+    try {
+      await navigator.clipboard.writeText(password);
+      setPasswordCopied(true);
+      
+      // Reset do estado após 3 segundos
+      setTimeout(() => {
+        setPasswordCopied(false);
+      }, 3000);
+    } catch (err) {
+      console.error('Erro ao copiar password:', err);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -252,6 +272,18 @@ const CreatePsicologoPage = () => {
                 readOnly
                 required
               />
+              <button
+                type="button"
+                onClick={handleCopyPassword}
+                className={`px-4 py-2 rounded transition-colors text-sm ${
+                  passwordCopied 
+                    ? 'bg-green-500 text-white hover:bg-green-600' 
+                    : 'bg-gray-500 text-white hover:bg-gray-600'
+                }`}
+                disabled={loading}
+              >
+                {passwordCopied ? '✅ Copiado' : '📋 Copiar'}
+              </button>
               <button
                 type="button"
                 onClick={handleGenerateNewPassword}
