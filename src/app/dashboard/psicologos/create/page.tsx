@@ -14,7 +14,7 @@ const CreatePsicologoPage = () => {
   const [passwordCopied, setPasswordCopied] = useState(false);
   const router = useRouter();
 
-  // Função para gerar password aleatória de até 5 dígitos
+  // Função para gerar password aleatória de 6 dígitos
   const generateRandomPassword = () => {
     // Caracteres disponíveis: números e letras (maiúsculas e minúsculas)
     const numbers = '0123456789';
@@ -25,8 +25,8 @@ const CreatePsicologoPage = () => {
     
     let password = '';
     
-    // Gerar 5 caracteres aleatórios
-    for (let i = 0; i < 5; i++) {
+    // Gerar 6 caracteres aleatórios
+    for (let i = 0; i < 6; i++) {
       const randomIndex = Math.floor(Math.random() * allChars.length);
       password += allChars[randomIndex];
     }
@@ -62,6 +62,10 @@ const CreatePsicologoPage = () => {
     }
   };
 
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -72,8 +76,8 @@ const CreatePsicologoPage = () => {
       return;
     }
 
-    if (password.length < 5) {
-      setError('A palavra-passe deve ter pelo menos 5 caracteres.');
+    if (password.length < 6) {
+      setError('A palavra-passe deve ter pelo menos 6 caracteres.');
       return;
     }
 
@@ -98,11 +102,34 @@ const CreatePsicologoPage = () => {
 
       console.log('👤 Criando psicólogo com usuário CMS:', user.email);
 
-      // 2. Criar psicólogo usando apenas a função SQL (sem afetar sessão atual)
-      console.log('🚀 Chamando função create_psicologo...');
+      // 2. Criar usuário de autenticação no Supabase
+      console.log('🔐 Criando credenciais de login para o psicólogo...');
+      const { data: authData, error: signupError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            name: nome,
+            role: 'psicologo'
+          }
+        }
+      });
+
+      if (signupError || !authData.user) {
+        console.error('❌ Erro ao criar credenciais:', signupError);
+        setError('Erro ao criar credenciais de login: ' + (signupError?.message || 'Erro desconhecido'));
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Credenciais criadas com ID:', authData.user.id);
+
+      // 3. Criar perfil do psicólogo usando a função correta
+      console.log('🚀 Chamando função create_psicologo_with_existing_auth...');
       
       const { data: profileResult, error: profileError } = await supabase
-        .rpc('create_psicologo', {
+        .rpc('create_psicologo_with_existing_auth', {
+          existing_user_id: authData.user.id,
           created_by_id: user.id,
           psicologo_name: nome,
           psicologo_username: email.split('@')[0],
@@ -126,77 +153,13 @@ const CreatePsicologoPage = () => {
       // Verificar se resultado é válido
       if (!profileResult) {
         console.error('❌ Função retornou resultado nulo ou undefined');
-        console.log('🔄 Tentando função alternativa...');
-        
-        // FALLBACK: Tentar função alternativa
-        try {
-          const { data: fallbackResult, error: fallbackError } = await supabase
-            .rpc('create_psicologo_alt', {
-              created_by_id: user.id,
-              psicologo_name: nome,
-              psicologo_username: email.split('@')[0],
-              psicologo_guardian_email: email,
-              psicologo_avatar_path: '/default-avatar.png'
-            });
-
-          console.log('🔄 Resultado da função alternativa:', fallbackResult);
-
-          if (fallbackError) {
-            console.error('❌ Função alternativa também falhou:', fallbackError);
-            setError('Erro: Ambas as funções falharam. Verifique as permissões no database.sql');
-            setLoading(false);
-            return;
-          }
-
-          if (fallbackResult?.success) {
-            console.log('✅ Função alternativa funcionou!');
-            
-            setSuccess(`Psicólogo "${nome}" criado com sucesso! Email: ${email} (senha: ${password}). Redirecionando em 2 segundos...`);
-            setLoading(false);
-            
-            // Reset do formulário
-            setNome('');
-            setEmail('');
-            setPassword(generateRandomPassword());
-            
-            // Redirecionar para a página de gerenciamento após 2 segundos
-            console.log('🔄 Redirecionando para página de gerenciamento (fallback)...');
-            setTimeout(() => {
-              console.log('🚀 Executando redirecionamento (fallback)...');
-              router.push('/dashboard/psicologos');
-            }, 2000);
-            return;
-          } else {
-            console.error('❌ Função alternativa retornou erro:', fallbackResult);
-            setError('Erro na função alternativa: ' + (fallbackResult?.error || 'Erro desconhecido'));
-            setLoading(false);
-            return;
-          }
-        } catch (fallbackException) {
-          console.error('❌ Exceção na função alternativa:', fallbackException);
-          setError('Erro: Execute o debug_user.sql no Supabase para diagnosticar o problema');
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Validações da função principal (se chegou até aqui, profileResult não é null)
-      if (typeof profileResult !== 'object') {
-        console.error('❌ Função principal retornou tipo inválido:', typeof profileResult);
-        setError('Erro: Função retornou tipo inválido: ' + typeof profileResult);
-        setLoading(false);
-        return;
-      }
-
-      if (!profileResult.hasOwnProperty('success')) {
-        console.error('❌ Função principal retornou objeto sem propriedade success:', profileResult);
-        setError('Erro: Resposta da função inválida - sem propriedade success');
+        setError('Erro: Resposta vazia da função SQL. Verifique as permissões na database.');
         setLoading(false);
         return;
       }
 
       if (!profileResult?.success) {
-        console.error('❌ Função principal retornou erro:', profileResult);
+        console.error('❌ Função retornou erro:', profileResult);
         const errorMsg = profileResult?.error || 'Erro desconhecido';
         setError('Erro ao criar psicólogo: ' + errorMsg);
         setLoading(false);
@@ -205,7 +168,15 @@ const CreatePsicologoPage = () => {
 
       console.log('✅ Psicólogo criado com sucesso!', profileResult);
        
-      setSuccess(`Psicólogo "${nome}" criado com sucesso! Email: ${email} (senha: ${password}). Redirecionando em 2 segundos...`);
+      setSuccess(`✅ Psicólogo "${nome}" criado com sucesso!
+
+🔐 Credenciais de login:
+📧 Email: ${email}
+🔑 Password: ${password}
+👤 Username: ${profileResult.username}
+
+⚠️ O psicólogo já pode fazer login no sistema usando estas credenciais.
+📋 Guarde estas informações com segurança!`);
       
       // Reset do formulário
       setNome('');
@@ -213,12 +184,12 @@ const CreatePsicologoPage = () => {
       setPassword(generateRandomPassword());
       setLoading(false);
 
-      // 3. Redirecionar para a página de gerenciamento após 2 segundos
+      // Redirecionar para a página de gerenciamento após 5 segundos
       console.log('🔄 Redirecionando para página de gerenciamento...');
       setTimeout(() => {
         console.log('🚀 Executando redirecionamento...');
         router.push('/dashboard/psicologos');
-      }, 2000);
+      }, 5000);
       
     } catch (error) {
       console.error('❌ Erro inesperado ao criar psicólogo:', error);
@@ -262,15 +233,16 @@ const CreatePsicologoPage = () => {
           </div>
 
           <div>
-            <label className="block font-semibold mb-1 text-gray-800">Password Gerada *</label>
-            <span className="block text-xs text-gray-500 mb-1">Password aleatória de 5 caracteres (números e letras) gerada automaticamente</span>
+            <label className="block font-semibold mb-1 text-gray-800">Password *</label>
+            <span className="block text-xs text-gray-500 mb-1">Password de pelo menos 6 caracteres (números e letras) - pode ser gerada automaticamente ou editada manualmente</span>
             <div className="flex gap-2">
               <input
                 type="text"
                 className="flex-1 border border-gray-300 rounded px-3 py-2 text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-black font-mono text-lg"
                 value={password}
-                readOnly
+                onChange={handlePasswordChange}
                 required
+                placeholder="Mínimo 6 caracteres"
               />
               <button
                 type="button"
@@ -299,7 +271,7 @@ const CreatePsicologoPage = () => {
             <h3 className="text-sm font-semibold text-blue-800 mb-1">📝 Informação Importante</h3>
             <p className="text-xs text-blue-700">
               O psicólogo terá credenciais de login reais e poderá acessar outras aplicações do sistema.
-              A password é gerada automaticamente com 5 caracteres (números e letras) e é de utilização única.
+              A password deve ter pelo menos 6 caracteres (números e letras) e pode ser gerada automaticamente ou editada diretamente no campo.
               Após o psicólogo entrar na sua conta pela primeira vez, ele poderá alterar a password.
               Guarde as credenciais com segurança.
             </p>
