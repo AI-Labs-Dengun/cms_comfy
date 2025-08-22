@@ -36,7 +36,7 @@ export default function PsicologosLayout({ children }: PsicologosLayoutProps) {
       <div className="min-h-screen bg-gray-50">
         {/* Header do painel de psicólogos */}
         <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               {/* Logo e título */}
               <div className="flex items-center">
@@ -63,8 +63,8 @@ export default function PsicologosLayout({ children }: PsicologosLayoutProps) {
           </div>
         </header>
         
-        {/* Conteúdo principal */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Conteúdo principal - sem padding para ocupar toda a tela */}
+        <main className="h-[calc(100vh-4rem)]">
           {children}
         </main>
       </div>
