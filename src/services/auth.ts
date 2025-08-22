@@ -75,21 +75,27 @@ export class AuthService {
     }
 
     try {
+      console.log('🔍 AuthService - Chamando can_user_login_with_role:', { email, requiredRole });
+      
       const { data, error } = await supabase.rpc('can_user_login_with_role', {
         user_email: email,
         required_role: requiredRole
       });
 
+      console.log('📊 AuthService - Resposta da função SQL:', { data, error });
+
       if (error) {
+        console.error('❌ AuthService - Erro na função SQL:', error);
         const response = {
           success: false,
-          error: 'Erro na verificação de permissões',
+          error: 'Erro na verificação de permissões: ' + error.message,
           code: 'PERMISSION_CHECK_ERROR'
         };
         return response;
       }
 
       const response = data as AuthResponse;
+      console.log('✅ AuthService - Resposta processada:', response);
       
       // Cachear apenas respostas de sucesso
       if (response.success) {
