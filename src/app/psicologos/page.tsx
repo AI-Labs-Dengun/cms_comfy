@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import ChatInterface from '@/components/ChatInterface';
 
 // Tipos para os chats
 interface Chat {
@@ -18,12 +17,11 @@ interface Chat {
 }
 
 export default function PsicologosPage() {
-  const router = useRouter();
-  const { user, profile } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showChatList, setShowChatList] = useState(true);
 
   // Carregar chats disponíveis
   useEffect(() => {
@@ -94,6 +92,17 @@ export default function PsicologosPage() {
     return `${Math.floor(diffInMinutes / 1440)}d atrás`;
   };
 
+  // Função para selecionar um chat
+  const handleSelectChat = (chat: Chat) => {
+    setSelectedChat(chat);
+    setShowChatList(false);
+  };
+
+  // Função para voltar à lista de chats (mobile)
+  const handleBackToList = () => {
+    setShowChatList(true);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-96">
@@ -123,165 +132,132 @@ export default function PsicologosPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Cabeçalho da página */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Conversas Ativas
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Bem-vindo(a), {profile?.name || user?.email}
-            </p>
-          </div>
-          
-          <div className="text-right">
-            <div className="text-sm text-gray-500">Total de conversas</div>
-            <div className="text-3xl font-bold text-blue-600">{chats.length}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Estatísticas rápidas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                <div className="w-3 h-3 bg-red-600 rounded-full"></div>
-              </div>
+    <div className="h-full flex bg-gray-50">
+      {/* Coluna da lista de chats - visível sempre no desktop, condicional no mobile */}
+      <div className={`w-full lg:w-96 lg:flex-shrink-0 bg-white border-r border-gray-200 flex flex-col ${
+        showChatList ? 'flex' : 'hidden lg:flex'
+      }`}>
+        {/* Cabeçalho da lista */}
+        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">
+                Conversas
+              </h1>
+              <p className="text-sm text-gray-600 mt-1">
+                {chats.length} conversa{chats.length !== 1 ? 's' : ''} ativa{chats.length !== 1 ? 's' : ''}
+              </p>
             </div>
-            <div className="ml-4">
-              <div className="text-sm font-medium text-gray-500">Não lidas</div>
-              <div className="text-2xl font-bold text-gray-900">
+            
+            {/* Estatísticas rápidas */}
+            <div className="text-right">
+              <div className="text-xs text-gray-500 font-medium">Não lidas</div>
+              <div className="text-2xl font-bold text-red-600">
                 {chats.reduce((sum, chat) => sum + chat.unread_count_psicologo, 0)}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <div className="w-3 h-3 bg-green-600 rounded-full"></div>
-              </div>
-            </div>
-            <div className="ml-4">
-              <div className="text-sm font-medium text-gray-500">Ativas hoje</div>
-              <div className="text-2xl font-bold text-gray-900">
-                {chats.filter(chat => {
-                  const lastMessage = new Date(chat.last_message_at);
-                  const today = new Date();
-                  return lastMessage.toDateString() === today.toDateString();
-                }).length}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-              </div>
-            </div>
-            <div className="ml-4">
-              <div className="text-sm font-medium text-gray-500">Total ativas</div>
-              <div className="text-2xl font-bold text-gray-900">
-                {chats.filter(chat => chat.is_active).length}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Lista de conversas */}
-      <div className="bg-white rounded-lg shadow-sm">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Conversas Recentes
-          </h2>
-        </div>
-        
-        <div className="divide-y divide-gray-200">
+        {/* Lista de conversas */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           {chats.length === 0 ? (
-            <div className="px-6 py-12 text-center">
+            <div className="p-8 text-center">
               <div className="text-gray-400 mb-4">
-                <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </div>
-              <p className="text-gray-500">Nenhuma conversa disponível no momento.</p>
+              <p className="text-gray-500 font-medium">Nenhuma conversa disponível.</p>
             </div>
           ) : (
-            chats.map((chat) => (
-              <div
-                key={chat.id}
-                className={`px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors ${
-                  selectedChat?.id === chat.id ? 'bg-blue-50 border-r-4 border-blue-500' : ''
-                }`}
-                onClick={() => {
-                  setSelectedChat(chat);
-                  router.push(`/psicologos/chat/${chat.id}`);
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-gray-900 truncate">
-                        {chat.app_user_name}
-                      </h3>
-                      <div className="ml-2 flex items-center space-x-2">
-                        {chat.unread_count_psicologo > 0 && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                            {chat.unread_count_psicologo}
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-500">
-                          {formatDate(chat.last_message_at)}
-                        </span>
+            <div className="divide-y divide-gray-100">
+              {chats.map((chat) => (
+                <div
+                  key={chat.id}
+                  className={`p-6 hover:bg-gray-50 cursor-pointer transition-all duration-200 ${
+                    selectedChat?.id === chat.id ? 'bg-blue-50 border-r-4 border-blue-500 shadow-sm' : ''
+                  }`}
+                  onClick={() => handleSelectChat(chat)}
+                >
+                  <div className="flex items-start space-x-4">
+                    {/* Avatar do usuário */}
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-semibold text-lg">
+                        {chat.app_user_name.charAt(0).toUpperCase()}
                       </div>
                     </div>
                     
-                    {chat.last_message_content && (
-                      <p className="mt-1 text-sm text-gray-600 truncate">
-                        {chat.last_message_content}
-                      </p>
-                    )}
-                    
-                    {chat.tags && chat.tags.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {chat.tags.map((tag, index) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800"
-                          >
-                            {tag}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold text-gray-900 truncate">
+                          {chat.app_user_name}
+                        </h3>
+                        <div className="flex items-center space-x-2">
+                          {chat.unread_count_psicologo > 0 && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              {chat.unread_count_psicologo}
+                            </span>
+                          )}
+                          <span className="text-xs text-gray-400 font-medium">
+                            {formatDate(chat.last_message_at)}
                           </span>
-                        ))}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  
-                  <div className="ml-4 flex-shrink-0">
-                    <button
-                      className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/psicologos/chat/${chat.id}`);
-                      }}
-                    >
-                      Ver conversa →
-                    </button>
+                      
+                      {chat.last_message_content && (
+                        <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                          {chat.last_message_content}
+                        </p>
+                      )}
+                      
+                      {chat.tags && chat.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {chat.tags.map((tag, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
+      </div>
+
+      {/* Área do chat - visível sempre no desktop, condicional no mobile */}
+      <div className={`flex-1 flex flex-col ${
+        !showChatList ? 'flex' : 'hidden lg:flex'
+      }`}>
+        {selectedChat ? (
+          <ChatInterface 
+            chatId={selectedChat.id} 
+            onBack={handleBackToList}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+            <div className="text-center max-w-md">
+              <div className="text-gray-400 mb-6">
+                <svg className="w-24 h-24 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                Selecione uma conversa
+              </h2>
+              <p className="text-gray-600 text-lg">
+                Escolha uma conversa da lista para começar a responder e ajudar seus pacientes
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
