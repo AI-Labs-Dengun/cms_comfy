@@ -1031,6 +1031,7 @@ export default function CreateContent() {
                     accept="image/*"
                     disabled={isUploading}
                   />
+                  {/* eslint-disable-next-line jsx-a11y/alt-text */}
                   <Image className="w-8 h-8 mb-2 text-white" />
                   <span className="text-white">
                     {isUploading ? "A fazer upload..." : 
