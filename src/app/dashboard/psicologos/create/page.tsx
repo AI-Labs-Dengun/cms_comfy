@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -8,29 +8,52 @@ const CreatePsicologoPage = () => {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  // Função para gerar password aleatória de até 5 dígitos
+  const generateRandomPassword = () => {
+    // Caracteres disponíveis: números e letras (maiúsculas e minúsculas)
+    const numbers = '0123456789';
+    const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    
+    // Combinar números e letras
+    const allChars = numbers + letters;
+    
+    let password = '';
+    
+    // Gerar 5 caracteres aleatórios
+    for (let i = 0; i < 5; i++) {
+      const randomIndex = Math.floor(Math.random() * allChars.length);
+      password += allChars[randomIndex];
+    }
+    
+    return password;
+  };
+
+  // Gerar password inicial quando o componente carrega
+  useEffect(() => {
+    setPassword(generateRandomPassword());
+  }, []);
+
+  const handleGenerateNewPassword = () => {
+    setPassword(generateRandomPassword());
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     
-    if (!nome || !email || !password || !confirmPassword) {
+    if (!nome || !email || !password) {
       setError('Por favor, preencha todos os campos.');
       return;
     }
-    
-    if (password !== confirmPassword) {
-      setError('As palavras-passe não coincidem.');
-      return;
-    }
 
-    if (password.length < 6) {
-      setError('A palavra-passe deve ter pelo menos 6 caracteres.');
+    if (password.length < 5) {
+      setError('A palavra-passe deve ter pelo menos 5 caracteres.');
       return;
     }
 
@@ -114,8 +137,7 @@ const CreatePsicologoPage = () => {
             // Reset do formulário
             setNome('');
             setEmail('');
-            setPassword('');
-            setConfirmPassword('');
+            setPassword(generateRandomPassword());
             
             // Redirecionar para a página de gerenciamento após 2 segundos
             console.log('🔄 Redirecionando para página de gerenciamento (fallback)...');
@@ -168,8 +190,7 @@ const CreatePsicologoPage = () => {
       // Reset do formulário
       setNome('');
       setEmail('');
-      setPassword('');
-      setConfirmPassword('');
+      setPassword(generateRandomPassword());
       setLoading(false);
 
       // 3. Redirecionar para a página de gerenciamento após 2 segundos
@@ -221,36 +242,33 @@ const CreatePsicologoPage = () => {
           </div>
 
           <div>
-            <label className="block font-semibold mb-1 text-gray-800">Password *</label>
-            <span className="block text-xs text-gray-500 mb-1">Escolha uma palavra-passe para a conta do psicólogo (mínimo 6 caracteres)</span>
-            <input
-              type="password"
-              className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-black"
-              placeholder="palavra-passe123"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              minLength={6}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block font-semibold mb-1 text-gray-800">Confirmar Password *</label>
-            <span className="block text-xs text-gray-500 mb-1">Digite a palavra-passe novamente</span>
-            <input
-              type="password"
-              className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-black"
-              placeholder="palavra-passe123"
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              required
-            />
+            <label className="block font-semibold mb-1 text-gray-800">Password Gerada *</label>
+            <span className="block text-xs text-gray-500 mb-1">Password aleatória de 5 caracteres (números e letras) gerada automaticamente</span>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="flex-1 border border-gray-300 rounded px-3 py-2 text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-black font-mono text-lg"
+                value={password}
+                readOnly
+                required
+              />
+              <button
+                type="button"
+                onClick={handleGenerateNewPassword}
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
+                disabled={loading}
+              >
+                🔄 Nova
+              </button>
+            </div>
           </div>
 
           <div className="bg-blue-50 p-4 rounded-md">
             <h3 className="text-sm font-semibold text-blue-800 mb-1">📝 Informação Importante</h3>
             <p className="text-xs text-blue-700">
               O psicólogo terá credenciais de login reais e poderá acessar outras aplicações do sistema.
+              A password é gerada automaticamente com 5 caracteres (números e letras) e é de utilização única.
+              Após o psicólogo entrar na sua conta pela primeira vez, ele poderá alterar a password.
               Guarde as credenciais com segurança.
             </p>
           </div>
