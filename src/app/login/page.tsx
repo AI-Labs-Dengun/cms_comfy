@@ -47,31 +47,38 @@ export default function LoginPage() {
       return;
     }
 
-    // Verificar se deve redirecionar
-    const shouldRedirect = isAuthenticated && 
-                          canAccessCMS && 
-                          user && 
-                          profile && 
-                          profile.user_role === 'cms' && 
-                          profile.authorized === true &&
-                          authInfo?.success === true;
+    // Verificar se deve redirecionar baseado no role
+    const shouldRedirectCMS = isAuthenticated && 
+                             canAccessCMS && 
+                             user && 
+                             profile && 
+                             profile.user_role === 'cms' && 
+                             profile.authorized === true &&
+                             authInfo?.success === true;
+
+    const shouldRedirectPsicologo = isAuthenticated &&
+                                   user &&
+                                   profile &&
+                                   profile.user_role === 'psicologo' &&
+                                   profile.authorized === true;
 
     console.log('🔍 LoginPage - Verificando redirecionamento:', {
-      shouldRedirect,
+      shouldRedirectCMS,
+      shouldRedirectPsicologo,
       isAuthenticated,
       canAccessCMS,
       hasUser: !!user,
       hasProfile: !!profile,
-      isCMSUser: profile?.user_role === 'cms',
+      userRole: profile?.user_role,
       isAuthorized: profile?.authorized === true,
       authSuccess: authInfo?.success === true,
       loginSuccess: loginSuccessRef.current
     });
 
-    if (shouldRedirect) {
-      console.log('✅ LoginPage - Redirecionando para dashboard...');
+    if (shouldRedirectCMS) {
+      console.log('✅ LoginPage - Redirecionando para dashboard CMS...');
       hasRedirected.current = true;
-      setSuccessMessage('Acesso autorizado! Redirecionando...');
+      setSuccessMessage('Acesso autorizado! Redirecionando para CMS...');
       
       // Limpar timeout anterior se existir
       if (redirectTimeoutRef.current) {
@@ -84,8 +91,28 @@ export default function LoginPage() {
       // Fallback de segurança usando window.location
       redirectTimeoutRef.current = setTimeout(() => {
         if (window.location.pathname === '/login') {
-          console.log('🔄 LoginPage - Usando fallback window.location...');
+          console.log('🔄 LoginPage - Usando fallback window.location para CMS...');
           window.location.href = '/dashboard/create';
+        }
+      }, 1500);
+    } else if (shouldRedirectPsicologo) {
+      console.log('✅ LoginPage - Redirecionando para painel de psicólogos...');
+      hasRedirected.current = true;
+      setSuccessMessage('Acesso autorizado! Redirecionando para painel de psicólogos...');
+      
+      // Limpar timeout anterior se existir
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+      
+      // Redirecionamento direto sem delay
+      router.replace('/psicologos');
+      
+      // Fallback de segurança usando window.location
+      redirectTimeoutRef.current = setTimeout(() => {
+        if (window.location.pathname === '/login') {
+          console.log('🔄 LoginPage - Usando fallback window.location para psicólogos...');
+          window.location.href = '/psicologos';
         }
       }, 1500);
     }
@@ -108,11 +135,26 @@ export default function LoginPage() {
     }
 
     try {
-      // Tentar fazer login com role CMS
+      // Primeiro tentar CMS, depois psicólogo
       console.log('🔑 LoginPage - Tentando login com role CMS...');
-      const result = await AuthService.loginWithRole(email, password, 'cms');
+      let result = await AuthService.loginWithRole(email, password, 'cms');
+      
+      // Se falhou no CMS, tentar psicólogo
+      if (!result.success) {
+        console.log('🔑 LoginPage - CMS falhou, tentando login com role psicólogo...');
+        result = await AuthService.loginWithRole(email, password, 'psicologo');
+      }
 
       console.log('📝 LoginPage - Resultado do login:', result);
+      console.log('📊 LoginPage - Detalhes completos:', {
+        success: result.success,
+        error: result.error,
+        code: result.code,
+        user_role: result.user_role,
+        user_id: result.user_id,
+        name: result.name,
+        username: result.username
+      });
 
       if (result.success) {
         setError('');
@@ -120,25 +162,31 @@ export default function LoginPage() {
         loginSuccessRef.current = true; // Marcar que o login foi bem-sucedido
         
         console.log('✅ LoginPage - Login bem-sucedido, atualizando contexto...');
+        console.log('📊 LoginPage - User role:', result.user_role);
         
         // Forçar atualização do contexto de autenticação (forceRefresh = true)
         await refreshAuth(true);
         
-        // Aguardar um pouco para sincronização e deixar o useEffect detectar
+        // Aguardar um pouco para sincronização
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // Se o useEffect não redirecionou ainda, fazer redirecionamento manual
+        // Redirecionamento baseado no role
         if (!hasRedirected.current) {
-          console.log('🔄 LoginPage - Redirecionamento manual...');
+          console.log('🔄 LoginPage - Redirecionamento baseado no role...');
           hasRedirected.current = true;
           setSuccessMessage('Redirecionando...');
-          router.replace('/dashboard/create');
+          
+          // Definir rota baseada no role
+          const redirectPath = result.user_role === 'psicologo' ? '/psicologos' : '/dashboard/create';
+          console.log('🎯 LoginPage - Redirecionando para:', redirectPath);
+          
+          router.replace(redirectPath);
           
           // Fallback adicional
           redirectTimeoutRef.current = setTimeout(() => {
             if (window.location.pathname === '/login') {
               console.log('🔄 LoginPage - Fallback do redirecionamento manual...');
-              window.location.href = '/dashboard/create';
+              window.location.href = redirectPath;
             }
           }, 1500);
         }
@@ -241,7 +289,7 @@ export default function LoginPage() {
           {/* Subtitle */}
           <div className="mb-6 text-center">
             <p className="text-sm sm:text-base text-gray-600">
-              Inicie sessão para acessar o CMS
+              Inicie sessão para acessar a plataforma
             </p>
           </div>
           
@@ -307,7 +355,7 @@ export default function LoginPage() {
           {/* Footer Links */}
           <div className="mt-6 sm:mt-8 text-center w-full">
             <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4 px-4">
-              Apenas utilizadores com role &quot;CMS&quot; podem acessar este sistema
+              Para administradores (CMS) e psicólogos autorizados
             </p>
             <p className="text-sm sm:text-base text-gray-600">
               Não tem uma conta?{' '}
