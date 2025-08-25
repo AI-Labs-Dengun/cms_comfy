@@ -13,6 +13,7 @@ interface UserProfile {
   username: string;
   user_role: 'app' | 'cms' | 'psicologo';
   authorized: boolean | null;
+  is_online?: boolean;
 }
 
 interface AuthContextType {
@@ -101,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('id, name, username, user_role, authorized')
+        .select('id, name, username, user_role, authorized, is_online')
         .eq('id', currentUser.id)
         .single();
 
@@ -110,10 +111,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       }
 
+      // Se for psicólogo, definir como online automaticamente
+      if (profile.user_role === 'psicologo' && profile.authorized === true) {
+        try {
+          console.log('🔄 AuthContext - Definindo psicólogo como online...');
+          const { error: statusError } = await supabase
+            .rpc('handle_psicologo_login', { psicologo_id: profile.id });
+          
+          if (statusError) {
+            console.warn('⚠️ AuthContext - Erro ao definir status online:', statusError);
+          } else {
+            console.log('✅ AuthContext - Status online definido com sucesso');
+            // Atualizar o perfil com o status online
+            profile.is_online = true;
+          }
+        } catch (statusError) {
+          console.warn('⚠️ AuthContext - Erro ao definir status online:', statusError);
+        }
+      }
+
       console.log('✅ AuthContext - Perfil carregado:', { 
         id: profile.id, 
         user_role: profile.user_role, 
-        authorized: profile.authorized 
+        authorized: profile.authorized,
+        is_online: profile.is_online
       });
       
       return profile as UserProfile;
@@ -154,6 +175,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🚪 AuthContext - Fazendo logout...');
       
+      // Se for psicólogo, definir como offline antes do logout
+      if (profile?.user_role === 'psicologo' && profile?.id) {
+        try {
+          console.log('🔄 AuthContext - Definindo psicólogo como offline...');
+          const { error: statusError } = await supabase
+            .rpc('handle_psicologo_logout', { psicologo_id: profile.id });
+          
+          if (statusError) {
+            console.warn('⚠️ AuthContext - Erro ao definir status offline:', statusError);
+          } else {
+            console.log('✅ AuthContext - Status offline definido com sucesso');
+          }
+        } catch (statusError) {
+          console.warn('⚠️ AuthContext - Erro ao definir status offline:', statusError);
+        }
+      }
+      
       // Primeiro, encerrar sessão no Supabase
       const { error } = await supabase.auth.signOut();
       if (error) {
@@ -189,7 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('❌ AuthContext - Erro inesperado ao fazer logout:', error);
       return { success: false, error: 'Erro de conexão ao fazer logout' };
     }
-  }, [clearCache]);
+  }, [clearCache, profile]);
 
   // Função principal para atualizar autenticação - OTIMIZADA
   const refreshAuth = useCallback(async (forceRefresh: boolean = false): Promise<void> => {
