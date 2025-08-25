@@ -304,9 +304,9 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
   const groupedMessages = groupMessagesByDate(messages);
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-white chat-interface">
       {/* Cabeçalho da conversa */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+      <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             {onBack && (
@@ -353,8 +353,8 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
         </div>
       </div>
 
-      {/* Área de mensagens */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-gray-50 to-white custom-scrollbar">
+      {/* Área de mensagens - com altura fixa e scroll independente */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-gray-50 to-white custom-scrollbar chat-messages-container" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {groupedMessages.map((group) => (
           <div key={group.date} className="space-y-4">
             {/* Separador de data */}
@@ -410,7 +410,7 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
       </div>
 
       {/* Área de envio de mensagem */}
-      <div className="p-6 border-t border-gray-200 bg-white">
+      <div className="p-6 border-t border-gray-200 bg-white flex-shrink-0">
         <form onSubmit={handleSendMessage} className="space-y-4">
           <div className="relative">
             <textarea
