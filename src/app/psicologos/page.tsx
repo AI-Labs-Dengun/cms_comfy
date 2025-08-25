@@ -180,7 +180,7 @@ export default function PsicologosPage() {
   }
 
   return (
-    <div className="flex-1 flex bg-gray-50 min-h-0">
+    <div className="flex-1 flex bg-gray-50 min-h-0 h-screen">
       {/* Coluna da lista de chats - visível sempre no desktop, condicional no mobile */}
       <div className={`w-full lg:w-96 lg:flex-shrink-0 bg-white border-r border-gray-200 flex flex-col ${
         showChatList ? 'flex' : 'hidden lg:flex'
@@ -281,7 +281,7 @@ export default function PsicologosPage() {
       </div>
 
       {/* Área do chat - visível sempre no desktop, condicional no mobile */}
-      <div className={`flex-1 flex flex-col min-h-0 ${
+      <div className={`flex-1 flex flex-col min-h-0 h-full ${
         !showChatList ? 'flex' : 'hidden lg:flex'
       }`}>
         {selectedChat ? (

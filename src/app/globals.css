@@ -81,6 +81,26 @@ body {
     background: #94a3b8;
   }
   
+  /* Controle de scroll para área de mensagens */
+  .chat-messages-container {
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Prevenir scroll na página quando estiver na área de mensagens */
+  .chat-interface {
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  /* Garantir que o layout do chat seja fixo */
+  .chat-layout {
+    height: 100vh;
+    overflow: hidden;
+  }
+  
   /* Animações suaves */
   .message-enter {
     animation: messageSlideIn 0.3s ease-out;
