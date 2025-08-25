@@ -23,6 +23,15 @@ export default function PsicologosPage() {
   const [error, setError] = useState<string | null>(null);
   const [showChatList, setShowChatList] = useState(true);
 
+  // Debug temporário - remover depois
+  console.log('🔍 PsicologosPage Debug:', {
+    loading,
+    error,
+    chatsCount: chats.length,
+    selectedChat: !!selectedChat,
+    showChatList
+  });
+
   // Carregar chats disponíveis
   useEffect(() => {
     const loadChats = async () => {
@@ -142,7 +151,7 @@ export default function PsicologosPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-96">
+      <div className="flex-1 flex justify-center items-center bg-gray-50">
         <LoadingSpinner size="lg" text="Carregando conversas..." />
       </div>
     );
@@ -150,32 +159,34 @@ export default function PsicologosPage() {
 
   if (error) {
     return (
-      <div className="text-center py-12">
-        <div className="text-red-500 mb-4">
-          <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
+      <div className="flex-1 flex justify-center items-center bg-gray-50">
+        <div className="text-center py-12">
+          <div className="text-red-500 mb-4">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Erro ao carregar</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Tentar novamente
+          </button>
         </div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">Erro ao carregar</h2>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Tentar novamente
-        </button>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex bg-gray-50">
+    <div className="flex-1 flex bg-gray-50 min-h-0">
       {/* Coluna da lista de chats - visível sempre no desktop, condicional no mobile */}
       <div className={`w-full lg:w-96 lg:flex-shrink-0 bg-white border-r border-gray-200 flex flex-col ${
         showChatList ? 'flex' : 'hidden lg:flex'
       }`}>
         {/* Cabeçalho da lista */}
-        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-gray-900">
@@ -197,7 +208,7 @@ export default function PsicologosPage() {
         </div>
 
         {/* Lista de conversas */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
           {chats.length === 0 ? (
             <div className="p-8 text-center">
               <div className="text-gray-400 mb-4">
@@ -270,7 +281,7 @@ export default function PsicologosPage() {
       </div>
 
       {/* Área do chat - visível sempre no desktop, condicional no mobile */}
-      <div className={`flex-1 flex flex-col ${
+      <div className={`flex-1 flex flex-col min-h-0 ${
         !showChatList ? 'flex' : 'hidden lg:flex'
       }`}>
         {selectedChat ? (

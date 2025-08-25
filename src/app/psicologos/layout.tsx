@@ -11,12 +11,12 @@ interface PsicologosLayoutProps {
 export default function PsicologosLayout({ children }: PsicologosLayoutProps) {
   return (
     <AuthGuard requiredRole="psicologo" redirectTo="/login">
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
         {/* Header do painel de psicólogos */}
         <PsicologosNavbar />
         
-        {/* Conteúdo principal - sem padding para ocupar toda a tela */}
-        <main className="h-[calc(100vh-4rem)]">
+        {/* Conteúdo principal */}
+        <main className="flex-1 flex flex-col">
           {children}
         </main>
       </div>
