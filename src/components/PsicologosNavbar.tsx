@@ -8,10 +8,21 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 export default function PsicologosNavbar() {
   const router = useRouter();
   const { signOut, profile, user } = useAuth();
-  const { isOnline, isUpdating, wasAutoOffline, clearAutoOfflineFlag, updateStatus, inactivityTimeout, setInactivityTimeout } = useOnlineStatus();
+  const { 
+    isOnline, 
+    isUpdating, 
+    wasAutoOffline, 
+    clearAutoOfflineFlag, 
+    updateStatus, 
+    inactivityTimeout, 
+    setInactivityTimeout,
+    isInactivityTimerActive,
+    getRemainingTime
+  } = useOnlineStatus();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isTimeoutDropdownOpen, setIsTimeoutDropdownOpen] = useState(false);
   const [showAutoOfflineModal, setShowAutoOfflineModal] = useState(false);
+  const [remainingTime, setRemainingTime] = useState(0);
 
   // Opções de tempo de inatividade (em minutos)
   const timeoutOptions = [
@@ -25,6 +36,21 @@ export default function PsicologosNavbar() {
   // Encontrar a opção atual
   const currentTimeoutOption = timeoutOptions.find(option => option.value === inactivityTimeout) || timeoutOptions[2]; // 5 minutos padrão
 
+  // Atualizar tempo restante a cada segundo quando o timer estiver ativo
+  useEffect(() => {
+    if (!isInactivityTimerActive) {
+      setRemainingTime(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const remaining = getRemainingTime();
+      setRemainingTime(remaining);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isInactivityTimerActive, getRemainingTime]);
+
   // Mostrar modal quando status foi alterado automaticamente
   useEffect(() => {
     console.log('🔍 PsicologosNavbar - useEffect wasAutoOffline:', wasAutoOffline);
@@ -33,6 +59,14 @@ export default function PsicologosNavbar() {
       setShowAutoOfflineModal(true);
     }
   }, [wasAutoOffline]);
+
+  // Função para formatar tempo restante
+  const formatRemainingTime = (ms: number) => {
+    if (ms <= 0) return '0:00';
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
 
   // Função para fechar modal e limpar flag
   const handleCloseAutoOfflineModal = () => {
@@ -109,8 +143,6 @@ export default function PsicologosNavbar() {
     );
   }
 
-
-
   return (
     <>
       <header className="bg-white shadow-sm border-b border-gray-200">
@@ -128,6 +160,16 @@ export default function PsicologosNavbar() {
               <span className="text-sm text-gray-500">
                 Bem-vindo(a), {profile?.name || user?.email || 'Usuário'}
               </span>
+              
+              {/* Indicador de Timer de Inatividade */}
+              {isInactivityTimerActive && isOnline && (
+                <div className="flex items-center space-x-2 px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-medium text-yellow-700">
+                    Auto-offline em: {formatRemainingTime(remainingTime)}
+                  </span>
+                </div>
+              )}
               
               {/* Dropdown de Configuração de Tempo */}
               <div className="relative">
