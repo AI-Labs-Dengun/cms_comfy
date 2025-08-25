@@ -39,7 +39,7 @@ export default function PsicologosPage() {
             id: '1',
             app_user_id: 'user1',
             app_user_name: 'João Silva',
-            last_message_at: new Date(Date.now() - 30000).toISOString(),
+            last_message_at: new Date(Date.now() - 30000).toISOString(), // Hoje - 30 segundos atrás
             last_message_content: 'Olá, preciso de ajuda...',
             unread_count_psicologo: 2,
             is_active: true,
@@ -49,7 +49,7 @@ export default function PsicologosPage() {
             id: '2',
             app_user_id: 'user2',
             app_user_name: 'Maria Santos',
-            last_message_at: new Date(Date.now() - 300000).toISOString(),
+            last_message_at: new Date(Date.now() - 300000).toISOString(), // Hoje - 5 minutos atrás
             last_message_content: 'Obrigada pela sessão de hoje.',
             unread_count_psicologo: 0,
             is_active: true,
@@ -59,11 +59,31 @@ export default function PsicologosPage() {
             id: '3',
             app_user_id: 'user3',
             app_user_name: 'Pedro Costa',
-            last_message_at: new Date(Date.now() - 86400000).toISOString(),
+            last_message_at: new Date(Date.now() - 86400000).toISOString(), // Ontem
             last_message_content: 'Consegui aplicar as técnicas que discutimos.',
             unread_count_psicologo: 1,
             is_active: true,
             tags: ['progresso']
+          },
+          {
+            id: '4',
+            app_user_id: 'user4',
+            app_user_name: 'Ana Oliveira',
+            last_message_at: new Date(Date.now() - 172800000).toISOString(), // 2 dias atrás
+            last_message_content: 'Vou marcar uma nova consulta.',
+            unread_count_psicologo: 0,
+            is_active: true,
+            tags: ['acompanhamento']
+          },
+          {
+            id: '5',
+            app_user_id: 'user5',
+            app_user_name: 'Carlos Ferreira',
+            last_message_at: new Date(Date.now() - 604800000).toISOString(), // 1 semana atrás
+            last_message_content: 'Muito obrigado pelo apoio.',
+            unread_count_psicologo: 0,
+            is_active: true,
+            tags: ['finalização']
           }
         ];
 
@@ -84,12 +104,29 @@ export default function PsicologosPage() {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Agora';
-    if (diffInMinutes < 60) return `${diffInMinutes}min atrás`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h atrás`;
-    return `${Math.floor(diffInMinutes / 1440)}d atrás`;
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Verificar se é hoje
+    if (date.toDateString() === today.toDateString()) {
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+      if (diffInMinutes < 1) return 'Agora';
+      if (diffInMinutes < 60) return `${diffInMinutes}min atrás`;
+      return `${Math.floor(diffInMinutes / 60)}h atrás`;
+    }
+
+    // Verificar se é ontem
+    if (date.toDateString() === yesterday.toDateString()) {
+      return 'Ontem';
+    }
+
+    // Para outras datas, mostrar DD/MM/YYYY
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
   };
 
   // Função para selecionar um chat
