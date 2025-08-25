@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { getAllPsicologos, Psicologo } from '@/services/psicologos';
 
 export default function PsicologosNavbar() {
   const router = useRouter();
@@ -23,6 +24,9 @@ export default function PsicologosNavbar() {
   const [isTimeoutDropdownOpen, setIsTimeoutDropdownOpen] = useState(false);
   const [showAutoOfflineModal, setShowAutoOfflineModal] = useState(false);
   const [remainingTime, setRemainingTime] = useState(0);
+  const [isPsicologosDropdownOpen, setIsPsicologosDropdownOpen] = useState(false);
+  const [psicologos, setPsicologos] = useState<Psicologo[]>([]);
+  const [loadingPsicologos, setLoadingPsicologos] = useState(false);
 
   // Opções de tempo de inatividade (em minutos)
   const timeoutOptions = [
@@ -68,6 +72,24 @@ export default function PsicologosNavbar() {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  // Função para formatar última atividade
+  const formatLastSeen = (lastSeen?: string) => {
+    if (!lastSeen) return 'Nunca visto';
+    
+    const date = new Date(lastSeen);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Agora mesmo';
+    if (diffInMinutes < 60) return `${diffInMinutes} min atrás`;
+    
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h atrás`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays}d atrás`;
+  };
+
   // Função para fechar modal e limpar flag
   const handleCloseAutoOfflineModal = () => {
     console.log('🔍 PsicologosNavbar - Fechando modal (Ok)');
@@ -98,6 +120,46 @@ export default function PsicologosNavbar() {
     }
   };
 
+  // Função para buscar todos os psicólogos
+  const fetchPsicologos = async () => {
+    try {
+      setLoadingPsicologos(true);
+      const result = await getAllPsicologos();
+      if (result.success) {
+        // Ordenar psicólogos: online primeiro, depois offline por tempo de última atividade
+        const sortedPsicologos = (result.data || []).sort((a, b) => {
+          // Primeiro: online antes de offline
+          if (a.is_online && !b.is_online) return -1;
+          if (!a.is_online && b.is_online) return 1;
+          
+          // Se ambos são offline, ordenar por tempo de última atividade (mais recente primeiro)
+          if (!a.is_online && !b.is_online) {
+            const aTime = new Date(a.last_seen || a.updated_at).getTime();
+            const bTime = new Date(b.last_seen || b.updated_at).getTime();
+            return bTime - aTime; // Mais recente primeiro
+          }
+          
+          // Se ambos são online, ordenar por nome
+          return a.name.localeCompare(b.name);
+        });
+        
+        setPsicologos(sortedPsicologos);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar psicólogos:', error);
+    } finally {
+      setLoadingPsicologos(false);
+    }
+  };
+
+  // Função para abrir dropdown de psicólogos
+  const handlePsicologosDropdownToggle = () => {
+    if (!isPsicologosDropdownOpen) {
+      fetchPsicologos();
+    }
+    setIsPsicologosDropdownOpen(!isPsicologosDropdownOpen);
+  };
+
   // Função para alterar tempo de inatividade
   const handleTimeoutChange = (timeout: number) => {
     setInactivityTimeout(timeout);
@@ -122,6 +184,14 @@ export default function PsicologosNavbar() {
       alert('Erro inesperado ao fazer logout');
     }
   };
+
+  // Atualizar lista de psicólogos quando o dropdown estiver aberto
+  useEffect(() => {
+    if (isPsicologosDropdownOpen) {
+      const interval = setInterval(fetchPsicologos, 10000); // Atualizar a cada 10 segundos
+      return () => clearInterval(interval);
+    }
+  }, [isPsicologosDropdownOpen]);
 
   // Verificação de segurança para evitar renderização com dados inválidos
   if (!profile && !user) {
@@ -149,10 +219,196 @@ export default function PsicologosNavbar() {
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo e título */}
-            <div className="flex items-center">
+            <div className="flex items-center space-x-6">
               <h1 className="text-xl font-semibold text-gray-900">
                 Painel Psicólogos - Comfy
               </h1>
+              
+              {/* Dropdown de Psicólogos Online */}
+              <div className="relative">
+                <button
+                  onClick={handlePsicologosDropdownToggle}
+                  className="flex items-center space-x-2 px-3 py-2 text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 hover:text-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <span>Psicólogos</span>
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {/* Dropdown Menu de Psicólogos */}
+                {isPsicologosDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border-2 border-gray-200 z-50 overflow-hidden">
+                    <div className="py-2">
+                      <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                          Psicólogos ({psicologos.length})
+                        </span>
+                      </div>
+                      
+                      {loadingPsicologos ? (
+                        <div className="px-4 py-6 text-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                          <p className="text-sm text-gray-500 mt-2">Carregando...</p>
+                        </div>
+                      ) : psicologos.length === 0 ? (
+                        <div className="px-4 py-6 text-center">
+                          <div className="text-gray-400 mb-2">
+                            <svg className="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                          </div>
+                          <p className="text-sm text-gray-500">Nenhum psicólogo encontrado</p>
+                        </div>
+                      ) : (
+                        <div className="max-h-96 overflow-y-auto">
+                          {(() => {
+                            const onlinePsicologos = psicologos.filter(p => p.is_online);
+                            const offlinePsicologos = psicologos.filter(p => !p.is_online);
+                            
+                            return (
+                              <>
+                                {/* Psicólogos Online */}
+                                {onlinePsicologos.length > 0 && (
+                                  <>
+                                    <div className="px-3 py-2 bg-green-50 border-b border-green-200">
+                                      <span className="text-xs font-medium text-green-700 uppercase tracking-wide">
+                                        Online ({onlinePsicologos.length})
+                                      </span>
+                                    </div>
+                                    {onlinePsicologos.slice(0, 3).map((psicologo: Psicologo) => (
+                                      <div
+                                        key={psicologo.id}
+                                        className="flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                                      >
+                                        {/* Avatar */}
+                                        <div className="flex-shrink-0">
+                                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                            {psicologo.avatar_path && psicologo.avatar_path !== '/default-avatar.png' ? (
+                                              <img
+                                                src={psicologo.avatar_path}
+                                                alt={psicologo.name}
+                                                className="w-8 h-8 rounded-full object-cover"
+                                              />
+                                            ) : (
+                                              <span className="text-blue-600 font-semibold text-sm">
+                                                {psicologo.name.charAt(0).toUpperCase()}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {/* Informações */}
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center space-x-2">
+                                            <h4 className="text-sm font-medium text-gray-900 truncate">
+                                              {psicologo.name}
+                                            </h4>
+                                            <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                                          </div>
+                                          <p className="text-xs text-gray-500 truncate">
+                                            @{psicologo.username}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {onlinePsicologos.length > 3 && (
+                                      <div className="px-4 py-2 text-xs text-gray-500 text-center border-t border-gray-100">
+                                        +{onlinePsicologos.length - 3} mais online
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+
+                                {/* Linha Divisória */}
+                                {onlinePsicologos.length > 0 && offlinePsicologos.length > 0 && (
+                                  <div className="px-3 py-2 bg-gray-100 border-t border-b border-gray-200">
+                                    <div className="h-px bg-gray-300"></div>
+                                  </div>
+                                )}
+
+                                {/* Psicólogos Offline */}
+                                {offlinePsicologos.length > 0 && (
+                                  <>
+                                    <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+                                      <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                                        Offline ({offlinePsicologos.length})
+                                      </span>
+                                    </div>
+                                    {offlinePsicologos.slice(0, 3).map((psicologo: Psicologo) => (
+                                      <div
+                                        key={psicologo.id}
+                                        className="flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                                      >
+                                        {/* Avatar */}
+                                        <div className="flex-shrink-0">
+                                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                                            {psicologo.avatar_path && psicologo.avatar_path !== '/default-avatar.png' ? (
+                                              <img
+                                                src={psicologo.avatar_path}
+                                                alt={psicologo.name}
+                                                className="w-8 h-8 rounded-full object-cover opacity-60"
+                                              />
+                                            ) : (
+                                              <span className="text-gray-500 font-semibold text-sm">
+                                                {psicologo.name.charAt(0).toUpperCase()}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {/* Informações */}
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center space-x-2">
+                                            <h4 className="text-sm font-medium text-gray-700 truncate">
+                                              {psicologo.name}
+                                            </h4>
+                                            <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
+                                          </div>
+                                          <p className="text-xs text-gray-500 truncate">
+                                            @{psicologo.username}
+                                          </p>
+                                          <p className="text-xs text-gray-400">
+                                            Última atividade: {formatLastSeen(psicologo.last_seen)}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {offlinePsicologos.length > 3 && (
+                                      <div className="px-4 py-2 text-xs text-gray-500 text-center border-t border-gray-100">
+                                        +{offlinePsicologos.length - 3} mais offline
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
+                      
+                      {/* Botão Ver Mais */}
+                      <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
+                        <button
+                          onClick={() => {
+                            setIsPsicologosDropdownOpen(false);
+                            router.push('/psicologos/lista');
+                          }}
+                          className="w-full flex items-center justify-center space-x-2 px-3 py-2 text-sm text-blue-600 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition-all duration-200"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          <span>Ver Lista Completa</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             
             {/* Menu de usuário */}
@@ -366,12 +622,13 @@ export default function PsicologosNavbar() {
         </div>
         
         {/* Overlay para fechar dropdowns quando clicar fora */}
-        {(isDropdownOpen || isTimeoutDropdownOpen) && (
+        {(isDropdownOpen || isTimeoutDropdownOpen || isPsicologosDropdownOpen) && (
           <div 
             className="fixed inset-0 z-40" 
             onClick={() => {
               setIsDropdownOpen(false);
               setIsTimeoutDropdownOpen(false);
+              setIsPsicologosDropdownOpen(false);
             }}
           />
         )}
