@@ -27,6 +27,7 @@ interface ChatInfo {
 interface ChatInterfaceProps {
   chatId: string;
   onBack?: () => void;
+  onClose?: () => void;
 }
 
 // Interface para mensagens agrupadas
@@ -36,7 +37,7 @@ interface GroupedMessages {
   messages: Message[];
 }
 
-export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
+export default function ChatInterface({ chatId, onBack, onClose }: ChatInterfaceProps) {
   const { profile } = useAuth();
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -55,6 +56,20 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Detectar tecla ESC para fechar o chat
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
 
   // Função para agrupar mensagens por data
   const groupMessagesByDate = (messages: Message[]): GroupedMessages[] => {
@@ -337,19 +352,34 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
             </div>
           </div>
 
-          {/* Tags */}
-          {chatInfo.tags && chatInfo.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 ml-4">
-              {chatInfo.tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="flex items-center space-x-4">
+            {/* Tags */}
+            {chatInfo.tags && chatInfo.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {chatInfo.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Botão X para fechar o chat */}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                title="Fechar conversa (ESC)"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -448,9 +478,14 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
             <span>
               Pressione Enter para enviar, Shift+Enter para nova linha
             </span>
-            <span className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="font-medium">Online</span>
+            <span className="flex items-center space-x-4">
+              <span className="hidden sm:inline">
+                Pressione ESC para sair
+              </span>
+              <span className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="font-medium">Online</span>
+              </span>
             </span>
           </div>
         </form>
