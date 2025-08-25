@@ -3,16 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ChatInterface from '@/components/ChatInterface';
+import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
+import { getChats, updateChatStatus, Chat as ChatType } from '@/services/chat';
 
 // Tipos para os chats
-interface Chat {
-  id: string;
-  app_user_id: string;
-  app_user_name: string;
-  last_message_at: string;
-  last_message_content?: string;
-  unread_count_psicologo: number;
-  is_active: boolean;
+interface Chat extends ChatType {
   tags?: string[];
 }
 
@@ -39,64 +34,13 @@ export default function PsicologosPage() {
         setLoading(true);
         setError(null);
 
-        // TODO: Implementar chamada à API para buscar chats
-        // Por enquanto, dados simulados
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simular loading
+        const result = await getChats();
         
-        const mockChats: Chat[] = [
-          {
-            id: '1',
-            app_user_id: 'user1',
-            app_user_name: 'João Silva',
-            last_message_at: new Date(Date.now() - 30000).toISOString(), // Hoje - 30 segundos atrás
-            last_message_content: 'Olá, preciso de ajuda...',
-            unread_count_psicologo: 2,
-            is_active: true,
-            tags: ['ansiedade', 'urgente']
-          },
-          {
-            id: '2',
-            app_user_id: 'user2',
-            app_user_name: 'Maria Santos',
-            last_message_at: new Date(Date.now() - 300000).toISOString(), // Hoje - 5 minutos atrás
-            last_message_content: 'Obrigada pela sessão de hoje.',
-            unread_count_psicologo: 0,
-            is_active: true,
-            tags: ['depressão']
-          },
-          {
-            id: '3',
-            app_user_id: 'user3',
-            app_user_name: 'Pedro Costa',
-            last_message_at: new Date(Date.now() - 86400000).toISOString(), // Ontem
-            last_message_content: 'Consegui aplicar as técnicas que discutimos.',
-            unread_count_psicologo: 1,
-            is_active: true,
-            tags: ['progresso']
-          },
-          {
-            id: '4',
-            app_user_id: 'user4',
-            app_user_name: 'Ana Oliveira',
-            last_message_at: new Date(Date.now() - 172800000).toISOString(), // 2 dias atrás
-            last_message_content: 'Vou marcar uma nova consulta.',
-            unread_count_psicologo: 0,
-            is_active: true,
-            tags: ['acompanhamento']
-          },
-          {
-            id: '5',
-            app_user_id: 'user5',
-            app_user_name: 'Carlos Ferreira',
-            last_message_at: new Date(Date.now() - 604800000).toISOString(), // 1 semana atrás
-            last_message_content: 'Muito obrigado pelo apoio.',
-            unread_count_psicologo: 0,
-            is_active: true,
-            tags: ['finalização']
-          }
-        ];
-
-        setChats(mockChats);
+        if (result.success && result.data) {
+          setChats(result.data);
+        } else {
+          setError(result.error || 'Erro ao carregar conversas. Tente novamente.');
+        }
         
       } catch (error) {
         console.error('Erro ao carregar chats:', error);
@@ -153,6 +97,33 @@ export default function PsicologosPage() {
   const handleCloseChat = () => {
     setSelectedChat(null);
     setShowChatList(true);
+  };
+
+  // Função para atualizar o status de um chat
+  const handleStatusChange = async (chatId: string, newStatus: ChatStatus) => {
+    try {
+      const result = await updateChatStatus(chatId, newStatus);
+      
+      if (result.success) {
+        // Atualizar o chat na lista local
+        setChats(prevChats => 
+          prevChats.map(chat => 
+            chat.id === chatId 
+              ? { ...chat, status: newStatus }
+              : chat
+          )
+        );
+        
+        // Se o chat selecionado foi atualizado, atualizar também
+        if (selectedChat?.id === chatId) {
+          setSelectedChat(prev => prev ? { ...prev, status: newStatus } : null);
+        }
+      } else {
+        console.error('Erro ao atualizar status:', result.error);
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status do chat:', error);
+    }
   };
 
   if (loading) {
@@ -265,18 +236,29 @@ export default function PsicologosPage() {
                         </p>
                       )}
                       
-                      {chat.tags && chat.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {chat.tags.map((tag, index) => (
-                            <span
-                              key={index}
-                              className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      <div className="flex items-center justify-between">
+                        {/* Tags de status */}
+                        <ChatStatusTag
+                          status={chat.status}
+                          onStatusChange={(newStatus) => handleStatusChange(chat.id, newStatus)}
+                          isEditable={true}
+                          className="mr-2"
+                        />
+                        
+                        {/* Tags adicionais */}
+                        {chat.tags && chat.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {chat.tags.map((tag, index) => (
+                              <span
+                                key={index}
+                                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

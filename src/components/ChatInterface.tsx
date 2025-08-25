@@ -2,27 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
-
-// Tipos para as mensagens
-interface Message {
-  id: string;
-  chat_id: string;
-  sender_id: string;
-  sender_type: 'psicologo' | 'app_user';
-  content: string;
-  created_at: string;
-  is_read: boolean;
-  is_deleted: boolean;
-}
-
-interface ChatInfo {
-  id: string;
-  app_user_id: string;
-  app_user_name: string;
-  is_active: boolean;
-  created_at: string;
-  tags?: string[];
-}
+import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
+import { getChatInfo, getChatMessages, sendMessage, updateChatStatus, markMessagesAsRead, ChatInfo, Message } from '@/services/chat';
 
 interface ChatInterfaceProps {
   chatId: string;
@@ -131,102 +112,26 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
         // Por enquanto, dados simulados
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Chat info simulado
-        const mockChatInfo: ChatInfo = {
-          id: chatId,
-          app_user_id: 'user1',
-          app_user_name: 'João Silva',
-          is_active: true,
-          created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-          tags: ['ansiedade', 'urgente']
-        };
+        // Carregar informações do chat
+        const chatInfoResult = await getChatInfo(chatId);
+        if (chatInfoResult.success && chatInfoResult.data) {
+          setChatInfo(chatInfoResult.data);
+        } else {
+          setError(chatInfoResult.error || 'Erro ao carregar informações do chat');
+          return;
+        }
 
-        // Mensagens simuladas com diferentes datas
-        const mockMessages: Message[] = [
-          {
-            id: '1',
-            chat_id: chatId,
-            sender_id: 'user1',
-            sender_type: 'app_user',
-            content: 'Olá, preciso de ajuda com ansiedade.',
-            created_at: new Date(Date.now() - 86400000 * 7 - 3600000).toISOString(), // 1 semana atrás
-            is_read: true,
-            is_deleted: false
-          },
-          {
-            id: '2',
-            chat_id: chatId,
-            sender_id: profile?.id || 'psicologo1',
-            sender_type: 'psicologo',
-            content: 'Olá! Como posso ajudá-lo hoje? Pode me contar um pouco mais sobre o que está sentindo?',
-            created_at: new Date(Date.now() - 86400000 * 7 - 3300000).toISOString(), // 1 semana atrás
-            is_read: true,
-            is_deleted: false
-          },
-          {
-            id: '3',
-            chat_id: chatId,
-            sender_id: 'user1',
-            sender_type: 'app_user',
-            content: 'Tenho sentido muito nervoso ultimamente, principalmente antes de apresentações no trabalho. Meu coração acelera e fico com dificuldade para respirar.',
-            created_at: new Date(Date.now() - 86400000 * 5 - 3000000).toISOString(), // 5 dias atrás
-            is_read: true,
-            is_deleted: false
-          },
-          {
-            id: '4',
-            chat_id: chatId,
-            sender_id: profile?.id || 'psicologo1',
-            sender_type: 'psicologo',
-            content: 'Entendo. Esses sintomas são muito comuns em casos de ansiedade de performance. Há quanto tempo isso vem acontecendo?',
-            created_at: new Date(Date.now() - 86400000 * 5 - 2700000).toISOString(), // 5 dias atrás
-            is_read: true,
-            is_deleted: false
-          },
-          {
-            id: '5',
-            chat_id: chatId,
-            sender_id: 'user1',
-            sender_type: 'app_user',
-            content: 'Cerca de 3 meses. Começou depois que mudei de cargo.',
-            created_at: new Date(Date.now() - 86400000 - 3000000).toISOString(), // ontem
-            is_read: true,
-            is_deleted: false
-          },
-          {
-            id: '6',
-            chat_id: chatId,
-            sender_id: profile?.id || 'psicologo1',
-            sender_type: 'psicologo',
-            content: 'Entendo. Vamos trabalhar juntos para gerenciar essa ansiedade. Que tal começarmos com algumas técnicas de respiração?',
-            created_at: new Date(Date.now() - 86400000 - 2700000).toISOString(), // ontem
-            is_read: true,
-            is_deleted: false
-          },
-          {
-            id: '7',
-            chat_id: chatId,
-            sender_id: 'user1',
-            sender_type: 'app_user',
-            content: 'Sim, gostaria muito de aprender essas técnicas.',
-            created_at: new Date(Date.now() - 30000).toISOString(), // hoje
-            is_read: false,
-            is_deleted: false
-          },
-          {
-            id: '8',
-            chat_id: chatId,
-            sender_id: profile?.id || 'psicologo1',
-            sender_type: 'psicologo',
-            content: 'Perfeito! Vamos começar com a técnica da respiração 4-7-8. Inspire pelo nariz contando até 4, segure por 7 segundos e expire pela boca contando até 8.',
-            created_at: new Date(Date.now() - 10000).toISOString(), // hoje
-            is_read: false,
-            is_deleted: false
-          }
-        ];
+        // Carregar mensagens do chat
+        const messagesResult = await getChatMessages(chatId);
+        if (messagesResult.success && messagesResult.data) {
+          setMessages(messagesResult.data);
+        } else {
+          setError(messagesResult.error || 'Erro ao carregar mensagens');
+          return;
+        }
 
-        setChatInfo(mockChatInfo);
-        setMessages(mockMessages);
+        // Marcar mensagens como lidas
+        await markMessagesAsRead(chatId);
 
       } catch (error) {
         console.error('Erro ao carregar chat:', error);
@@ -241,6 +146,21 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
     }
   }, [chatId, profile?.id]);
 
+  // Função para atualizar status do chat
+  const handleStatusChange = async (newStatus: ChatStatus) => {
+    try {
+      const result = await updateChatStatus(chatId, newStatus);
+      if (result.success) {
+        // Atualizar o chat info local
+        setChatInfo(prev => prev ? { ...prev, status: newStatus } : null);
+      } else {
+        console.error('Erro ao atualizar status:', result.error);
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status do chat:', error);
+    }
+  };
+
   // Enviar nova mensagem
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -250,22 +170,14 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
     try {
       setSending(true);
       
-      // TODO: Implementar chamada à API
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const message: Message = {
-        id: Date.now().toString(),
-        chat_id: chatId,
-        sender_id: profile?.id || 'psicologo1',
-        sender_type: 'psicologo',
-        content: newMessage.trim(),
-        created_at: new Date().toISOString(),
-        is_read: false,
-        is_deleted: false
-      };
-
-      setMessages(prev => [...prev, message]);
-      setNewMessage('');
+      const result = await sendMessage(chatId, newMessage.trim());
+      
+      if (result.success && result.data) {
+        setMessages(prev => [...prev, result.data!]);
+        setNewMessage('');
+      } else {
+        console.error('Erro ao enviar mensagem:', result.error);
+      }
 
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
@@ -353,18 +265,15 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Tags */}
-            {chatInfo.tags && chatInfo.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {chatInfo.tags.map((tag, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
+            {/* Tags de Status - Integradas na barra principal */}
+            {chatInfo && (
+              <ChatStatusTag
+                status={chatInfo.status}
+                onStatusChange={handleStatusChange}
+                isEditable={true}
+                variant="horizontal"
+                className="mr-4"
+              />
             )}
 
             {/* Botão X para fechar o chat */}
@@ -447,7 +356,7 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Digite sua mensagem..."
-              className="w-full border border-gray-300 rounded-2xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all duration-200"
+              className="w-full border border-gray-300 rounded-2xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all duration-200 text-black"
               rows={3}
               disabled={sending}
               onKeyDown={(e) => {
