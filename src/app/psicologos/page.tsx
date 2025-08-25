@@ -149,6 +149,12 @@ export default function PsicologosPage() {
     setShowChatList(true);
   };
 
+  // Função para sair do chat (limpar seleção)
+  const handleCloseChat = () => {
+    setSelectedChat(null);
+    setShowChatList(true);
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex justify-center items-center bg-gray-50">
@@ -288,6 +294,7 @@ export default function PsicologosPage() {
           <ChatInterface 
             chatId={selectedChat.id} 
             onBack={handleBackToList}
+            onClose={handleCloseChat}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
