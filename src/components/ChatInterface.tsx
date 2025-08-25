@@ -29,6 +29,13 @@ interface ChatInterfaceProps {
   onBack?: () => void;
 }
 
+// Interface para mensagens agrupadas
+interface GroupedMessages {
+  date: string;
+  dateLabel: string;
+  messages: Message[];
+}
+
 export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
   const { profile } = useAuth();
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
@@ -48,6 +55,55 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Função para agrupar mensagens por data
+  const groupMessagesByDate = (messages: Message[]): GroupedMessages[] => {
+    const groups: { [key: string]: Message[] } = {};
+    
+    messages.forEach(message => {
+      const date = new Date(message.created_at);
+      const dateKey = date.toDateString();
+      
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+      }
+      groups[dateKey].push(message);
+    });
+
+    return Object.keys(groups).map(dateKey => {
+      const date = new Date(dateKey);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      let dateLabel = '';
+      if (date.toDateString() === today.toDateString()) {
+        dateLabel = 'Hoje';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        dateLabel = 'Ontem';
+      } else {
+        // Para outras datas, mostrar dia da semana + data completa
+        // Exemplo: "Sexta-feira, 22/08/2025"
+        const weekday = date.toLocaleDateString('pt-BR', {
+          weekday: 'long'
+        });
+        const fullDate = date.toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+        dateLabel = `${weekday}, ${fullDate}`;
+      }
+
+      return {
+        date: dateKey,
+        dateLabel: dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1),
+        messages: groups[dateKey].sort((a, b) => 
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        )
+      };
+    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  };
 
   // Carregar dados do chat e mensagens
   useEffect(() => {
@@ -70,7 +126,7 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
           tags: ['ansiedade', 'urgente']
         };
 
-        // Mensagens simuladas
+        // Mensagens simuladas com diferentes datas
         const mockMessages: Message[] = [
           {
             id: '1',
@@ -78,7 +134,7 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
             sender_id: 'user1',
             sender_type: 'app_user',
             content: 'Olá, preciso de ajuda com ansiedade.',
-            created_at: new Date(Date.now() - 3600000).toISOString(),
+            created_at: new Date(Date.now() - 86400000 * 7 - 3600000).toISOString(), // 1 semana atrás
             is_read: true,
             is_deleted: false
           },
@@ -88,7 +144,7 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
             sender_id: profile?.id || 'psicologo1',
             sender_type: 'psicologo',
             content: 'Olá! Como posso ajudá-lo hoje? Pode me contar um pouco mais sobre o que está sentindo?',
-            created_at: new Date(Date.now() - 3300000).toISOString(),
+            created_at: new Date(Date.now() - 86400000 * 7 - 3300000).toISOString(), // 1 semana atrás
             is_read: true,
             is_deleted: false
           },
@@ -98,7 +154,7 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
             sender_id: 'user1',
             sender_type: 'app_user',
             content: 'Tenho sentido muito nervoso ultimamente, principalmente antes de apresentações no trabalho. Meu coração acelera e fico com dificuldade para respirar.',
-            created_at: new Date(Date.now() - 3000000).toISOString(),
+            created_at: new Date(Date.now() - 86400000 * 5 - 3000000).toISOString(), // 5 dias atrás
             is_read: true,
             is_deleted: false
           },
@@ -108,7 +164,7 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
             sender_id: profile?.id || 'psicologo1',
             sender_type: 'psicologo',
             content: 'Entendo. Esses sintomas são muito comuns em casos de ansiedade de performance. Há quanto tempo isso vem acontecendo?',
-            created_at: new Date(Date.now() - 2700000).toISOString(),
+            created_at: new Date(Date.now() - 86400000 * 5 - 2700000).toISOString(), // 5 dias atrás
             is_read: true,
             is_deleted: false
           },
@@ -118,7 +174,37 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
             sender_id: 'user1',
             sender_type: 'app_user',
             content: 'Cerca de 3 meses. Começou depois que mudei de cargo.',
-            created_at: new Date(Date.now() - 30000).toISOString(),
+            created_at: new Date(Date.now() - 86400000 - 3000000).toISOString(), // ontem
+            is_read: true,
+            is_deleted: false
+          },
+          {
+            id: '6',
+            chat_id: chatId,
+            sender_id: profile?.id || 'psicologo1',
+            sender_type: 'psicologo',
+            content: 'Entendo. Vamos trabalhar juntos para gerenciar essa ansiedade. Que tal começarmos com algumas técnicas de respiração?',
+            created_at: new Date(Date.now() - 86400000 - 2700000).toISOString(), // ontem
+            is_read: true,
+            is_deleted: false
+          },
+          {
+            id: '7',
+            chat_id: chatId,
+            sender_id: 'user1',
+            sender_type: 'app_user',
+            content: 'Sim, gostaria muito de aprender essas técnicas.',
+            created_at: new Date(Date.now() - 30000).toISOString(), // hoje
+            is_read: false,
+            is_deleted: false
+          },
+          {
+            id: '8',
+            chat_id: chatId,
+            sender_id: profile?.id || 'psicologo1',
+            sender_type: 'psicologo',
+            content: 'Perfeito! Vamos começar com a técnica da respiração 4-7-8. Inspire pelo nariz contando até 4, segure por 7 segundos e expire pela boca contando até 8.',
+            created_at: new Date(Date.now() - 10000).toISOString(), // hoje
             is_read: false,
             is_deleted: false
           }
@@ -174,25 +260,13 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
     }
   };
 
-  // Formatar data/hora
-  const formatDateTime = (dateString: string) => {
+  // Formatar hora da mensagem
+  const formatMessageTime = (dateString: string) => {
     const date = new Date(dateString);
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-    
-    if (isToday) {
-      return date.toLocaleTimeString('pt-BR', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
-    } else {
-      return date.toLocaleDateString('pt-BR', { 
-        day: '2-digit', 
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    }
+    return date.toLocaleTimeString('pt-BR', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
   };
 
   if (loading) {
@@ -225,6 +299,9 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
       </div>
     );
   }
+
+  // Agrupar mensagens por data
+  const groupedMessages = groupMessagesByDate(messages);
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -278,43 +355,55 @@ export default function ChatInterface({ chatId, onBack }: ChatInterfaceProps) {
 
       {/* Área de mensagens */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-gray-50 to-white custom-scrollbar">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.sender_type === 'psicologo' ? 'justify-end' : 'justify-start'} message-enter`}
-          >
-            <div className={`max-w-xs lg:max-w-md xl:max-w-lg ${
-              message.sender_type === 'psicologo' ? 'order-2' : 'order-1'
-            }`}>
-              <div
-                className={`px-4 py-3 rounded-2xl shadow-sm ${
-                  message.sender_type === 'psicologo'
-                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
-                    : 'bg-white text-gray-900 border border-gray-200'
-                }`}
-              >
-                <p className="text-sm leading-relaxed">{message.content}</p>
-                <p
-                  className={`text-xs mt-2 ${
-                    message.sender_type === 'psicologo' ? 'text-blue-100' : 'text-gray-400'
-                  }`}
-                >
-                  {formatDateTime(message.created_at)}
-                </p>
+        {groupedMessages.map((group) => (
+          <div key={group.date} className="space-y-4">
+            {/* Separador de data */}
+            <div className="flex justify-center">
+              <div className="date-separator text-gray-700 px-4 py-2 rounded-full text-sm font-medium">
+                {group.dateLabel}
               </div>
             </div>
             
-            {/* Avatar do remetente */}
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium mx-3 shadow-sm ${
-              message.sender_type === 'psicologo' 
-                ? 'order-1 gradient-green' 
-                : 'order-2 gradient-blue'
-            }`}>
-              {message.sender_type === 'psicologo' 
-                ? 'P' 
-                : chatInfo.app_user_name.charAt(0).toUpperCase()
-              }
-            </div>
+            {/* Mensagens do grupo */}
+            {group.messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.sender_type === 'psicologo' ? 'justify-end' : 'justify-start'} message-enter`}
+              >
+                <div className={`relative max-w-xs lg:max-w-md xl:max-w-lg ${
+                  message.sender_type === 'psicologo' ? 'order-2' : 'order-1'
+                }`}>
+                  <div
+                    className={`px-4 py-3 pb-6 rounded-2xl shadow-sm ${
+                      message.sender_type === 'psicologo'
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+                        : 'bg-white text-gray-900 border border-gray-200'
+                    }`}
+                  >
+                    <p className="text-sm leading-relaxed">{message.content}</p>
+                    <p
+                      className={`text-xs mt-2 ${
+                        message.sender_type === 'psicologo' ? 'text-blue-100' : 'text-gray-400'
+                      }`}
+                    >
+                      {formatMessageTime(message.created_at)}
+                    </p>
+                  </div>
+                  
+                  {/* Avatar do remetente posicionado no canto inferior */}
+                  <div className={`absolute w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium shadow-sm border-2 border-white ${
+                    message.sender_type === 'psicologo' 
+                      ? 'bottom-2 right-2 transform translate-x-1/2 translate-y-1/2 gradient-green' 
+                      : 'bottom-2 left-2 transform -translate-x-1/2 translate-y-1/2 gradient-blue'
+                  }`}>
+                    {message.sender_type === 'psicologo' 
+                      ? 'P' 
+                      : chatInfo.app_user_name.charAt(0).toUpperCase()
+                    }
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ))}
         <div ref={messagesEndRef} />
