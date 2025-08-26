@@ -250,12 +250,12 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
             <div className="flex items-center space-x-3">
               {/* Avatar do usuário */}
               <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-semibold">
-                {chatInfo.app_user_name.charAt(0).toUpperCase()}
+                {chatInfo.masked_user_name.charAt(0).toUpperCase()}
               </div>
               
               <div className="flex-1 min-w-0">
                 <h1 className="text-lg font-bold text-gray-900 truncate">
-                  {chatInfo.app_user_name}
+                  {chatInfo.masked_user_name}
                 </h1>
                 <p className="text-sm text-gray-600">
                   Conversa iniciada em {new Date(chatInfo.created_at).toLocaleDateString('pt-BR')}
@@ -337,7 +337,7 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
                   }`}>
                     {message.sender_type === 'psicologo' 
                       ? 'P' 
-                      : chatInfo.app_user_name.charAt(0).toUpperCase()
+                      : chatInfo.masked_user_name.charAt(0).toUpperCase()
                     }
                   </div>
                 </div>
