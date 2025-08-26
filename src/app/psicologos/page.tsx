@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ChatInterface from '@/components/ChatInterface';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
-import { getChats, updateChatStatus, Chat as ChatType } from '@/services/chat';
+import { getChats, updateChatStatus, Chat as ChatType, getChatInfo } from '@/services/chat';
+import { useChatRealtime } from '@/hooks/useChatRealtime';
 
 // Tipos para os chats
 interface Chat extends ChatType {
@@ -18,6 +19,9 @@ export default function PsicologosPage() {
   const [error, setError] = useState<string | null>(null);
   const [showChatList, setShowChatList] = useState(true);
   const [activeFilters, setActiveFilters] = useState<ChatStatus[]>([]);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
+  const [recentlyUpdatedChats, setRecentlyUpdatedChats] = useState<Set<string>>(new Set());
 
   // Debug temporário - remover depois
   console.log('🔍 PsicologosPage Debug:', {
@@ -26,6 +30,179 @@ export default function PsicologosPage() {
     chatsCount: chats.length,
     selectedChat: !!selectedChat,
     showChatList
+  });
+
+  // Função para atualizar um chat específico na lista
+  const updateChatInList = useCallback(async (chatId: string) => {
+    try {
+      const result = await getChatInfo(chatId);
+      if (result.success && result.data) {
+        // Como getChatInfo retorna ChatInfo, precisamos buscar o chat completo
+        const fullChatResult = await getChats();
+        if (fullChatResult.success && fullChatResult.data) {
+          const fullChat = fullChatResult.data.find(chat => chat.id === chatId);
+          if (fullChat) {
+            // Sanitizar os dados do chat
+            const sanitizedChat = {
+              ...fullChat,
+              unread_count_psicologo: Number(fullChat.unread_count_psicologo) || 0,
+              masked_user_name: fullChat.masked_user_name || 'Utilizador',
+              last_message_at: fullChat.last_message_at || new Date().toISOString(),
+              last_message_content: fullChat.last_message_content || '',
+              last_message_sender_type: fullChat.last_message_sender_type || 'app_user',
+              status: fullChat.status || 'novo_chat',
+              is_active: fullChat.is_active !== undefined ? fullChat.is_active : true
+            };
+            
+            setChats(prevChats => {
+              const existingIndex = prevChats.findIndex(chat => chat.id === chatId);
+              if (existingIndex >= 0) {
+                // Atualizar chat existente
+                const updatedChats = [...prevChats];
+                updatedChats[existingIndex] = sanitizedChat;
+                return updatedChats;
+              } else {
+                // Adicionar novo chat
+                return [...prevChats, sanitizedChat];
+              }
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar chat na lista:', error);
+    }
+  }, []);
+
+  // Função para lidar com nova mensagem
+  const handleNewMessage = useCallback(async (message: any) => {
+    console.log('💬 Nova mensagem recebida:', message);
+    setLastUpdate(new Date());
+    setIsRealtimeActive(true);
+    
+    // Atualizar o chat correspondente à mensagem
+    if (message.chat_id) {
+      await updateChatInList(message.chat_id);
+      
+      // Mostrar notificação sutil se a mensagem não for do psicólogo atual
+      if (message.sender_type === 'app_user') {
+        // Encontrar o chat na lista para mostrar o nome do usuário
+        const chat = chats.find(c => c.id === message.chat_id);
+        if (chat) {
+          // Criar notificação do navegador se permitido
+          if ('Notification' in window && Notification.permission === 'granted') {
+            const userName = chat.masked_user_name || 'Utilizador';
+            const messageContent = message.content || 'Nova mensagem';
+            const preview = messageContent.length > 50 
+              ? messageContent.substring(0, 50) + '...' 
+              : messageContent;
+            
+            new Notification('Nova mensagem', {
+              body: `${userName}: ${preview}`,
+              icon: '/cms-logo.png'
+            });
+          }
+        }
+      }
+    }
+    
+    // Resetar o indicador após 3 segundos
+    setTimeout(() => setIsRealtimeActive(false), 3000);
+  }, [updateChatInList, chats]);
+
+  // Função para lidar com atualização de chat
+  const handleChatUpdate = useCallback(async (updatedChat: Chat) => {
+    console.log('🔄 Chat atualizado:', updatedChat);
+    setLastUpdate(new Date());
+    setIsRealtimeActive(true);
+    
+    // Garantir que todos os campos obrigatórios estejam presentes
+    const sanitizedChat = {
+      ...updatedChat,
+      unread_count_psicologo: Number(updatedChat.unread_count_psicologo) || 0,
+      masked_user_name: updatedChat.masked_user_name || 'Utilizador',
+      last_message_at: updatedChat.last_message_at || new Date().toISOString(),
+      last_message_content: updatedChat.last_message_content || '',
+      last_message_sender_type: updatedChat.last_message_sender_type || 'app_user',
+      status: updatedChat.status || 'novo_chat',
+      is_active: updatedChat.is_active !== undefined ? updatedChat.is_active : true
+    };
+    
+    // Marcar chat como recentemente atualizado
+    setRecentlyUpdatedChats(prev => new Set([...prev, sanitizedChat.id]));
+    
+    setChats(prevChats => {
+      const existingIndex = prevChats.findIndex(chat => chat.id === sanitizedChat.id);
+      if (existingIndex >= 0) {
+        const updatedChats = [...prevChats];
+        updatedChats[existingIndex] = sanitizedChat;
+        return updatedChats;
+      }
+      return prevChats;
+    });
+
+    // Se o chat selecionado foi atualizado, atualizar também
+    if (selectedChat?.id === sanitizedChat.id) {
+      setSelectedChat(sanitizedChat);
+    }
+    
+    // Resetar o indicador após 3 segundos
+    setTimeout(() => setIsRealtimeActive(false), 3000);
+    
+    // Remover da lista de chats recentemente atualizados após 5 segundos
+    setTimeout(() => {
+      setRecentlyUpdatedChats(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(sanitizedChat.id);
+        return newSet;
+      });
+    }, 5000);
+  }, [selectedChat]);
+
+  // Função para lidar com novo chat criado
+  const handleChatCreated = useCallback((newChat: Chat) => {
+    console.log('🆕 Novo chat criado:', newChat);
+    
+    // Garantir que todos os campos obrigatórios estejam presentes
+    const sanitizedChat = {
+      ...newChat,
+      unread_count_psicologo: Number(newChat.unread_count_psicologo) || 0,
+      masked_user_name: newChat.masked_user_name || 'Utilizador',
+      last_message_at: newChat.last_message_at || new Date().toISOString(),
+      last_message_content: newChat.last_message_content || '',
+      last_message_sender_type: newChat.last_message_sender_type || 'app_user',
+      status: newChat.status || 'novo_chat',
+      is_active: newChat.is_active !== undefined ? newChat.is_active : true
+    };
+    
+    setChats(prevChats => {
+      // Verificar se o chat já existe na lista
+      const exists = prevChats.some(chat => chat.id === sanitizedChat.id);
+      if (!exists) {
+        return [sanitizedChat, ...prevChats];
+      }
+      return prevChats;
+    });
+  }, []);
+
+  // Função para lidar com chat deletado
+  const handleChatDeleted = useCallback((chatId: string) => {
+    console.log('🗑️ Chat deletado:', chatId);
+    setChats(prevChats => prevChats.filter(chat => chat.id !== chatId));
+    
+    // Se o chat selecionado foi deletado, limpar seleção
+    if (selectedChat?.id === chatId) {
+      setSelectedChat(null);
+      setShowChatList(true);
+    }
+  }, [selectedChat]);
+
+  // Configurar tempo real
+  useChatRealtime({
+    onChatUpdate: handleChatUpdate,
+    onNewMessage: handleNewMessage,
+    onChatCreated: handleChatCreated,
+    onChatDeleted: handleChatDeleted
   });
 
   // Carregar chats disponíveis
@@ -70,6 +247,13 @@ export default function PsicologosPage() {
     loadChats();
   }, []);
 
+  // Solicitar permissão de notificação
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   // Função para formatar data
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -80,10 +264,12 @@ export default function PsicologosPage() {
 
     // Verificar se é hoje
     if (date.toDateString() === today.toDateString()) {
-      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-      if (diffInMinutes < 1) return 'Agora';
-      if (diffInMinutes < 60) return `${diffInMinutes}min atrás`;
-      return `${Math.floor(diffInMinutes / 60)}h atrás`;
+      // Mostrar apenas o horário (HH:MM)
+      return date.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
     }
 
     // Verificar se é ontem
@@ -106,7 +292,7 @@ export default function PsicologosPage() {
     }
     
     // Para usuários, usar o nome mascarado
-    return chat.masked_user_name;
+    return chat.masked_user_name || 'Utilizador';
   };
 
   // Função para selecionar um chat
@@ -215,16 +401,27 @@ export default function PsicologosPage() {
               <h1 className="text-lg font-semibold text-gray-900">
                 Conversas
               </h1>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {filteredChats.length} de {chats.length} ativas
-              </p>
+              <div className="flex items-center space-x-2 mt-0.5">
+                <p className="text-xs text-gray-500">
+                  {filteredChats.length} de {chats.length} ativas
+                </p>
+                {/* Indicador de tempo real */}
+                <div className="flex items-center space-x-1">
+                  <div className={`w-2 h-2 rounded-full ${
+                    isRealtimeActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'
+                  }`}></div>
+                  <span className="text-xs text-gray-400">
+                    {isRealtimeActive ? 'Ativo' : 'Online'}
+                  </span>
+                </div>
+              </div>
             </div>
             
             {/* Estatísticas rápidas */}
             <div className="text-right">
               <div className="text-xs text-gray-400 mb-1">Não lidas</div>
               <div className="text-2xl font-bold text-red-600 bg-red-50 px-3 py-1 rounded-lg border border-red-200">
-                {chats.reduce((sum, chat) => sum + chat.unread_count_psicologo, 0)}
+                {chats.reduce((sum, chat) => sum + (chat.unread_count_psicologo || 0), 0)}
               </div>
             </div>
           </div>
@@ -296,11 +493,13 @@ export default function PsicologosPage() {
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {filteredChats.map((chat) => (
+              {filteredChats.filter(chat => chat && chat.id).map((chat) => (
                 <div
                   key={chat.id}
                   className={`p-6 hover:bg-gray-50 cursor-pointer transition-all duration-200 ${
                     selectedChat?.id === chat.id ? 'bg-blue-50 border-r-4 border-blue-500 shadow-sm' : ''
+                  } ${
+                    recentlyUpdatedChats.has(chat.id) ? 'bg-green-50 border-l-4 border-green-500 animate-pulse' : ''
                   }`}
                   onClick={() => handleSelectChat(chat)}
                 >
@@ -308,30 +507,33 @@ export default function PsicologosPage() {
                     {/* Avatar do usuário */}
                     <div className="flex-shrink-0 relative">
                       <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-semibold text-lg">
-                        {chat.masked_user_name.charAt(0).toUpperCase()}
+                        {(chat.masked_user_name || 'U').charAt(0).toUpperCase()}
                       </div>
-                      {chat.unread_count_psicologo > 0 && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
+                      {(chat.unread_count_psicologo || 0) > 0 && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>
+                      )}
+                      {recentlyUpdatedChats.has(chat.id) && (chat.unread_count_psicologo || 0) === 0 && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-ping"></div>
                       )}
                     </div>
                     
                     <div className="flex-1 min-w-0">
                                               <div className="flex items-center justify-between mb-2">
                           <h3 className={`text-sm font-semibold truncate ${
-                            chat.unread_count_psicologo > 0 
+                            (chat.unread_count_psicologo || 0) > 0 
                               ? 'text-gray-900 font-bold' 
                               : 'text-gray-700'
                           }`}>
-                            {chat.masked_user_name}
+                            {chat.masked_user_name || 'Utilizador'}
                           </h3>
                           <div className="flex items-center space-x-2">
-                            {chat.unread_count_psicologo > 0 && (
+                            {(chat.unread_count_psicologo || 0) > 0 && (
                               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-red-500 text-white shadow-sm animate-pulse">
-                                {chat.unread_count_psicologo}
+                                {chat.unread_count_psicologo || 0}
                               </span>
                             )}
                             <span className="text-xs text-gray-400 font-medium">
-                              {formatDate(chat.last_message_at)}
+                              {chat.last_message_at ? formatDate(chat.last_message_at) : '--'}
                             </span>
                           </div>
                         </div>
