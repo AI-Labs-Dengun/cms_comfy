@@ -37,15 +37,31 @@ export default function PsicologosPage() {
 
         const result = await getChats();
         
-        if (result.success && result.data) {
-          setChats(result.data);
+        if (result.success) {
+          // Garantir que sempre temos um array, mesmo que vazio
+          setChats(result.data || []);
         } else {
-          setError(result.error || 'Erro ao carregar conversas. Tente novamente.');
+          // Se o erro for sobre tabela não existir, mostrar mensagem específica
+          if (result.error && result.error.includes('relation') && result.error.includes('does not exist')) {
+            setError('Sistema de chat ainda não foi configurado. Entre em contacto com o administrador.');
+          } else if (result.error && result.error.includes('GROUP BY')) {
+            setError('Erro na configuração do banco de dados. Entre em contacto com o administrador.');
+          } else {
+            setError(result.error || 'Erro ao carregar conversas. Tente novamente.');
+          }
         }
         
       } catch (error) {
         console.error('Erro ao carregar chats:', error);
-        setError('Erro ao carregar conversas. Tente novamente.');
+        // Verificar se é um erro de tabela não existir
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('relation') && errorMessage.includes('does not exist')) {
+          setError('Sistema de chat ainda não foi configurado. Entre em contacto com o administrador.');
+        } else if (errorMessage.includes('GROUP BY')) {
+          setError('Erro na configuração do banco de dados. Entre em contacto com o administrador.');
+        } else {
+          setError('Erro ao carregar conversas. Tente novamente.');
+        }
       } finally {
         setLoading(false);
       }
@@ -89,9 +105,8 @@ export default function PsicologosPage() {
       return 'Você';
     }
     
-    // Para usuários, mostrar apenas o primeiro nome
-    const firstName = chat.app_user_name.split(' ')[0];
-    return firstName;
+    // Para usuários, usar o nome mascarado
+    return chat.masked_user_name;
   };
 
   // Função para selecionar um chat
@@ -266,7 +281,9 @@ export default function PsicologosPage() {
               <p className="text-gray-500 font-medium">
                 {activeFilters.length > 0 
                   ? 'Nenhuma conversa encontrada com os filtros selecionados.' 
-                  : 'Nenhuma conversa disponível.'}
+                  : chats.length === 0 
+                    ? 'Ainda não existem conversas disponíveis. Os chats aparecerão aqui quando os utilizadores iniciarem conversas.'
+                    : 'Nenhuma conversa disponível.'}
               </p>
               {activeFilters.length > 0 && (
                 <button
@@ -291,7 +308,7 @@ export default function PsicologosPage() {
                     {/* Avatar do usuário */}
                     <div className="flex-shrink-0 relative">
                       <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-semibold text-lg">
-                        {chat.app_user_name.charAt(0).toUpperCase()}
+                        {chat.masked_user_name.charAt(0).toUpperCase()}
                       </div>
                       {chat.unread_count_psicologo > 0 && (
                         <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
@@ -305,7 +322,7 @@ export default function PsicologosPage() {
                               ? 'text-gray-900 font-bold' 
                               : 'text-gray-700'
                           }`}>
-                            {chat.app_user_name}
+                            {chat.masked_user_name}
                           </h3>
                           <div className="flex items-center space-x-2">
                             {chat.unread_count_psicologo > 0 && (
