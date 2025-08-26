@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 export interface Chat {
   id: string;
   app_user_id: string;
-  app_user_name: string;
+  masked_user_name: string; // Alterado de app_user_name para masked_user_name
   last_message_at: string;
   last_message_content?: string;
   last_message_sender_type?: 'psicologo' | 'app_user';
@@ -12,7 +12,6 @@ export interface Chat {
   unread_count_psicologo: number;
   is_active: boolean;
   status: 'novo_chat' | 'a_decorrer' | 'follow_up' | 'encerrado';
-  psicologo_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -31,10 +30,9 @@ export interface Message {
 export interface ChatInfo {
   id: string;
   app_user_id: string;
-  app_user_name: string;
+  masked_user_name: string; // Alterado de app_user_name para masked_user_name
   is_active: boolean;
   status: 'novo_chat' | 'a_decorrer' | 'follow_up' | 'encerrado';
-  psicologo_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -71,93 +69,44 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
       };
     }
 
-    // Buscar chats (por enquanto dados simulados)
-    // TODO: Implementar busca real no banco de dados
-    const mockChats: Chat[] = [
-      {
-        id: '1',
-        app_user_id: 'user1',
-        app_user_name: 'João Silva',
-        last_message_at: new Date(Date.now() - 30000).toISOString(),
-        last_message_content: 'Olá, preciso de ajuda com ansiedade.',
-        last_message_sender_type: 'app_user',
-        last_message_sender_name: 'João Silva',
-        unread_count_psicologo: 1,
-        is_active: true,
-        status: 'novo_chat',
-        psicologo_id: profile.id,
-        created_at: new Date(Date.now() - 86400000).toISOString(),
-        updated_at: new Date(Date.now() - 30000).toISOString()
-      },
-      {
-        id: '2',
-        app_user_id: 'user2',
-        app_user_name: 'Maria Santos',
-        last_message_at: new Date(Date.now() - 300000).toISOString(),
-        last_message_content: 'Obrigada pela sessão de hoje.',
-        last_message_sender_type: 'app_user',
-        last_message_sender_name: 'Maria Santos',
-        unread_count_psicologo: 0,
-        is_active: true,
-        status: 'a_decorrer',
-        psicologo_id: profile.id,
-        created_at: new Date(Date.now() - 172800000).toISOString(),
-        updated_at: new Date(Date.now() - 300000).toISOString()
-      },
-      {
-        id: '3',
-        app_user_id: 'user3',
-        app_user_name: 'Pedro Costa',
-        last_message_at: new Date(Date.now() - 86400000).toISOString(),
-        last_message_content: 'Consegui aplicar as técnicas que discutimos.',
-        last_message_sender_type: 'app_user',
-        last_message_sender_name: 'Pedro Costa',
-        unread_count_psicologo: 1,
-        is_active: true,
-        status: 'follow_up',
-        psicologo_id: profile.id,
-        created_at: new Date(Date.now() - 259200000).toISOString(),
-        updated_at: new Date(Date.now() - 86400000).toISOString()
-      },
-      {
-        id: '4',
-        app_user_id: 'user4',
-        app_user_name: 'Ana Oliveira',
-        last_message_at: new Date(Date.now() - 172800000).toISOString(),
-        last_message_content: 'Vou marcar uma nova consulta.',
-        last_message_sender_type: 'app_user',
-        last_message_sender_name: 'Ana Oliveira',
-        unread_count_psicologo: 0,
-        is_active: true,
-        status: 'encerrado',
-        psicologo_id: profile.id,
-        created_at: new Date(Date.now() - 345600000).toISOString(),
-        updated_at: new Date(Date.now() - 172800000).toISOString()
-      },
-      {
-        id: '5',
-        app_user_id: 'user5',
-        app_user_name: 'Carlos Ferreira',
-        last_message_at: new Date(Date.now() - 600000).toISOString(),
-        last_message_content: 'Perfeito! Vamos continuar trabalhando nessa direção.',
-        last_message_sender_type: 'psicologo',
-        last_message_sender_name: 'Você',
-        unread_count_psicologo: 0,
-        is_active: true,
-        status: 'a_decorrer',
-        psicologo_id: profile.id,
-        created_at: new Date(Date.now() - 432000000).toISOString(),
-        updated_at: new Date(Date.now() - 600000).toISOString()
-      }
-    ];
+    // ✅ IMPLEMENTAÇÃO REAL: Buscar chats do banco de dados
+    const { data, error } = await supabase.rpc('get_psicologo_chats', {
+      psicologo_id_param: user.id
+    });
 
+    if (error) {
+      console.error('Erro ao buscar chats:', error);
+      return {
+        success: false,
+        error: 'Erro ao carregar chats: ' + error.message
+      };
+    }
+
+    // Verificar se data existe
+    if (!data) {
+      return {
+        success: false,
+        error: 'Resposta vazia do servidor'
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao carregar chats'
+      };
+    }
+
+    // Garantir que sempre retornamos um array
+    const chats = Array.isArray(data.chats) ? data.chats : [];
+    
     return {
       success: true,
-      data: mockChats
+      data: chats
     };
 
   } catch (error) {
-    console.error('Erro ao buscar chats:', error);
+    console.error('Erro inesperado ao buscar chats:', error);
     return {
       success: false,
       error: 'Erro inesperado ao carregar chats'
@@ -177,76 +126,34 @@ export async function getChatInfo(chatId: string): Promise<ApiResponse<ChatInfo>
       };
     }
 
-    // TODO: Implementar busca real no banco de dados
-    // Informações específicas para cada chat
-    const chatInfoMap: { [key: string]: ChatInfo } = {
-      '1': {
-        id: chatId,
-        app_user_id: 'user1',
-        app_user_name: 'João Silva',
-        is_active: true,
-        status: 'novo_chat',
-        psicologo_id: user.id,
-        created_at: new Date(Date.now() - 86400000).toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      '2': {
-        id: chatId,
-        app_user_id: 'user2',
-        app_user_name: 'Maria Santos',
-        is_active: true,
-        status: 'a_decorrer',
-        psicologo_id: user.id,
-        created_at: new Date(Date.now() - 172800000).toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      '3': {
-        id: chatId,
-        app_user_id: 'user3',
-        app_user_name: 'Pedro Costa',
-        is_active: true,
-        status: 'follow_up',
-        psicologo_id: user.id,
-        created_at: new Date(Date.now() - 259200000).toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      '4': {
-        id: chatId,
-        app_user_id: 'user4',
-        app_user_name: 'Ana Oliveira',
-        is_active: true,
-        status: 'encerrado',
-        psicologo_id: user.id,
-        created_at: new Date(Date.now() - 345600000).toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      '5': {
-        id: chatId,
-        app_user_id: 'user5',
-        app_user_name: 'Carlos Ferreira',
-        is_active: true,
-        status: 'a_decorrer',
-        psicologo_id: user.id,
-        created_at: new Date(Date.now() - 432000000).toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    };
+    // ✅ IMPLEMENTAÇÃO REAL: Buscar informações do chat
+    const { data, error } = await supabase.rpc('get_chat_info', {
+      chat_id_param: chatId,
+      user_id_param: user.id
+    });
 
-    const chatInfo = chatInfoMap[chatId];
-    if (!chatInfo) {
+    if (error) {
+      console.error('Erro ao buscar informações do chat:', error);
       return {
         success: false,
-        error: 'Chat não encontrado'
+        error: 'Erro ao carregar informações do chat: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao carregar informações do chat'
       };
     }
 
     return {
       success: true,
-      data: chatInfo
+      data: data.chat
     };
 
   } catch (error) {
-    console.error('Erro ao buscar informações do chat:', error);
+    console.error('Erro inesperado ao buscar informações do chat:', error);
     return {
       success: false,
       error: 'Erro inesperado ao carregar informações do chat'
@@ -266,169 +173,34 @@ export async function getChatMessages(chatId: string): Promise<ApiResponse<Messa
       };
     }
 
-    // TODO: Implementar busca real no banco de dados
-    // Mensagens específicas para cada chat
-    const chatMessages: { [key: string]: Message[] } = {
-      '1': [ // João Silva
-        {
-          id: '1',
-          chat_id: chatId,
-          sender_id: 'user1',
-          sender_type: 'app_user',
-          content: 'Olá, preciso de ajuda com ansiedade.',
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-          is_read: true,
-          is_deleted: false
-        },
-      ],
-      '2': [ // Maria Santos
-        {
-          id: '1',
-          chat_id: chatId,
-          sender_id: 'user2',
-          sender_type: 'app_user',
-          content: 'Olá, gostaria de agendar uma consulta.',
-          created_at: new Date(Date.now() - 172800000).toISOString(),
-          is_read: true,
-          is_deleted: false
-        },
-        {
-          id: '2',
-          chat_id: chatId,
-          sender_id: user.id,
-          sender_type: 'psicologo',
-          content: 'Claro! Que dia seria melhor para você?',
-          created_at: new Date(Date.now() - 169200000).toISOString(),
-          is_read: true,
-          is_deleted: false
-        },
-        {
-          id: '3',
-          chat_id: chatId,
-          sender_id: 'user2',
-          sender_type: 'app_user',
-          content: 'Obrigada pela sessão de hoje.',
-          created_at: new Date(Date.now() - 300000).toISOString(),
-          is_read: true,
-          is_deleted: false
-        }
-      ],
-      '3': [ // Pedro Costa
-        {
-          id: '1',
-          chat_id: chatId,
-          sender_id: 'user3',
-          sender_type: 'app_user',
-          content: 'Estou enfrentando dificuldades com depressão.',
-          created_at: new Date(Date.now() - 259200000).toISOString(),
-          is_read: true,
-          is_deleted: false
-        },
-        {
-          id: '2',
-          chat_id: chatId,
-          sender_id: user.id,
-          sender_type: 'psicologo',
-          content: 'Entendo. Vamos trabalhar juntos para superar isso.',
-          created_at: new Date(Date.now() - 255600000).toISOString(),
-          is_read: true,
-          is_deleted: false
-        },
-        {
-          id: '3',
-          chat_id: chatId,
-          sender_id: 'user3',
-          sender_type: 'app_user',
-          content: 'Consegui aplicar as técnicas que discutimos.',
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-          is_read: false,
-          is_deleted: false
-        }
-      ],
-      '4': [ // Ana Oliveira
-        {
-          id: '1',
-          chat_id: chatId,
-          sender_id: 'user4',
-          sender_type: 'app_user',
-          content: 'Preciso de ajuda com relacionamentos.',
-          created_at: new Date(Date.now() - 345600000).toISOString(),
-          is_read: true,
-          is_deleted: false
-        },
-        {
-          id: '2',
-          chat_id: chatId,
-          sender_id: user.id,
-          sender_type: 'psicologo',
-          content: 'Vamos explorar isso juntos. Pode me contar mais?',
-          created_at: new Date(Date.now() - 342000000).toISOString(),
-          is_read: true,
-          is_deleted: false
-        },
-        {
-          id: '3',
-          chat_id: chatId,
-          sender_id: 'user4',
-          sender_type: 'app_user',
-          content: 'Vou marcar uma nova consulta.',
-          created_at: new Date(Date.now() - 172800000).toISOString(),
-          is_read: true,
-          is_deleted: false
-        }
-      ],
-      '5': [ // Carlos Ferreira
-        {
-          id: '1',
-          chat_id: chatId,
-          sender_id: 'user5',
-          sender_type: 'app_user',
-          content: 'Tenho problemas com autoestima.',
-          created_at: new Date(Date.now() - 432000000).toISOString(),
-          is_read: true,
-          is_deleted: false
-        },
-        {
-          id: '2',
-          chat_id: chatId,
-          sender_id: user.id,
-          sender_type: 'psicologo',
-          content: 'A autoestima é fundamental. Vamos trabalhar nisso.',
-          created_at: new Date(Date.now() - 428400000).toISOString(),
-          is_read: true,
-          is_deleted: false
-        },
-        {
-          id: '3',
-          chat_id: chatId,
-          sender_id: 'user5',
-          sender_type: 'app_user',
-          content: 'Estou me sentindo melhor com os exercícios.',
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-          is_read: true,
-          is_deleted: false
-        },
-        {
-          id: '4',
-          chat_id: chatId,
-          sender_id: user.id,
-          sender_type: 'psicologo',
-          content: 'Perfeito! Vamos continuar trabalhando nessa direção.',
-          created_at: new Date(Date.now() - 600000).toISOString(),
-          is_read: false,
-          is_deleted: false
-        }
-      ]
-    };
+    // ✅ IMPLEMENTAÇÃO REAL: Buscar mensagens do banco de dados
+    const { data, error } = await supabase.rpc('get_chat_messages', {
+      chat_id_param: chatId,
+      user_id_param: user.id
+    });
 
-    const messages = chatMessages[chatId] || [];
+    if (error) {
+      console.error('Erro ao buscar mensagens:', error);
+      return {
+        success: false,
+        error: 'Erro ao carregar mensagens: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao carregar mensagens'
+      };
+    }
+
     return {
       success: true,
-      data: messages
+      data: data.messages || []
     };
 
   } catch (error) {
-    console.error('Erro ao buscar mensagens:', error);
+    console.error('Erro inesperado ao buscar mensagens:', error);
     return {
       success: false,
       error: 'Erro inesperado ao carregar mensagens'
@@ -448,28 +220,49 @@ export async function sendMessage(chatId: string, content: string): Promise<ApiR
       };
     }
 
-    // TODO: Implementar envio real no banco de dados
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      chat_id: chatId,
-      sender_id: user.id,
-      sender_type: 'psicologo',
-      content,
-      created_at: new Date().toISOString(),
-      is_read: false,
-      is_deleted: false
-    };
+    // ✅ IMPLEMENTAÇÃO REAL: Enviar mensagem para o banco de dados
+    const { data, error } = await supabase.rpc('send_message', {
+      chat_id_param: chatId,
+      content_param: content,
+      sender_id_param: user.id
+    });
 
-    // Atualizar status do chat para "a_decorrer" quando o psicólogo responde
-    await updateChatStatus(chatId, 'a_decorrer');
+    if (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      return {
+        success: false,
+        error: 'Erro ao enviar mensagem: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao enviar mensagem'
+      };
+    }
+
+    // Buscar a mensagem criada para retornar
+    const { data: messageData, error: messageError } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('id', data.message_id)
+      .single();
+
+    if (messageError || !messageData) {
+      return {
+        success: false,
+        error: 'Erro ao recuperar mensagem enviada'
+      };
+    }
 
     return {
       success: true,
-      data: newMessage
+      data: messageData
     };
 
   } catch (error) {
-    console.error('Erro ao enviar mensagem:', error);
+    console.error('Erro inesperado ao enviar mensagem:', error);
     return {
       success: false,
       error: 'Erro inesperado ao enviar mensagem'
@@ -489,8 +282,27 @@ export async function updateChatStatus(chatId: string, status: 'novo_chat' | 'a_
       };
     }
 
-    // TODO: Implementar atualização real no banco de dados
-    console.log(`Atualizando status do chat ${chatId} para: ${status}`);
+    // ✅ IMPLEMENTAÇÃO REAL: Atualizar status no banco de dados
+    const { data, error } = await supabase.rpc('update_chat_status', {
+      chat_id_param: chatId,
+      status_param: status,
+      user_id_param: user.id
+    });
+
+    if (error) {
+      console.error('Erro ao atualizar status do chat:', error);
+      return {
+        success: false,
+        error: 'Erro ao atualizar status: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao atualizar status'
+      };
+    }
 
     return {
       success: true,
@@ -498,7 +310,7 @@ export async function updateChatStatus(chatId: string, status: 'novo_chat' | 'a_
     };
 
   } catch (error) {
-    console.error('Erro ao atualizar status do chat:', error);
+    console.error('Erro inesperado ao atualizar status do chat:', error);
     return {
       success: false,
       error: 'Erro inesperado ao atualizar status do chat'
@@ -518,8 +330,26 @@ export async function markMessagesAsRead(chatId: string): Promise<ApiResponse<bo
       };
     }
 
-    // TODO: Implementar marcação real no banco de dados
-    console.log(`Marcando mensagens do chat ${chatId} como lidas`);
+    // ✅ IMPLEMENTAÇÃO REAL: Marcar mensagens como lidas no banco de dados
+    const { data, error } = await supabase.rpc('mark_messages_as_read', {
+      chat_id_param: chatId,
+      user_id_param: user.id
+    });
+
+    if (error) {
+      console.error('Erro ao marcar mensagens como lidas:', error);
+      return {
+        success: false,
+        error: 'Erro ao marcar mensagens como lidas: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao marcar mensagens como lidas'
+      };
+    }
 
     return {
       success: true,
@@ -527,7 +357,7 @@ export async function markMessagesAsRead(chatId: string): Promise<ApiResponse<bo
     };
 
   } catch (error) {
-    console.error('Erro ao marcar mensagens como lidas:', error);
+    console.error('Erro inesperado ao marcar mensagens como lidas:', error);
     return {
       success: false,
       error: 'Erro inesperado ao marcar mensagens como lidas'
@@ -535,32 +365,424 @@ export async function markMessagesAsRead(chatId: string): Promise<ApiResponse<bo
   }
 }
 
-// Função para simular recebimento de nova mensagem (para testes)
-export async function simulateNewMessage(chatId: string, content: string): Promise<ApiResponse<Message>> {
-  try {
-    // TODO: Implementar recebimento real no banco de dados
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      chat_id: chatId,
-      sender_id: 'user1',
-      sender_type: 'app_user',
-      content,
-      created_at: new Date().toISOString(),
-      is_read: false,
-      is_deleted: false
-    };
+// Função para configurar Realtime para chats
+export function setupChatRealtime(
+  onNewMessage?: (message: Message) => void,
+  onChatUpdate?: (chat: Chat) => void
+) {
+  // Configurar subscription para novas mensagens
+  const messagesSubscription = supabase
+    .channel('chat-messages')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages'
+      },
+      (payload) => {
+        if (onNewMessage) {
+          onNewMessage(payload.new as Message);
+        }
+      }
+    )
+    .subscribe();
 
-    // Se for uma nova mensagem de um chat que não tem psicólogo atribuído,
-    // o status deve ser "novo_chat"
-    await updateChatStatus(chatId, 'novo_chat');
+  // Configurar subscription para atualizações de chat
+  const chatsSubscription = supabase
+    .channel('chat-updates')
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'chats'
+      },
+      (payload) => {
+        if (onChatUpdate) {
+          onChatUpdate(payload.new as Chat);
+        }
+      }
+    )
+    .subscribe();
+
+  // Retornar função para limpar subscriptions
+  return () => {
+    supabase.removeChannel(messagesSubscription);
+    supabase.removeChannel(chatsSubscription);
+  };
+}
+
+// Função para buscar estatísticas de chat
+export async function getChatStats(): Promise<ApiResponse<{
+  total_chats: number;
+  active_chats: number;
+  new_chats: number;
+  in_progress_chats: number;
+  follow_up_chats: number;
+  closed_chats: number;
+  total_messages: number;
+  unread_messages: number;
+}>> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return {
+        success: false,
+        error: 'Usuário não autenticado'
+      };
+    }
+
+    // Verificar se o usuário é um psicólogo autorizado
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_role, authorized')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile || profile.user_role !== 'psicologo' || !profile.authorized) {
+      return {
+        success: false,
+        error: 'Acesso negado. Apenas psicólogos autorizados podem acessar estatísticas.'
+      };
+    }
+
+    // ✅ IMPLEMENTAÇÃO REAL: Buscar estatísticas do banco de dados
+    const { data: chatStats, error: chatError } = await supabase
+      .from('chats')
+      .select('status, is_active')
+      .eq('is_active', true);
+
+    if (chatError) {
+      console.error('Erro ao buscar estatísticas de chats:', chatError);
+      return {
+        success: false,
+        error: 'Erro ao carregar estatísticas: ' + chatError.message
+      };
+    }
+
+    const { data: messageStats, error: messageError } = await supabase
+      .from('messages')
+      .select('is_read')
+      .eq('is_deleted', false);
+
+    if (messageError) {
+      console.error('Erro ao buscar estatísticas de mensagens:', messageError);
+      return {
+        success: false,
+        error: 'Erro ao carregar estatísticas: ' + messageError.message
+      };
+    }
+
+    // Calcular estatísticas
+    const stats = {
+      total_chats: chatStats?.length || 0,
+      active_chats: chatStats?.filter(c => c.is_active).length || 0,
+      new_chats: chatStats?.filter(c => c.status === 'novo_chat').length || 0,
+      in_progress_chats: chatStats?.filter(c => c.status === 'a_decorrer').length || 0,
+      follow_up_chats: chatStats?.filter(c => c.status === 'follow_up').length || 0,
+      closed_chats: chatStats?.filter(c => c.status === 'encerrado').length || 0,
+      total_messages: messageStats?.length || 0,
+      unread_messages: messageStats?.filter(m => !m.is_read).length || 0
+    };
 
     return {
       success: true,
-      data: newMessage
+      data: stats
     };
 
   } catch (error) {
-    console.error('Erro ao simular nova mensagem:', error);
+    console.error('Erro inesperado ao buscar estatísticas:', error);
+    return {
+      success: false,
+      error: 'Erro inesperado ao carregar estatísticas'
+    };
+  }
+}
+
+// Função para encerrar um chat
+export async function closeChat(chatId: string): Promise<ApiResponse<boolean>> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return {
+        success: false,
+        error: 'Usuário não autenticado'
+      };
+    }
+
+    // Verificar se o usuário é um psicólogo autorizado
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_role, authorized')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile || profile.user_role !== 'psicologo' || !profile.authorized) {
+      return {
+        success: false,
+        error: 'Acesso negado. Apenas psicólogos autorizados podem encerrar chats.'
+      };
+    }
+
+    // ✅ IMPLEMENTAÇÃO REAL: Encerrar chat no banco de dados
+    const { data, error } = await supabase.rpc('update_chat_status', {
+      chat_id_param: chatId,
+      status_param: 'encerrado',
+      user_id_param: user.id
+    });
+
+    if (error) {
+      console.error('Erro ao encerrar chat:', error);
+      return {
+        success: false,
+        error: 'Erro ao encerrar chat: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao encerrar chat'
+      };
+    }
+
+    // Marcar chat como inativo
+    const { error: updateError } = await supabase
+      .from('chats')
+      .update({ is_active: false })
+      .eq('id', chatId);
+
+    if (updateError) {
+      console.error('Erro ao marcar chat como inativo:', updateError);
+      return {
+        success: false,
+        error: 'Erro ao marcar chat como inativo: ' + updateError.message
+      };
+    }
+
+    return {
+      success: true,
+      data: true
+    };
+
+  } catch (error) {
+    console.error('Erro inesperado ao encerrar chat:', error);
+    return {
+      success: false,
+      error: 'Erro inesperado ao encerrar chat'
+    };
+  }
+}
+
+// Função para buscar usuários disponíveis para criar chats
+export async function getAvailableUsers(): Promise<ApiResponse<{ id: string; name: string; email: string }[]>> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return {
+        success: false,
+        error: 'Usuário não autenticado'
+      };
+    }
+
+    // Verificar se o usuário é um psicólogo autorizado
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_role, authorized')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile || profile.user_role !== 'psicologo' || !profile.authorized) {
+      return {
+        success: false,
+        error: 'Acesso negado. Apenas psicólogos autorizados podem acessar usuários.'
+      };
+    }
+
+    // ✅ IMPLEMENTAÇÃO REAL: Buscar usuários app autorizados sem chat ativo
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name, email')
+      .eq('user_role', 'app')
+      .eq('authorized', true)
+      .not('id', 'in', `(
+        SELECT DISTINCT app_user_id 
+        FROM chats 
+        WHERE is_active = true
+      )`);
+
+    if (error) {
+      console.error('Erro ao buscar usuários disponíveis:', error);
+      return {
+        success: false,
+        error: 'Erro ao carregar usuários: ' + error.message
+      };
+    }
+
+    return {
+      success: true,
+      data: data || []
+    };
+
+  } catch (error) {
+    console.error('Erro inesperado ao buscar usuários disponíveis:', error);
+    return {
+      success: false,
+      error: 'Erro inesperado ao carregar usuários'
+    };
+  }
+}
+
+// Função para criar um novo chat
+export async function createChat(appUserId: string): Promise<ApiResponse<Chat>> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return {
+        success: false,
+        error: 'Usuário não autenticado'
+      };
+    }
+
+    // Verificar se o usuário é um psicólogo autorizado
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_role, authorized')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile || profile.user_role !== 'psicologo' || !profile.authorized) {
+      return {
+        success: false,
+        error: 'Acesso negado. Apenas psicólogos autorizados podem criar chats.'
+      };
+    }
+
+    // ✅ IMPLEMENTAÇÃO REAL: Criar chat no banco de dados
+    const { data, error } = await supabase.rpc('create_chat', {
+      app_user_id_param: appUserId
+    });
+
+    if (error) {
+      console.error('Erro ao criar chat:', error);
+      return {
+        success: false,
+        error: 'Erro ao criar chat: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao criar chat'
+      };
+    }
+
+    // Buscar o chat criado para retornar
+    const { data: chatData, error: chatError } = await supabase
+      .from('chats')
+      .select('*')
+      .eq('id', data.chat_id)
+      .single();
+
+    if (chatError || !chatData) {
+      return {
+        success: false,
+        error: 'Erro ao recuperar chat criado'
+      };
+    }
+
+    return {
+      success: true,
+      data: chatData
+    };
+
+  } catch (error) {
+    console.error('Erro inesperado ao criar chat:', error);
+    return {
+      success: false,
+      error: 'Erro inesperado ao criar chat'
+    };
+  }
+}
+
+// Função para simular recebimento de nova mensagem (para testes)
+export async function simulateNewMessage(chatId: string, content: string): Promise<ApiResponse<Message>> {
+  try {
+    // ✅ IMPLEMENTAÇÃO REAL: Criar mensagem simulada no banco de dados
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return {
+        success: false,
+        error: 'Usuário não autenticado'
+      };
+    }
+
+    // Buscar um usuário app para simular mensagem
+    const { data: appUser, error: appUserError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_role', 'app')
+      .eq('authorized', true)
+      .limit(1)
+      .single();
+
+    if (appUserError || !appUser) {
+      return {
+        success: false,
+        error: 'Não foi possível encontrar um usuário para simular a mensagem'
+      };
+    }
+
+    // Enviar mensagem simulada
+    const { data, error } = await supabase.rpc('send_message', {
+      chat_id_param: chatId,
+      content_param: content,
+      sender_id_param: appUser.id
+    });
+
+    if (error) {
+      console.error('Erro ao simular nova mensagem:', error);
+      return {
+        success: false,
+        error: 'Erro ao simular mensagem: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao simular mensagem'
+      };
+    }
+
+    // Buscar a mensagem criada
+    const { data: messageData, error: messageError } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('id', data.message_id)
+      .single();
+
+    if (messageError || !messageData) {
+      return {
+        success: false,
+        error: 'Erro ao recuperar mensagem simulada'
+      };
+    }
+
+    return {
+      success: true,
+      data: messageData
+    };
+
+  } catch (error) {
+    console.error('Erro inesperado ao simular nova mensagem:', error);
     return {
       success: false,
       error: 'Erro inesperado ao simular nova mensagem'
