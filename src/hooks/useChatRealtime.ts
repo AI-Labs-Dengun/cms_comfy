@@ -8,20 +8,64 @@ interface UseChatRealtimeProps {
   onNewMessage?: (message: Message) => void;
   onChatCreated?: (newChat: Chat) => void;
   onChatDeleted?: (chatId: string) => void;
+  chatId?: string; // Adicionar chatId opcional para filtrar mensagens específicas
 }
 
 export function useChatRealtime({
   onChatUpdate,
   onNewMessage,
   onChatCreated,
-  onChatDeleted
+  onChatDeleted,
+  chatId
 }: UseChatRealtimeProps = {}) {
   const subscriptionsRef = useRef<RealtimeChannel[]>([]);
+  
+  // Usar refs para armazenar as funções de callback e evitar recriações
+  const onChatUpdateRef = useRef(onChatUpdate);
+  const onNewMessageRef = useRef(onNewMessage);
+  const onChatCreatedRef = useRef(onChatCreated);
+  const onChatDeletedRef = useRef(onChatDeleted);
+
+  // Atualizar as refs quando as funções mudam
+  useEffect(() => {
+    onChatUpdateRef.current = onChatUpdate;
+  }, [onChatUpdate]);
 
   useEffect(() => {
+    onNewMessageRef.current = onNewMessage;
+  }, [onNewMessage]);
+
+  useEffect(() => {
+    onChatCreatedRef.current = onChatCreated;
+  }, [onChatCreated]);
+
+  useEffect(() => {
+    onChatDeletedRef.current = onChatDeleted;
+  }, [onChatDeleted]);
+
+  useEffect(() => {
+    console.log('🚀 useChatRealtime - Configurando subscriptions...');
+    console.log('🔍 Verificando configuração do Supabase Realtime...');
+    
+    // Verificar se o Supabase está configurado corretamente
+    if (!supabase) {
+      console.error('❌ Supabase não está configurado');
+      return;
+    }
+    
+    console.log('✅ Supabase configurado, criando subscriptions...');
+
+    // Teste simples para verificar se o Realtime está funcionando
+    const testChannel = supabase
+      .channel('test-realtime')
+      .on('presence', { event: 'sync' }, () => {
+        console.log('✅ Realtime está funcionando corretamente');
+      })
+      .subscribe();
+
     // Configurar subscription para atualizações de chats
     const chatsSubscription = supabase
-      .channel('chats-realtime')
+      .channel(`chats-realtime-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -31,8 +75,8 @@ export function useChatRealtime({
         },
         (payload) => {
           console.log('🔄 Chat atualizado em tempo real:', payload);
-          if (onChatUpdate) {
-            onChatUpdate(payload.new as Chat);
+          if (onChatUpdateRef.current) {
+            onChatUpdateRef.current(payload.new as Chat);
           }
         }
       )
@@ -45,8 +89,8 @@ export function useChatRealtime({
         },
         (payload) => {
           console.log('🆕 Novo chat criado em tempo real:', payload);
-          if (onChatCreated) {
-            onChatCreated(payload.new as Chat);
+          if (onChatCreatedRef.current) {
+            onChatCreatedRef.current(payload.new as Chat);
           }
         }
       )
@@ -59,16 +103,18 @@ export function useChatRealtime({
         },
         (payload) => {
           console.log('🗑️ Chat deletado em tempo real:', payload);
-          if (onChatDeleted) {
-            onChatDeleted(payload.old.id);
+          if (onChatDeletedRef.current) {
+            onChatDeletedRef.current(payload.old.id);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Status da subscription de chats:', status);
+      });
 
     // Configurar subscription para novas mensagens
     const messagesSubscription = supabase
-      .channel('messages-realtime')
+      .channel(`messages-realtime-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -78,15 +124,41 @@ export function useChatRealtime({
         },
         (payload) => {
           console.log('💬 Nova mensagem em tempo real:', payload);
-          if (onNewMessage) {
-            onNewMessage(payload.new as Message);
+          console.log('🔍 ChatId atual:', chatId);
+          console.log('🔍 Mensagem chat_id:', payload.new?.chat_id);
+          console.log('🔍 onNewMessageRef.current existe:', !!onNewMessageRef.current);
+          
+          if (onNewMessageRef.current) {
+            const message = payload.new as Message;
+            // Se chatId foi especificado, só processar mensagens desse chat
+            if (!chatId || message.chat_id === chatId) {
+              console.log('✅ Processando nova mensagem para o chat atual');
+              onNewMessageRef.current(message);
+            } else {
+              console.log('⚠️ Mensagem ignorada - não pertence ao chat atual');
+            }
+          } else {
+            console.log('⚠️ onNewMessageRef.current não está definido');
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Status da subscription de mensagens:', status);
+      });
 
     // Armazenar referências das subscriptions
-    subscriptionsRef.current = [chatsSubscription, messagesSubscription];
+    subscriptionsRef.current = [testChannel, chatsSubscription, messagesSubscription];
+
+    // Verificar se as subscriptions foram criadas com sucesso
+    console.log('✅ Subscriptions criadas:', {
+      testChannel: !!testChannel,
+      chatsSubscription: !!chatsSubscription,
+      messagesSubscription: !!messagesSubscription
+    });
+
+    // Teste adicional: verificar se o Realtime está habilitado para as tabelas
+    console.log('🔍 Verificando configuração do Realtime para as tabelas...');
+    console.log('📋 Tabelas monitoradas: messages, chats');
 
     // Cleanup function
     return () => {
@@ -98,10 +170,11 @@ export function useChatRealtime({
       });
       subscriptionsRef.current = [];
     };
-  }, [onChatUpdate, onNewMessage, onChatCreated, onChatDeleted]);
+  }, [chatId]); // Remover dependências das funções de callback para evitar recriação desnecessária
 
   // Função para limpar manualmente as subscriptions
   const cleanup = () => {
+    console.log('🧹 Limpeza manual das subscriptions');
     subscriptionsRef.current.forEach(subscription => {
       if (subscription) {
         supabase.removeChannel(subscription);
