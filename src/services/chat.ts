@@ -116,7 +116,7 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
     
     // Buscar a última mensagem de cada chat para garantir que temos a mais recente
     const chatsWithLastMessage = await Promise.all(
-      chats.map(async (chat) => {
+      chats.map(async (chat: Chat) => {
         try {
           // Buscar a última mensagem do chat
           const { data: lastMessage, error: messageError } = await supabase
