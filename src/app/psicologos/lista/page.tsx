@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { getAllPsicologos, Psicologo } from '@/services/psicologos';
@@ -315,9 +316,11 @@ export default function ListaPsicologosPage() {
                       <div className="relative">
                         <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
                           {psicologo.avatar_path && psicologo.avatar_path !== '/default-avatar.png' ? (
-                            <img
+                            <Image
                               src={psicologo.avatar_path}
                               alt={psicologo.name}
+                              width={48}
+                              height={48}
                               className="w-12 h-12 rounded-full object-cover"
                             />
                           ) : (

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -288,9 +289,11 @@ export default function PsicologosNavbar() {
                                         <div className="flex-shrink-0">
                                           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
                                             {psicologo.avatar_path && psicologo.avatar_path !== '/default-avatar.png' ? (
-                                              <img
+                                              <Image
                                                 src={psicologo.avatar_path}
                                                 alt={psicologo.name}
+                                                width={32}
+                                                height={32}
                                                 className="w-8 h-8 rounded-full object-cover"
                                               />
                                             ) : (
@@ -347,9 +350,11 @@ export default function PsicologosNavbar() {
                                         <div className="flex-shrink-0">
                                           <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
                                             {psicologo.avatar_path && psicologo.avatar_path !== '/default-avatar.png' ? (
-                                              <img
+                                              <Image
                                                 src={psicologo.avatar_path}
                                                 alt={psicologo.name}
+                                                width={32}
+                                                height={32}
                                                 className="w-8 h-8 rounded-full object-cover opacity-60"
                                               />
                                             ) : (

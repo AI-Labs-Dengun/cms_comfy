@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 
 interface Psicologo {
@@ -140,9 +141,11 @@ export default function OnlinePsicologosList({ refreshInterval = 30000 }: Online
               <div className="flex-shrink-0">
                 <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                   {psicologo.avatar_path && psicologo.avatar_path !== '/default-avatar.png' ? (
-                    <img
+                    <Image
                       src={psicologo.avatar_path}
                       alt={psicologo.name}
+                      width={40}
+                      height={40}
                       className="w-10 h-10 rounded-full object-cover"
                     />
                   ) : (
