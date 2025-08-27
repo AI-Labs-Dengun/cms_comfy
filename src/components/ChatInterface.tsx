@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
-import { getChatInfo, getChatMessages, sendMessage, updateChatStatus, markMessagesAsRead, ChatInfo, Message, Chat } from '@/services/chat';
+import { getChatInfo, sendMessage, updateChatStatus, markMessagesAsRead, ChatInfo, Message, Chat } from '@/services/chat';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
 
 interface ChatInterfaceProps {
@@ -26,7 +26,7 @@ interface GroupedMessages {
 export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, onNewMessageReceived, showNewMessageIndicator = true, messages: externalMessages }: ChatInterfaceProps) {
   const { profile } = useAuth();
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Remover estado local de mensagens - usar apenas mensagens externas
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
@@ -68,7 +68,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
 
   // Marcar mensagens como lidas quando o usuário realmente visualiza o chat
   const markMessagesAsReadWhenViewed = useCallback(async () => {
-    if (!hasMarkedAsRead && messages.length > 0 && isChatActive) {
+    if (!hasMarkedAsRead && externalMessages && externalMessages.length > 0 && isChatActive) {
       try {
         console.log('📖 Marcando mensagens como lidas para o chat:', chatId);
         await markMessagesAsRead(chatId);
@@ -83,7 +83,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
         console.error('❌ Erro ao marcar mensagens como lidas:', error);
       }
     }
-  }, [hasMarkedAsRead, messages.length, isChatActive, chatId, onChatUpdate]);
+  }, [hasMarkedAsRead, externalMessages, isChatActive, chatId, onChatUpdate]);
 
   // Handler para interação do usuário com o chat
   const handleUserInteraction = useCallback(() => {
@@ -99,7 +99,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
       setIsChatActive(isVisible);
       
       // Se o chat se tornou visível e há mensagens não lidas, marcá-las como lidas
-      if (isVisible && !hasMarkedAsRead && messages.length > 0) {
+      if (isVisible && !hasMarkedAsRead && externalMessages && externalMessages.length > 0) {
         setTimeout(() => {
           markMessagesAsReadWhenViewed();
         }, 500);
@@ -108,7 +108,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
 
     const handleFocus = () => {
       setIsChatActive(true);
-      if (!hasMarkedAsRead && messages.length > 0) {
+      if (!hasMarkedAsRead && externalMessages && externalMessages.length > 0) {
         setTimeout(() => {
           markMessagesAsReadWhenViewed();
         }, 500);
@@ -129,22 +129,22 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [hasMarkedAsRead, messages.length, chatId, onChatUpdate, markMessagesAsReadWhenViewed]);
+  }, [hasMarkedAsRead, externalMessages, chatId, onChatUpdate, markMessagesAsReadWhenViewed]);
 
   // Scroll suave para novas mensagens (não para carregamento inicial)
   useEffect(() => {
-    if (!isInitialLoad && messages.length > 0) {
+    if (!isInitialLoad && externalMessages && externalMessages.length > 0) {
       scrollToBottom();
     }
-  }, [messages.length, isInitialLoad]);
+  }, [externalMessages, isInitialLoad]);
 
   // Posicionar scroll no final após carregamento inicial
   useLayoutEffect(() => {
-    if (isInitialLoad && messages.length > 0) {
+    if (isInitialLoad && externalMessages && externalMessages.length > 0) {
       positionAtBottom();
       setIsInitialLoad(false);
     }
-  }, [messages.length, isInitialLoad]);
+  }, [externalMessages, isInitialLoad]);
 
   // Marcar mensagens como lidas quando o usuário interage com o chat
   useEffect(() => {
@@ -227,11 +227,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
         setError(null);
         setHasMarkedAsRead(false); // Reset flag quando carrega novo chat
 
-        // TODO: Implementar chamadas à API
-        // Por enquanto, dados simulados
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Carregar informações do chat
+        // Carregar apenas informações do chat (não mensagens)
         const chatInfoResult = await getChatInfo(chatId);
         if (chatInfoResult.success && chatInfoResult.data) {
           setChatInfo(chatInfoResult.data);
@@ -240,22 +236,8 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
           return;
         }
 
-        // Carregar mensagens do chat
-        const messagesResult = await getChatMessages(chatId);
-        if (messagesResult.success && messagesResult.data) {
-          // Adicionar chaves únicas para todas as mensagens carregadas
-          const messagesWithUniqueKeys = messagesResult.data.map((message, index) => ({
-            ...message,
-            _uniqueKey: `${message.id}-${message.created_at}-${index}`
-          }));
-          setMessages(messagesWithUniqueKeys);
-        } else {
-          setError(messagesResult.error || 'Erro ao carregar mensagens');
-          return;
-        }
-
-        // NÃO marcar mensagens como lidas automaticamente aqui
-        // Será marcado apenas quando o usuário realmente visualizar
+        // NÃO carregar mensagens aqui - elas serão fornecidas pela página pai
+        // As mensagens serão carregadas pela página pai e passadas via props
 
       } catch (error) {
         console.error('Erro ao carregar chat:', error);
@@ -296,53 +278,38 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     try {
       setSending(true);
       
-      // Criar uma mensagem temporária para exibir imediatamente
-      const tempMessage: Message = {
-        id: `temp-${Date.now()}`,
-        chat_id: chatId,
-        sender_id: profile?.id || '',
-        sender_type: 'psicologo',
-        content: newMessage.trim(),
-        created_at: new Date().toISOString(),
-        is_read: false,
-        is_deleted: false,
-        _uniqueKey: `temp-${Date.now()}-${Math.random()}`
-      };
-
-      // Adicionar a mensagem temporária ao estado local imediatamente
-      setMessages(prevMessages => [...prevMessages, tempMessage]);
+      // Guardar o conteúdo da mensagem antes de limpar o campo
+      const messageContent = newMessage.trim();
       
-      // Limpar o campo de entrada
+      // Limpar o campo de entrada imediatamente
       setNewMessage('');
-      
-      // Scroll suave para a nova mensagem enviada
-      setTimeout(() => {
-        scrollToBottom();
-      }, 50);
       
       // Marcar mensagens como lidas quando o usuário envia uma mensagem
       handleUserInteraction();
       
-      const result = await sendMessage(chatId, newMessage.trim());
+      console.log('📤 Enviando mensagem:', messageContent);
+      
+      const result = await sendMessage(chatId, messageContent);
       
       if (result.success && result.data) {
-        // Substituir a mensagem temporária pela mensagem real do servidor
-        setMessages(prevMessages => 
-          prevMessages.map(msg => 
-            msg.id === tempMessage.id 
-              ? { ...result.data!, _uniqueKey: `${result.data!.id}-${result.data!.created_at}-${Math.random()}` }
-              : msg
-          )
-        );
+        console.log('✅ Mensagem enviada com sucesso:', result.data);
+        
+        // A mensagem será adicionada automaticamente via tempo real
+        // Scroll suave para a nova mensagem enviada
+        setTimeout(() => {
+          scrollToBottom();
+        }, 100);
       } else {
         console.error('Erro ao enviar mensagem:', result.error);
-        // Remover a mensagem temporária se houve erro
-        setMessages(prevMessages => prevMessages.filter(msg => msg.id !== tempMessage.id));
+        // Restaurar a mensagem no campo de entrada se houve erro
+        setNewMessage(messageContent);
         alert('Erro ao enviar mensagem. Tente novamente.');
       }
 
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
+      // Restaurar a mensagem no campo de entrada se houve erro
+      setNewMessage(newMessage.trim());
       alert('Erro ao enviar mensagem. Tente novamente.');
     } finally {
       setSending(false);
@@ -367,34 +334,8 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     
     // Só processar a mensagem se ela pertence ao chat atual
     if (message.chat_id === chatId) {
-      // Adicionar a mensagem ao estado local do ChatInterface
-      setMessages(prevMessages => {
-        // Verificar se a mensagem já existe para evitar duplicatas
-        const messageExists = prevMessages.some(m => 
-          m.id === message.id && 
-          m.created_at === message.created_at &&
-          m.content === message.content
-        );
-        
-        if (!messageExists) {
-          console.log('✅ Adicionando nova mensagem ao ChatInterface:', message.content);
-          
-          // Criar uma nova mensagem com chave única
-          const newMessage = {
-            ...message,
-            _uniqueKey: `${message.id}-${message.created_at}-${message.content?.substring(0, 10)}-${prevMessages.length}`
-          };
-          
-          // Ordenar mensagens por data de criação
-          const updatedMessages = [...prevMessages, newMessage].sort(
-            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          );
-          
-          return updatedMessages;
-        }
-        console.log('⚠️ Mensagem já existe no ChatInterface, ignorando duplicata:', message.id);
-        return prevMessages;
-      });
+      // NÃO adicionar mensagem ao estado local - apenas notificar a página pai
+      console.log('✅ Notificando página pai sobre nova mensagem:', message.content);
       
       // Usar a prop para processar a mensagem na página pai
       if (onNewMessageReceived) {
@@ -451,32 +392,22 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     chatId: chatId
   });
 
-  // Usar mensagens externas se fornecidas, senão usar estado local
-  // Combinar mensagens externas com mensagens locais para garantir que mensagens enviadas sejam exibidas
+  // Usar apenas mensagens externas fornecidas pela página pai
   const displayMessages = React.useMemo(() => {
+    // Se mensagens externas são fornecidas, usar apenas elas
     if (externalMessages && externalMessages.length > 0) {
-      // Combinar mensagens externas com mensagens locais, removendo duplicatas
-      const allMessages = [...externalMessages, ...messages];
-      const uniqueMessages = allMessages.filter((message, index, self) => 
-        index === self.findIndex(m => 
-          m.id === message.id && 
-          m.created_at === message.created_at &&
-          m.content === message.content
-        )
-      );
-      
-      // Ordenar por data de criação
-      return uniqueMessages.sort((a, b) => 
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
+      console.log('🔍 ChatInterface - Usando mensagens externas:', externalMessages.length);
+      return externalMessages;
     }
-    return messages;
-  }, [externalMessages, messages]);
+    
+    // Se não há mensagens externas, retornar array vazio
+    console.log('🔍 ChatInterface - Nenhuma mensagem externa fornecida');
+    return [];
+  }, [externalMessages]);
   
   // Debug: verificar mensagens
-  console.log('🔍 ChatInterface - Mensagens recebidas:', {
+  console.log('🔍 ChatInterface - Mensagens finais:', {
     externalMessages: externalMessages?.length || 0,
-    localMessages: messages.length,
     displayMessages: displayMessages.length,
     chatId
   });
@@ -675,8 +606,10 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Digite sua mensagem..."
-              className="w-full border border-gray-300 rounded-2xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all duration-200 text-black message-content"
+              placeholder={sending ? "Enviando mensagem..." : "Digite sua mensagem..."}
+              className={`w-full border border-gray-300 rounded-2xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all duration-200 text-black message-content ${
+                sending ? 'bg-gray-50 cursor-not-allowed' : ''
+              }`}
               rows={3}
               disabled={sending}
               onKeyDown={(e) => {
