@@ -25,6 +25,7 @@ export interface Message {
   created_at: string;
   is_read: boolean;
   is_deleted: boolean;
+  _uniqueKey?: string; // Chave única opcional para evitar conflitos de renderização
 }
 
 export interface ChatInfo {
