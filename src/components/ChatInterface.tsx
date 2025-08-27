@@ -30,6 +30,7 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false);
 
   // Auto-scroll para a última mensagem (apenas para novas mensagens)
   const scrollToBottom = () => {
@@ -55,6 +56,26 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
     }
   };
 
+  // Marcar mensagens como lidas quando o usuário realmente visualiza o chat
+  const markMessagesAsReadWhenViewed = async () => {
+    if (!hasMarkedAsRead && messages.length > 0) {
+      try {
+        await markMessagesAsRead(chatId);
+        setHasMarkedAsRead(true);
+        console.log('✅ Mensagens marcadas como lidas após visualização');
+      } catch (error) {
+        console.error('❌ Erro ao marcar mensagens como lidas:', error);
+      }
+    }
+  };
+
+  // Handler para interação do usuário com o chat
+  const handleUserInteraction = () => {
+    if (!hasMarkedAsRead) {
+      markMessagesAsReadWhenViewed();
+    }
+  };
+
   // Apenas scroll suave para novas mensagens (não para carregamento inicial)
   useEffect(() => {
     if (!isInitialLoad) {
@@ -67,75 +88,105 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
     if (!loading && messages.length > 0 && isInitialLoad) {
       positionAtBottom();
       setIsInitialLoad(false);
+      
+      // Marcar como lidas após um pequeno delay para garantir que o usuário viu as mensagens
+      setTimeout(() => {
+        markMessagesAsReadWhenViewed();
+      }, 1000);
     }
   }, [loading, messages.length, isInitialLoad]);
 
   // Posicionar na última mensagem quando o chatId muda
-  useEffect(() => {
-    if (chatId) {
-      setIsInitialLoad(true);
+  useLayoutEffect(() => {
+    if (messages.length > 0) {
+      positionAtBottom();
     }
   }, [chatId]);
 
-  // Detectar tecla ESC para fechar o chat
+  // Adicionar event listeners para detectar interação do usuário
+  useEffect(() => {
+    const handleScroll = () => {
+      handleUserInteraction();
+    };
+
+    const handleClick = () => {
+      handleUserInteraction();
+    };
+
+    const handleKeyPress = () => {
+      handleUserInteraction();
+    };
+
+    // Adicionar listeners ao container de mensagens
+    const messagesContainer = messagesContainerRef.current;
+    if (messagesContainer) {
+      messagesContainer.addEventListener('scroll', handleScroll);
+      messagesContainer.addEventListener('click', handleClick);
+      messagesContainer.addEventListener('keydown', handleKeyPress);
+    }
+
+    // Cleanup
+    return () => {
+      if (messagesContainer) {
+        messagesContainer.removeEventListener('scroll', handleScroll);
+        messagesContainer.removeEventListener('click', handleClick);
+        messagesContainer.removeEventListener('keydown', handleKeyPress);
+      }
+    };
+  }, [hasMarkedAsRead]); // Só recriar quando hasMarkedAsRead mudar
+
+  // Detectar tecla ESC para fechar o chat e marcar mensagens como lidas
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && onClose) {
         onClose();
       }
+      // Marcar mensagens como lidas quando o usuário pressiona qualquer tecla
+      handleUserInteraction();
     };
 
     document.addEventListener('keydown', handleKeyDown);
+    
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, hasMarkedAsRead]);
 
   // Função para agrupar mensagens por data
   const groupMessagesByDate = (messages: Message[]): GroupedMessages[] => {
     const groups: { [key: string]: Message[] } = {};
     
     messages.forEach(message => {
-      const date = new Date(message.created_at);
-      const dateKey = date.toDateString();
-      
-      if (!groups[dateKey]) {
-        groups[dateKey] = [];
+      const date = new Date(message.created_at).toDateString();
+      if (!groups[date]) {
+        groups[date] = [];
       }
-      groups[dateKey].push(message);
+      groups[date].push(message);
     });
 
-    return Object.keys(groups).map(dateKey => {
-      const date = new Date(dateKey);
+    return Object.entries(groups).map(([date, messages]) => {
+      const messageDate = new Date(date);
       const today = new Date();
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
 
       let dateLabel = '';
-      if (date.toDateString() === today.toDateString()) {
+      if (messageDate.toDateString() === today.toDateString()) {
         dateLabel = 'Hoje';
-      } else if (date.toDateString() === yesterday.toDateString()) {
+      } else if (messageDate.toDateString() === yesterday.toDateString()) {
         dateLabel = 'Ontem';
       } else {
-        // Para outras datas, mostrar dia da semana + data completa
-        // Exemplo: "Sexta-feira, 22/08/2025"
-        const weekday = date.toLocaleDateString('pt-BR', {
-          weekday: 'long'
-        });
-        const fullDate = date.toLocaleDateString('pt-BR', {
+        dateLabel = messageDate.toLocaleDateString('pt-BR', {
           day: '2-digit',
           month: '2-digit',
           year: 'numeric'
         });
-        dateLabel = `${weekday}, ${fullDate}`;
       }
 
       return {
-        date: dateKey,
-        dateLabel: dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1),
-        messages: groups[dateKey].sort((a, b) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        )
+        date,
+        dateLabel,
+        messages: messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       };
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
@@ -146,6 +197,7 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
       try {
         setLoading(true);
         setError(null);
+        setHasMarkedAsRead(false); // Reset flag quando carrega novo chat
 
         // TODO: Implementar chamadas à API
         // Por enquanto, dados simulados
@@ -169,8 +221,8 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
           return;
         }
 
-        // Marcar mensagens como lidas
-        await markMessagesAsRead(chatId);
+        // NÃO marcar mensagens como lidas automaticamente aqui
+        // Será marcado apenas quando o usuário realmente visualizar
 
       } catch (error) {
         console.error('Erro ao carregar chat:', error);
@@ -192,6 +244,8 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
       if (result.success) {
         // Atualizar o chat info local
         setChatInfo(prev => prev ? { ...prev, status: newStatus } : null);
+        // Marcar mensagens como lidas quando o usuário interage com o chat
+        handleUserInteraction();
       } else {
         console.error('Erro ao atualizar status:', result.error);
       }
@@ -214,6 +268,8 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
       if (result.success && result.data) {
         setMessages(prev => [...prev, result.data!]);
         setNewMessage('');
+        // Marcar mensagens como lidas quando o usuário envia uma mensagem
+        handleUserInteraction();
         // Scroll suave para a nova mensagem enviada
         setTimeout(() => {
           scrollToBottom();
