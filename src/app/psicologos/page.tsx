@@ -51,6 +51,22 @@ export default function PsicologosPage() {
         console.error('❌ Erro ao buscar última mensagem:', messageError);
       }
 
+      // Buscar mensagens não lidas do app_user para este chat
+      const { data: unreadMessages, error: unreadError } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('chat_id', chatId)
+        .eq('sender_type', 'app_user')
+        .eq('is_read', false)
+        .eq('is_deleted', false);
+
+      if (unreadError) {
+        console.error('❌ Erro ao buscar mensagens não lidas:', unreadError);
+      }
+
+      const unreadCount = unreadMessages ? unreadMessages.length : 0;
+      console.log('📊 Mensagens não lidas encontradas:', unreadCount);
+
       // Buscar o chat completo
       const fullChatResult = await getChats();
       if (fullChatResult.success && fullChatResult.data) {
@@ -59,10 +75,10 @@ export default function PsicologosPage() {
           console.log('📊 Chat encontrado:', fullChat);
           console.log('📝 Última mensagem encontrada:', lastMessage);
           
-          // Sanitizar os dados do chat
+          // Sanitizar os dados do chat com o contador correto de mensagens não lidas
           const sanitizedChat = {
             ...fullChat,
-            unread_count_psicologo: Number(fullChat.unread_count_psicologo) || 0,
+            unread_count_psicologo: unreadCount, // Usar contador real da base de dados
             masked_user_name: fullChat.masked_user_name || 'Utilizador',
             last_message_at: lastMessage ? lastMessage.created_at : (fullChat.last_message_at || new Date().toISOString()),
             last_message_content: lastMessage ? lastMessage.content : (fullChat.last_message_content || ''),
@@ -76,7 +92,8 @@ export default function PsicologosPage() {
             id: sanitizedChat.id,
             last_message_content: sanitizedChat.last_message_content,
             last_message_at: sanitizedChat.last_message_at,
-            sender: sanitizedChat.last_message_sender_name
+            sender: sanitizedChat.last_message_sender_name,
+            unread_count: sanitizedChat.unread_count_psicologo
           });
           
           setChats(prevChats => {
@@ -85,7 +102,7 @@ export default function PsicologosPage() {
               // Atualizar chat existente
               const updatedChats = [...prevChats];
               updatedChats[existingIndex] = sanitizedChat;
-              console.log('✅ Chat atualizado na lista:', chatId, 'com última mensagem:', sanitizedChat.last_message_content);
+              console.log('✅ Chat atualizado na lista:', chatId, 'com última mensagem:', sanitizedChat.last_message_content, 'e', sanitizedChat.unread_count_psicologo, 'mensagens não lidas');
               return updatedChats;
             } else {
               // Adicionar novo chat
@@ -126,16 +143,15 @@ export default function PsicologosPage() {
             last_message_at: chat.last_message_at
           });
           
-          // Atualizar o chat com a nova mensagem
+          // Atualizar o chat com a nova mensagem (sem alterar unread_count_psicologo aqui)
           updatedChats[chatIndex] = {
             ...chat,
             last_message_at: message.created_at,
             last_message_content: message.content,
             last_message_sender_type: message.sender_type,
             last_message_sender_name: message.sender_type === 'psicologo' ? 'Você' : chat.masked_user_name,
-            unread_count_psicologo: message.sender_type === 'app_user' 
-              ? (chat.unread_count_psicologo || 0) + 1 
-              : chat.unread_count_psicologo || 0
+            // NÃO incrementar unread_count_psicologo aqui - será atualizado via API
+            unread_count_psicologo: chat.unread_count_psicologo || 0
           };
           
           console.log('✅ Chat atualizado com nova mensagem:', {
@@ -150,7 +166,7 @@ export default function PsicologosPage() {
         return prevChats;
       });
       
-      // Também atualizar via API para garantir sincronização
+      // Atualizar via API para obter o unread_count_psicologo correto da base de dados
       await updateChatInList(message.chat_id);
       
       // Mostrar notificação sutil se a mensagem não for do psicólogo atual
@@ -184,10 +200,31 @@ export default function PsicologosPage() {
     console.log('🔄 Chat atualizado:', updatedChat);
     setIsRealtimeActive(true);
     
+    // Buscar o contador real de mensagens não lidas da base de dados
+    let realUnreadCount = 0;
+    try {
+      const { data: unreadMessages, error: unreadError } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('chat_id', updatedChat.id)
+        .eq('sender_type', 'app_user')
+        .eq('is_read', false)
+        .eq('is_deleted', false);
+
+      if (unreadError) {
+        console.error('❌ Erro ao buscar mensagens não lidas:', unreadError);
+      } else {
+        realUnreadCount = unreadMessages ? unreadMessages.length : 0;
+        console.log('📊 Contador real de mensagens não lidas:', realUnreadCount);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao buscar contador de mensagens não lidas:', error);
+    }
+    
     // Garantir que todos os campos obrigatórios estejam presentes
     const sanitizedChat = {
       ...updatedChat,
-      unread_count_psicologo: Number(updatedChat.unread_count_psicologo) || 0,
+      unread_count_psicologo: realUnreadCount, // Usar contador real da base de dados
       masked_user_name: updatedChat.masked_user_name || 'Utilizador',
       last_message_at: updatedChat.last_message_at || new Date().toISOString(),
       last_message_content: updatedChat.last_message_content || '',
@@ -207,7 +244,7 @@ export default function PsicologosPage() {
       if (existingIndex >= 0) {
         const updatedChats = [...prevChats];
         updatedChats[existingIndex] = sanitizedChat;
-        console.log('✅ Chat atualizado na lista:', sanitizedChat.id, 'com última mensagem:', sanitizedChat.last_message_content);
+        console.log('✅ Chat atualizado na lista:', sanitizedChat.id, 'com última mensagem:', sanitizedChat.last_message_content, 'e', sanitizedChat.unread_count_psicologo, 'mensagens não lidas');
         return updatedChats;
       }
       return prevChats;
@@ -232,13 +269,34 @@ export default function PsicologosPage() {
   }, [selectedChat]);
 
   // Função para lidar com novo chat criado
-  const handleChatCreated = useCallback((newChat: Chat) => {
+  const handleChatCreated = useCallback(async (newChat: Chat) => {
     console.log('🆕 Novo chat criado:', newChat);
+    
+    // Buscar o contador real de mensagens não lidas da base de dados
+    let realUnreadCount = 0;
+    try {
+      const { data: unreadMessages, error: unreadError } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('chat_id', newChat.id)
+        .eq('sender_type', 'app_user')
+        .eq('is_read', false)
+        .eq('is_deleted', false);
+
+      if (unreadError) {
+        console.error('❌ Erro ao buscar mensagens não lidas:', unreadError);
+      } else {
+        realUnreadCount = unreadMessages ? unreadMessages.length : 0;
+        console.log('📊 Contador real de mensagens não lidas para novo chat:', realUnreadCount);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao buscar contador de mensagens não lidas:', error);
+    }
     
     // Garantir que todos os campos obrigatórios estejam presentes
     const sanitizedChat = {
       ...newChat,
-      unread_count_psicologo: Number(newChat.unread_count_psicologo) || 0,
+      unread_count_psicologo: realUnreadCount, // Usar contador real da base de dados
       masked_user_name: newChat.masked_user_name || 'Utilizador',
       last_message_at: newChat.last_message_at || new Date().toISOString(),
       last_message_content: newChat.last_message_content || '',
@@ -345,6 +403,23 @@ export default function PsicologosPage() {
     }
   }, []);
 
+  // Atualizar contadores de mensagens não lidas periodicamente
+  useEffect(() => {
+    const updateUnreadCounts = async () => {
+      if (chats.length > 0) {
+        console.log('🔄 Atualizando contadores de mensagens não lidas...');
+        for (const chat of chats) {
+          await updateChatInList(chat.id);
+        }
+      }
+    };
+
+    // Atualizar a cada 30 segundos para garantir sincronização
+    const interval = setInterval(updateUnreadCounts, 30000);
+
+    return () => clearInterval(interval);
+  }, [chats.length, updateChatInList]);
+
   // Função para formatar data
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -386,9 +461,15 @@ export default function PsicologosPage() {
   };
 
   // Função para selecionar um chat
-  const handleSelectChat = (chat: Chat) => {
+  const handleSelectChat = async (chat: Chat) => {
     setSelectedChat(chat);
     setShowChatList(false);
+    
+    // Atualizar o contador de mensagens não lidas para este chat
+    // (será atualizado quando o ChatInterface marcar as mensagens como lidas)
+    setTimeout(async () => {
+      await updateChatInList(chat.id);
+    }, 1000);
   };
 
   // Função para voltar à lista de chats (mobile)
@@ -397,7 +478,11 @@ export default function PsicologosPage() {
   };
 
   // Função para sair do chat (limpar seleção)
-  const handleCloseChat = () => {
+  const handleCloseChat = async () => {
+    // Se havia um chat selecionado, atualizar o contador de mensagens não lidas
+    if (selectedChat) {
+      await updateChatInList(selectedChat.id);
+    }
     setSelectedChat(null);
     setShowChatList(true);
   };
