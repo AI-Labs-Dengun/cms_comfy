@@ -923,30 +923,30 @@ export default function PsicologosPage() {
                       )}
                     </div>
                     
-                    <div className="flex-1 min-w-0">
-                                              <div className="flex items-center justify-between mb-2">
-                          <h3 className={`text-sm font-semibold truncate ${
-                            (chat.unread_count_psicologo || 0) > 0 
-                              ? 'text-gray-900 font-bold' 
-                              : 'text-gray-700'
-                          }`}>
-                            {chat.masked_user_name || 'Utilizador'}
-                          </h3>
-                          <div className="flex items-center space-x-2">
-                            {(chat.unread_count_psicologo || 0) > 0 && (
-                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-red-500 text-white shadow-sm animate-pulse">
-                                {chat.unread_count_psicologo || 0}
-                              </span>
-                            )}
-                            <span className="text-xs text-gray-400 font-medium">
-                              {chat.last_message_at ? formatDate(chat.last_message_at) : '--'}
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className={`text-sm font-semibold truncate ${
+                          (chat.unread_count_psicologo || 0) > 0 
+                            ? 'text-gray-900 font-bold' 
+                            : 'text-gray-700'
+                        }`}>
+                          {chat.masked_user_name || 'Utilizador'}
+                        </h3>
+                        <div className="flex items-center space-x-2">
+                          {(chat.unread_count_psicologo || 0) > 0 && (
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-red-500 text-white shadow-sm animate-pulse">
+                              {chat.unread_count_psicologo || 0}
                             </span>
-                          </div>
+                          )}
+                          <span className="text-xs text-gray-400 font-medium">
+                            {chat.last_message_at ? formatDate(chat.last_message_at) : '--'}
+                          </span>
                         </div>
+                      </div>
                       
                       {(chat.last_message_content && chat.last_message_content.trim() !== '') ? (
-                        <div className="mb-3">
-                          <p className="text-sm text-gray-600 line-clamp-2 message-content">
+                        <div className="mb-3 min-h-0">
+                          <p className="text-sm text-gray-600 line-clamp-2 message-content break-words leading-relaxed">
                             <span className={`font-medium ${
                               chat.last_message_sender_type === 'psicologo' 
                                 ? 'text-blue-600' 
@@ -958,16 +958,22 @@ export default function PsicologosPage() {
                               {chat.last_message_content}
                             </span>
                           </p>
+                          {/* Debug temporário - remover depois */}
+                          {process.env.NODE_ENV === 'development' && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              Debug: {chat.last_message_sender_type} | {chat.last_message_content?.substring(0, 20)}...
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <div className="mb-3">
+                        <div className="mb-3 min-h-0">
                           <p className="text-sm text-gray-400 italic">
                             Nenhuma mensagem ainda
                           </p>
                         </div>
                       )}
                       
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between mt-auto">
                         {/* Tags de status */}
                         <ChatStatusTag
                           status={chat.status}
