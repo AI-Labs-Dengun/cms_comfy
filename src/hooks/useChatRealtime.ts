@@ -142,6 +142,7 @@ export function useChatRealtime({
           
           if (onNewMessageRef.current) {
             const message = payload.new as Message;
+            
             // Se chatId foi especificado, só processar mensagens desse chat
             if (!chatId || message.chat_id === chatId) {
               console.log('✅ Processando nova mensagem para o chat atual');
