@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
-import { getChatInfo, getChatMessages, sendMessage, updateChatStatus, markMessagesAsRead, ChatInfo, Message } from '@/services/chat';
+import { getChatInfo, getChatMessages, sendMessage, updateChatStatus, markMessagesAsRead, ChatInfo, Message, Chat } from '@/services/chat';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
 
 interface ChatInterfaceProps {
@@ -37,8 +37,8 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
   const [isChatActive, setIsChatActive] = useState(true); // Controla se o chat está ativo/visível
   
   // Usar refs para armazenar as funções de callback e evitar recriações
-  const handleNewMessageRef = useRef<(message: Message) => void>();
-  const handleChatUpdateRef = useRef<(updatedChat: any) => void>();
+  const handleNewMessageRef = useRef<(message: Message) => void>(() => {});
+  const handleChatUpdateRef = useRef<(updatedChat: Chat) => void>(() => {});
 
   // Auto-scroll para a última mensagem (apenas para novas mensagens)
   const scrollToBottom = () => {
@@ -65,7 +65,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
   };
 
   // Marcar mensagens como lidas quando o usuário realmente visualiza o chat
-  const markMessagesAsReadWhenViewed = async () => {
+  const markMessagesAsReadWhenViewed = useCallback(async () => {
     if (!hasMarkedAsRead && messages.length > 0 && isChatActive) {
       try {
         console.log('📖 Marcando mensagens como lidas para o chat:', chatId);
@@ -81,14 +81,14 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
         console.error('❌ Erro ao marcar mensagens como lidas:', error);
       }
     }
-  };
+  }, [hasMarkedAsRead, messages.length, isChatActive, chatId, onChatUpdate]);
 
   // Handler para interação do usuário com o chat
-  const handleUserInteraction = () => {
+  const handleUserInteraction = useCallback(() => {
     if (!hasMarkedAsRead && isChatActive) {
       markMessagesAsReadWhenViewed();
     }
-  };
+  }, [hasMarkedAsRead, isChatActive, markMessagesAsReadWhenViewed]);
 
   // Detectar quando o chat se torna ativo/inativo
   useEffect(() => {
@@ -127,86 +127,56 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [hasMarkedAsRead, messages.length, chatId, onChatUpdate]);
+  }, [hasMarkedAsRead, messages.length, chatId, onChatUpdate, markMessagesAsReadWhenViewed]);
 
   // Scroll suave para novas mensagens (não para carregamento inicial)
   useEffect(() => {
     if (!isInitialLoad && messages.length > 0) {
-      // Pequeno delay para garantir que a mensagem foi renderizada
-      setTimeout(() => {
-        scrollToBottom();
-      }, 100);
+      scrollToBottom();
     }
-  }, [messages, isInitialLoad]);
+  }, [messages.length, isInitialLoad]);
 
-  // Posicionar na última mensagem quando o chat é carregado (antes da renderização)
+  // Posicionar scroll no final após carregamento inicial
   useLayoutEffect(() => {
-    if (!loading && messages.length > 0 && isInitialLoad) {
+    if (isInitialLoad && messages.length > 0) {
       positionAtBottom();
       setIsInitialLoad(false);
-      
-      // Marcar como lidas imediatamente quando o chat é carregado
-      setTimeout(() => {
-        markMessagesAsReadWhenViewed();
-      }, 500);
     }
-  }, [loading, messages.length, isInitialLoad]);
+  }, [messages.length, isInitialLoad]);
 
-  // Posicionar na última mensagem quando o chatId muda
-  useLayoutEffect(() => {
-    if (messages.length > 0) {
-      positionAtBottom();
-    }
-  }, [chatId]);
-
-  // Adicionar event listeners para detectar interação do usuário
+  // Marcar mensagens como lidas quando o usuário interage com o chat
   useEffect(() => {
-    const handleScroll = () => {
+    const handleInteraction = () => {
       handleUserInteraction();
     };
 
-    const handleClick = () => {
-      handleUserInteraction();
-    };
+    // Adicionar listeners para interação do usuário
+    document.addEventListener('click', handleInteraction);
+    document.addEventListener('keydown', handleInteraction);
+    document.addEventListener('scroll', handleInteraction);
 
-    const handleKeyPress = () => {
-      handleUserInteraction();
-    };
-
-    // Adicionar listeners ao container de mensagens
-    const messagesContainer = messagesContainerRef.current;
-    if (messagesContainer) {
-      messagesContainer.addEventListener('scroll', handleScroll);
-      messagesContainer.addEventListener('click', handleClick);
-      messagesContainer.addEventListener('keydown', handleKeyPress);
-    }
-
-    // Cleanup
     return () => {
-      if (messagesContainer) {
-        messagesContainer.removeEventListener('scroll', handleScroll);
-        messagesContainer.removeEventListener('click', handleClick);
-        messagesContainer.removeEventListener('keydown', handleKeyPress);
-      }
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+      document.removeEventListener('scroll', handleInteraction);
     };
-  }, [hasMarkedAsRead, isChatActive]); // Adicionar isChatActive como dependência
+  }, [handleUserInteraction]);
 
-  // Detectar tecla ESC para fechar o chat e marcar mensagens como lidas
+  // Marcar mensagens como lidas quando o usuário está ativo
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && onClose) {
-        onClose();
-      }
-      // Marcar mensagens como lidas quando o usuário pressiona qualquer tecla
+    const handleActivity = () => {
       handleUserInteraction();
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    
+    // Adicionar listeners para atividade do usuário
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('keypress', handleActivity);
+
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keypress', handleActivity);
     };
-  }, [onClose, hasMarkedAsRead, isChatActive]);
+  }, [handleUserInteraction]);
 
   // Função para agrupar mensagens por data
   const groupMessagesByDate = (messages: Message[]): GroupedMessages[] => {
@@ -428,7 +398,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
   }, [handleNewMessage]);
 
   // Função para lidar com atualização de chat em tempo real
-  const handleChatUpdate = useCallback((updatedChat: any) => {
+  const handleChatUpdate = useCallback((updatedChat: Chat) => {
     console.log('🔄 Chat atualizado no ChatInterface:', updatedChat);
     
     // Atualizar informações do chat se for o chat atual
@@ -445,7 +415,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
   // Configurar tempo real para este chat específico
   useChatRealtime({
     onNewMessage: (message: Message) => handleNewMessageRef.current?.(message),
-    onChatUpdate: (updatedChat: any) => handleChatUpdateRef.current?.(updatedChat),
+    onChatUpdate: (updatedChat: Chat) => handleChatUpdateRef.current?.(updatedChat),
     onChatCreated: () => {}, // Adicionar handlers vazios para evitar warnings
     onChatDeleted: () => {},
     chatId: chatId
@@ -574,7 +544,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
             {/* Mensagens do grupo */}
             {group.messages.map((message) => (
               <div
-                key={message._uniqueKey || message.id}
+                key={message.id}
                 className={`flex ${message.sender_type === 'psicologo' ? 'justify-end' : 'justify-start'} message-enter`}
               >
                 <div className={`relative max-w-xs lg:max-w-md xl:max-w-lg ${
