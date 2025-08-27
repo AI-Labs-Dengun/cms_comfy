@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ChatInterface from '@/components/ChatInterface';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
-import { getChats, updateChatStatus, Chat as ChatType, getChatInfo, Message } from '@/services/chat';
+import { getChats, updateChatStatus, Chat as ChatType, Message } from '@/services/chat';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
 import { supabase } from '@/lib/supabase';
 
