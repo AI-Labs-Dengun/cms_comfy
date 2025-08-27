@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
 import { getChatInfo, getChatMessages, sendMessage, updateChatStatus, markMessagesAsRead, ChatInfo, Message } from '@/services/chat';
@@ -28,15 +28,54 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
   const [sending, setSending] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Auto-scroll para a última mensagem
+  // Auto-scroll para a última mensagem (apenas para novas mensagens)
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
+  // Posicionar o scroll na última mensagem sem animação
+  const positionAtBottom = () => {
+    if (messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      // Forçar o scroll para o final
+      container.scrollTop = container.scrollHeight;
+      
+      // Verificação adicional para garantir que o scroll foi aplicado
+      if (container.scrollTop < container.scrollHeight - container.clientHeight) {
+        // Se ainda não está no final, tentar novamente
+        setTimeout(() => {
+          container.scrollTop = container.scrollHeight;
+        }, 0);
+      }
+    }
+  };
+
+  // Apenas scroll suave para novas mensagens (não para carregamento inicial)
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (!isInitialLoad) {
+      scrollToBottom();
+    }
+  }, [messages, isInitialLoad]);
+
+  // Posicionar na última mensagem quando o chat é carregado (antes da renderização)
+  useLayoutEffect(() => {
+    if (!loading && messages.length > 0 && isInitialLoad) {
+      positionAtBottom();
+      setIsInitialLoad(false);
+    }
+  }, [loading, messages.length, isInitialLoad]);
+
+  // Posicionar na última mensagem quando o chatId muda
+  useEffect(() => {
+    if (chatId) {
+      setIsInitialLoad(true);
+    }
+  }, [chatId]);
 
   // Detectar tecla ESC para fechar o chat
   useEffect(() => {
@@ -175,6 +214,10 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
       if (result.success && result.data) {
         setMessages(prev => [...prev, result.data!]);
         setNewMessage('');
+        // Scroll suave para a nova mensagem enviada
+        setTimeout(() => {
+          scrollToBottom();
+        }, 50);
       } else {
         console.error('Erro ao enviar mensagem:', result.error);
       }
@@ -293,7 +336,14 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
       </div>
 
       {/* Área de mensagens - com altura fixa e scroll independente */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-gray-50 to-white custom-scrollbar chat-messages-container" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-gray-50 to-white custom-scrollbar chat-messages-container" 
+        style={{ 
+          maxHeight: 'calc(100vh - 280px)',
+          scrollBehavior: isInitialLoad ? 'auto' : 'smooth'
+        }}
+      >
         {groupedMessages.map((group) => (
           <div key={group.date} className="space-y-4">
             {/* Separador de data */}
