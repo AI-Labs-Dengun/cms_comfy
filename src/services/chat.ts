@@ -46,6 +46,8 @@ export interface ApiResponse<T> {
 // Função para buscar todos os chats do psicólogo
 export async function getChats(): Promise<ApiResponse<Chat[]>> {
   try {
+    console.log('🔍 Buscando chats do psicólogo...');
+    
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
@@ -55,6 +57,8 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
       };
     }
 
+    console.log('👤 Usuário autenticado:', user.id);
+
     // Verificar se o usuário é um psicólogo autorizado
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -63,11 +67,14 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
       .single();
 
     if (profileError || !profile || profile.user_role !== 'psicologo' || !profile.authorized) {
+      console.error('❌ Acesso negado:', { profile, profileError });
       return {
         success: false,
         error: 'Acesso negado. Apenas psicólogos autorizados podem acessar os chats.'
       };
     }
+
+    console.log('✅ Psicólogo autorizado:', profile);
 
     // ✅ IMPLEMENTAÇÃO REAL: Buscar chats do banco de dados
     const { data, error } = await supabase.rpc('get_psicologo_chats', {
@@ -75,15 +82,18 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
     });
 
     if (error) {
-      console.error('Erro ao buscar chats:', error);
+      console.error('❌ Erro ao buscar chats:', error);
       return {
         success: false,
         error: 'Erro ao carregar chats: ' + error.message
       };
     }
 
+    console.log('📊 Resposta do get_psicologo_chats:', data);
+
     // Verificar se data existe
     if (!data) {
+      console.error('❌ Resposta vazia do servidor');
       return {
         success: false,
         error: 'Resposta vazia do servidor'
@@ -91,6 +101,7 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
     }
 
     if (!data.success) {
+      console.error('❌ Erro na resposta:', data.error);
       return {
         success: false,
         error: data.error || 'Erro desconhecido ao carregar chats'
@@ -100,9 +111,54 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
     // Garantir que sempre retornamos um array
     const chats = Array.isArray(data.chats) ? data.chats : [];
     
+    console.log('✅ Chats encontrados:', chats.length);
+    console.log('📋 Dados dos chats:', chats);
+    
+    // Buscar a última mensagem de cada chat para garantir que temos a mais recente
+    const chatsWithLastMessage = await Promise.all(
+      chats.map(async (chat) => {
+        try {
+          // Buscar a última mensagem do chat
+          const { data: lastMessage, error: messageError } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('chat_id', chat.id)
+            .eq('is_deleted', false)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (messageError && messageError.code !== 'PGRST116') { // PGRST116 = no rows returned
+            console.error('❌ Erro ao buscar última mensagem do chat', chat.id, ':', messageError);
+          }
+
+          if (lastMessage) {
+            console.log('📝 Última mensagem encontrada para chat', chat.id, ':', lastMessage);
+            
+            // Atualizar o chat com a última mensagem real
+            return {
+              ...chat,
+              last_message_at: lastMessage.created_at,
+              last_message_content: lastMessage.content,
+              last_message_sender_type: lastMessage.sender_type,
+              last_message_sender_name: lastMessage.sender_type === 'psicologo' ? 'Você' : chat.masked_user_name
+            };
+          } else {
+            console.log('📝 Nenhuma mensagem encontrada para chat', chat.id);
+            return chat;
+          }
+        } catch (error) {
+          console.error('❌ Erro ao buscar última mensagem do chat', chat.id, ':', error);
+          return chat;
+        }
+      })
+    );
+    
+    console.log('✅ Chats com última mensagem atualizada:', chatsWithLastMessage);
+    
     return {
       success: true,
-      data: chats
+      data: chatsWithLastMessage
     };
 
   } catch (error) {
@@ -211,6 +267,8 @@ export async function getChatMessages(chatId: string): Promise<ApiResponse<Messa
 // Função para enviar uma mensagem
 export async function sendMessage(chatId: string, content: string): Promise<ApiResponse<Message>> {
   try {
+    console.log('📤 Enviando mensagem:', { chatId, content });
+    
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
@@ -228,12 +286,14 @@ export async function sendMessage(chatId: string, content: string): Promise<ApiR
     });
 
     if (error) {
-      console.error('Erro ao enviar mensagem:', error);
+      console.error('❌ Erro ao enviar mensagem:', error);
       return {
         success: false,
         error: 'Erro ao enviar mensagem: ' + error.message
       };
     }
+
+    console.log('📊 Resposta do send_message:', data);
 
     if (!data.success) {
       return {
@@ -250,11 +310,14 @@ export async function sendMessage(chatId: string, content: string): Promise<ApiR
       .single();
 
     if (messageError || !messageData) {
+      console.error('❌ Erro ao recuperar mensagem:', messageError);
       return {
         success: false,
         error: 'Erro ao recuperar mensagem enviada'
       };
     }
+
+    console.log('✅ Mensagem enviada com sucesso:', messageData);
 
     return {
       success: true,
