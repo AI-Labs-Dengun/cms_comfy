@@ -1,14 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
 import { getChatInfo, getChatMessages, sendMessage, updateChatStatus, markMessagesAsRead, ChatInfo, Message } from '@/services/chat';
+import { useChatRealtime } from '@/hooks/useChatRealtime';
 
 interface ChatInterfaceProps {
   chatId: string;
   onBack?: () => void;
   onClose?: () => void;
+  onChatUpdate?: (chatId: string) => void; // Callback para atualizar a lista de chats
 }
 
 // Interface para mensagens agrupadas
@@ -18,7 +20,7 @@ interface GroupedMessages {
   messages: Message[];
 }
 
-export default function ChatInterface({ chatId, onBack, onClose }: ChatInterfaceProps) {
+export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }: ChatInterfaceProps) {
   const { profile } = useAuth();
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -26,11 +28,17 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
   const [error, setError] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [newMessageReceived, setNewMessageReceived] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false);
+  const [isChatActive, setIsChatActive] = useState(true); // Controla se o chat está ativo/visível
+  
+  // Usar refs para armazenar as funções de callback e evitar recriações
+  const handleNewMessageRef = useRef<(message: Message) => void>();
+  const handleChatUpdateRef = useRef<(updatedChat: any) => void>();
 
   // Auto-scroll para a última mensagem (apenas para novas mensagens)
   const scrollToBottom = () => {
@@ -58,11 +66,17 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
 
   // Marcar mensagens como lidas quando o usuário realmente visualiza o chat
   const markMessagesAsReadWhenViewed = async () => {
-    if (!hasMarkedAsRead && messages.length > 0) {
+    if (!hasMarkedAsRead && messages.length > 0 && isChatActive) {
       try {
+        console.log('📖 Marcando mensagens como lidas para o chat:', chatId);
         await markMessagesAsRead(chatId);
         setHasMarkedAsRead(true);
         console.log('✅ Mensagens marcadas como lidas após visualização');
+        
+        // Notificar a lista de chats para atualizar o contador
+        if (onChatUpdate) {
+          onChatUpdate(chatId);
+        }
       } catch (error) {
         console.error('❌ Erro ao marcar mensagens como lidas:', error);
       }
@@ -71,15 +85,57 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
 
   // Handler para interação do usuário com o chat
   const handleUserInteraction = () => {
-    if (!hasMarkedAsRead) {
+    if (!hasMarkedAsRead && isChatActive) {
       markMessagesAsReadWhenViewed();
     }
   };
 
-  // Apenas scroll suave para novas mensagens (não para carregamento inicial)
+  // Detectar quando o chat se torna ativo/inativo
   useEffect(() => {
-    if (!isInitialLoad) {
-      scrollToBottom();
+    const handleVisibilityChange = () => {
+      const isVisible = !document.hidden;
+      setIsChatActive(isVisible);
+      
+      // Se o chat se tornou visível e há mensagens não lidas, marcá-las como lidas
+      if (isVisible && !hasMarkedAsRead && messages.length > 0) {
+        setTimeout(() => {
+          markMessagesAsReadWhenViewed();
+        }, 500);
+      }
+    };
+
+    const handleFocus = () => {
+      setIsChatActive(true);
+      if (!hasMarkedAsRead && messages.length > 0) {
+        setTimeout(() => {
+          markMessagesAsReadWhenViewed();
+        }, 500);
+      }
+    };
+
+    const handleBlur = () => {
+      setIsChatActive(false);
+    };
+
+    // Adicionar event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [hasMarkedAsRead, messages.length, chatId, onChatUpdate]);
+
+  // Scroll suave para novas mensagens (não para carregamento inicial)
+  useEffect(() => {
+    if (!isInitialLoad && messages.length > 0) {
+      // Pequeno delay para garantir que a mensagem foi renderizada
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
     }
   }, [messages, isInitialLoad]);
 
@@ -89,10 +145,10 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
       positionAtBottom();
       setIsInitialLoad(false);
       
-      // Marcar como lidas após um pequeno delay para garantir que o usuário viu as mensagens
+      // Marcar como lidas imediatamente quando o chat é carregado
       setTimeout(() => {
         markMessagesAsReadWhenViewed();
-      }, 1000);
+      }, 500);
     }
   }, [loading, messages.length, isInitialLoad]);
 
@@ -133,7 +189,7 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
         messagesContainer.removeEventListener('keydown', handleKeyPress);
       }
     };
-  }, [hasMarkedAsRead]); // Só recriar quando hasMarkedAsRead mudar
+  }, [hasMarkedAsRead, isChatActive]); // Adicionar isChatActive como dependência
 
   // Detectar tecla ESC para fechar o chat e marcar mensagens como lidas
   useEffect(() => {
@@ -150,7 +206,7 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose, hasMarkedAsRead]);
+  }, [onClose, hasMarkedAsRead, isChatActive]);
 
   // Função para agrupar mensagens por data
   const groupMessagesByDate = (messages: Message[]): GroupedMessages[] => {
@@ -215,7 +271,12 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
         // Carregar mensagens do chat
         const messagesResult = await getChatMessages(chatId);
         if (messagesResult.success && messagesResult.data) {
-          setMessages(messagesResult.data);
+          // Adicionar chaves únicas para todas as mensagens carregadas
+          const messagesWithUniqueKeys = messagesResult.data.map(message => ({
+            ...message,
+            _uniqueKey: `${message.id}-${Date.now()}-${Math.random()}`
+          }));
+          setMessages(messagesWithUniqueKeys);
         } else {
           setError(messagesResult.error || 'Erro ao carregar mensagens');
           return;
@@ -266,7 +327,13 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
       const result = await sendMessage(chatId, newMessage.trim());
       
       if (result.success && result.data) {
-        setMessages(prev => [...prev, result.data!]);
+        // Criar uma nova mensagem com timestamp único para evitar conflitos de key
+        const newMessage = {
+          ...result.data,
+          _uniqueKey: `${result.data.id}-${Date.now()}-${Math.random()}`
+        };
+        
+        setMessages(prev => [...prev, newMessage]);
         setNewMessage('');
         // Marcar mensagens como lidas quando o usuário envia uma mensagem
         handleUserInteraction();
@@ -294,6 +361,95 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
       minute: '2-digit' 
     });
   };
+
+  // Função para lidar com nova mensagem em tempo real
+  const handleNewMessage = useCallback((message: Message) => {
+    console.log('💬 Nova mensagem recebida no ChatInterface:', message);
+    console.log('🔍 ChatId atual no ChatInterface:', chatId);
+    console.log('🔍 Mensagem chat_id:', message.chat_id);
+    console.log('🔍 Chat ativo:', isChatActive);
+    
+    // Só adicionar a mensagem se ela pertence ao chat atual
+    if (message.chat_id === chatId) {
+      setMessages(prevMessages => {
+        // Verificar se a mensagem já existe para evitar duplicatas
+        const messageExists = prevMessages.some(m => m.id === message.id);
+        if (!messageExists) {
+          console.log('✅ Adicionando nova mensagem ao chat:', message.content);
+          
+          // Criar uma nova mensagem com timestamp único para evitar conflitos de key
+          const newMessage = {
+            ...message,
+            _uniqueKey: `${message.id}-${Date.now()}-${Math.random()}`
+          };
+          
+          // Ordenar mensagens por data de criação
+          const updatedMessages = [...prevMessages, newMessage].sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          
+          // Mostrar indicador de nova mensagem se não for do psicólogo atual
+          if (message.sender_type === 'app_user') {
+            setNewMessageReceived(true);
+            // Esconder o indicador após 3 segundos
+            setTimeout(() => setNewMessageReceived(false), 3000);
+          }
+          
+          return updatedMessages;
+        }
+        console.log('⚠️ Mensagem já existe, ignorando duplicata:', message.id);
+        return prevMessages;
+      });
+      
+      // Se a mensagem é do usuário e o chat está ativo, marcar como lida automaticamente
+      if (message.sender_type === 'app_user' && isChatActive) {
+        console.log('📖 Marcando nova mensagem como lida automaticamente (chat ativo)');
+        setTimeout(async () => {
+          try {
+            await markMessagesAsRead(chatId);
+            setHasMarkedAsRead(true);
+            console.log('✅ Nova mensagem marcada como lida automaticamente');
+            
+            // Notificar a lista de chats para atualizar o contador
+            if (onChatUpdate) {
+              onChatUpdate(chatId);
+            }
+          } catch (error) {
+            console.error('❌ Erro ao marcar nova mensagem como lida:', error);
+          }
+        }, 1000); // Pequeno delay para garantir que a mensagem foi processada
+      }
+    }
+  }, [chatId, isChatActive, onChatUpdate]);
+
+  // Atualizar as refs quando as funções mudam
+  useEffect(() => {
+    handleNewMessageRef.current = handleNewMessage;
+  }, [handleNewMessage]);
+
+  // Função para lidar com atualização de chat em tempo real
+  const handleChatUpdate = useCallback((updatedChat: any) => {
+    console.log('🔄 Chat atualizado no ChatInterface:', updatedChat);
+    
+    // Atualizar informações do chat se for o chat atual
+    if (updatedChat.id === chatId) {
+      setChatInfo(prev => prev ? { ...prev, ...updatedChat } : null);
+    }
+  }, [chatId]);
+
+  // Atualizar as refs quando as funções mudam
+  useEffect(() => {
+    handleChatUpdateRef.current = handleChatUpdate;
+  }, [handleChatUpdate]);
+
+  // Configurar tempo real para este chat específico
+  useChatRealtime({
+    onNewMessage: (message: Message) => handleNewMessageRef.current?.(message),
+    onChatUpdate: (updatedChat: any) => handleChatUpdateRef.current?.(updatedChat),
+    onChatCreated: () => {}, // Adicionar handlers vazios para evitar warnings
+    onChatDeleted: () => {},
+    chatId: chatId
+  });
 
   if (loading) {
     return (
@@ -394,12 +550,18 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
       {/* Área de mensagens - com altura fixa e scroll independente */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-gray-50 to-white custom-scrollbar chat-messages-container" 
+        className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-gray-50 to-white custom-scrollbar chat-messages-container relative" 
         style={{ 
           maxHeight: 'calc(100vh - 280px)',
           scrollBehavior: isInitialLoad ? 'auto' : 'smooth'
         }}
       >
+        {/* Indicador de nova mensagem */}
+        {newMessageReceived && (
+          <div className="absolute top-4 right-4 z-10 bg-green-500 text-white px-3 py-2 rounded-full text-sm font-medium shadow-lg animate-bounce">
+            💬 Nova mensagem!
+          </div>
+        )}
         {groupedMessages.map((group) => (
           <div key={group.date} className="space-y-4">
             {/* Separador de data */}
@@ -412,7 +574,7 @@ export default function ChatInterface({ chatId, onBack, onClose }: ChatInterface
             {/* Mensagens do grupo */}
             {group.messages.map((message) => (
               <div
-                key={message.id}
+                key={message._uniqueKey || message.id}
                 className={`flex ${message.sender_type === 'psicologo' ? 'justify-end' : 'justify-start'} message-enter`}
               >
                 <div className={`relative max-w-xs lg:max-w-md xl:max-w-lg ${
