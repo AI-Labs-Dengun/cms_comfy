@@ -6,6 +6,7 @@ import ChatInterface from '@/components/ChatInterface';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
 import { getChats, updateChatStatus, Chat as ChatType, getChatInfo, Message } from '@/services/chat';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
+import { supabase } from '@/lib/supabase';
 
 // Tipos para os chats
 interface Chat extends ChatType {
@@ -34,39 +35,69 @@ export default function PsicologosPage() {
   // Função para atualizar um chat específico na lista
   const updateChatInList = useCallback(async (chatId: string) => {
     try {
-      const result = await getChatInfo(chatId);
-      if (result.success && result.data) {
-        // Como getChatInfo retorna ChatInfo, precisamos buscar o chat completo
-        const fullChatResult = await getChats();
-        if (fullChatResult.success && fullChatResult.data) {
-          const fullChat = fullChatResult.data.find(chat => chat.id === chatId);
-          if (fullChat) {
-            // Sanitizar os dados do chat
-            const sanitizedChat = {
-              ...fullChat,
-              unread_count_psicologo: Number(fullChat.unread_count_psicologo) || 0,
-              masked_user_name: fullChat.masked_user_name || 'Utilizador',
-              last_message_at: fullChat.last_message_at || new Date().toISOString(),
-              last_message_content: fullChat.last_message_content || '',
-              last_message_sender_type: fullChat.last_message_sender_type || 'app_user',
-              status: fullChat.status || 'novo_chat',
-              is_active: fullChat.is_active !== undefined ? fullChat.is_active : true
-            };
-            
-            setChats(prevChats => {
-              const existingIndex = prevChats.findIndex(chat => chat.id === chatId);
-              if (existingIndex >= 0) {
-                // Atualizar chat existente
-                const updatedChats = [...prevChats];
-                updatedChats[existingIndex] = sanitizedChat;
-                return updatedChats;
-              } else {
-                // Adicionar novo chat
-                return [...prevChats, sanitizedChat];
-              }
-            });
-          }
+      console.log('🔄 Atualizando chat na lista:', chatId);
+      
+      // Buscar a última mensagem diretamente da tabela de mensagens
+      const { data: lastMessage, error: messageError } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('chat_id', chatId)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (messageError && messageError.code !== 'PGRST116') {
+        console.error('❌ Erro ao buscar última mensagem:', messageError);
+      }
+
+      // Buscar o chat completo
+      const fullChatResult = await getChats();
+      if (fullChatResult.success && fullChatResult.data) {
+        const fullChat = fullChatResult.data.find(chat => chat.id === chatId);
+        if (fullChat) {
+          console.log('📊 Chat encontrado:', fullChat);
+          console.log('📝 Última mensagem encontrada:', lastMessage);
+          
+          // Sanitizar os dados do chat
+          const sanitizedChat = {
+            ...fullChat,
+            unread_count_psicologo: Number(fullChat.unread_count_psicologo) || 0,
+            masked_user_name: fullChat.masked_user_name || 'Utilizador',
+            last_message_at: lastMessage ? lastMessage.created_at : (fullChat.last_message_at || new Date().toISOString()),
+            last_message_content: lastMessage ? lastMessage.content : (fullChat.last_message_content || ''),
+            last_message_sender_type: lastMessage ? lastMessage.sender_type : (fullChat.last_message_sender_type || 'app_user'),
+            last_message_sender_name: lastMessage ? (lastMessage.sender_type === 'psicologo' ? 'Você' : fullChat.masked_user_name) : (fullChat.last_message_sender_name || (fullChat.last_message_sender_type === 'psicologo' ? 'Você' : fullChat.masked_user_name)),
+            status: fullChat.status || 'novo_chat',
+            is_active: fullChat.is_active !== undefined ? fullChat.is_active : true
+          };
+          
+          console.log('📝 Chat sanitizado com última mensagem:', {
+            id: sanitizedChat.id,
+            last_message_content: sanitizedChat.last_message_content,
+            last_message_at: sanitizedChat.last_message_at,
+            sender: sanitizedChat.last_message_sender_name
+          });
+          
+          setChats(prevChats => {
+            const existingIndex = prevChats.findIndex(chat => chat.id === chatId);
+            if (existingIndex >= 0) {
+              // Atualizar chat existente
+              const updatedChats = [...prevChats];
+              updatedChats[existingIndex] = sanitizedChat;
+              console.log('✅ Chat atualizado na lista:', chatId, 'com última mensagem:', sanitizedChat.last_message_content);
+              return updatedChats;
+            } else {
+              // Adicionar novo chat
+              console.log('➕ Novo chat adicionado à lista:', chatId);
+              return [...prevChats, sanitizedChat];
+            }
+          });
+        } else {
+          console.log('❌ Chat não encontrado:', chatId);
         }
+      } else {
+        console.error('❌ Erro ao buscar chats:', fullChatResult.error);
       }
     } catch (error) {
       console.error('Erro ao atualizar chat na lista:', error);
@@ -80,6 +111,46 @@ export default function PsicologosPage() {
     
     // Atualizar o chat correspondente à mensagem
     if (message.chat_id) {
+      console.log('🔄 Atualizando chat', message.chat_id, 'com nova mensagem:', message.content);
+      
+      // Atualizar imediatamente o chat na lista com a nova mensagem
+      setChats(prevChats => {
+        const chatIndex = prevChats.findIndex(c => c.id === message.chat_id);
+        if (chatIndex >= 0) {
+          const updatedChats = [...prevChats];
+          const chat = updatedChats[chatIndex];
+          
+          console.log('📝 Chat atual antes da atualização:', {
+            id: chat.id,
+            last_message_content: chat.last_message_content,
+            last_message_at: chat.last_message_at
+          });
+          
+          // Atualizar o chat com a nova mensagem
+          updatedChats[chatIndex] = {
+            ...chat,
+            last_message_at: message.created_at,
+            last_message_content: message.content,
+            last_message_sender_type: message.sender_type,
+            last_message_sender_name: message.sender_type === 'psicologo' ? 'Você' : chat.masked_user_name,
+            unread_count_psicologo: message.sender_type === 'app_user' 
+              ? (chat.unread_count_psicologo || 0) + 1 
+              : chat.unread_count_psicologo || 0
+          };
+          
+          console.log('✅ Chat atualizado com nova mensagem:', {
+            id: updatedChats[chatIndex].id,
+            last_message_content: updatedChats[chatIndex].last_message_content,
+            last_message_at: updatedChats[chatIndex].last_message_at,
+            sender: updatedChats[chatIndex].last_message_sender_name
+          });
+          
+          return updatedChats;
+        }
+        return prevChats;
+      });
+      
+      // Também atualizar via API para garantir sincronização
       await updateChatInList(message.chat_id);
       
       // Mostrar notificação sutil se a mensagem não for do psicólogo atual
@@ -121,9 +192,12 @@ export default function PsicologosPage() {
       last_message_at: updatedChat.last_message_at || new Date().toISOString(),
       last_message_content: updatedChat.last_message_content || '',
       last_message_sender_type: updatedChat.last_message_sender_type || 'app_user',
+      last_message_sender_name: updatedChat.last_message_sender_name || (updatedChat.last_message_sender_type === 'psicologo' ? 'Você' : updatedChat.masked_user_name),
       status: updatedChat.status || 'novo_chat',
       is_active: updatedChat.is_active !== undefined ? updatedChat.is_active : true
     };
+    
+    console.log('📝 Chat sanitizado:', sanitizedChat);
     
     // Marcar chat como recentemente atualizado
     setRecentlyUpdatedChats(prev => new Set([...prev, sanitizedChat.id]));
@@ -133,6 +207,7 @@ export default function PsicologosPage() {
       if (existingIndex >= 0) {
         const updatedChats = [...prevChats];
         updatedChats[existingIndex] = sanitizedChat;
+        console.log('✅ Chat atualizado na lista:', sanitizedChat.id, 'com última mensagem:', sanitizedChat.last_message_content);
         return updatedChats;
       }
       return prevChats;
@@ -209,12 +284,31 @@ export default function PsicologosPage() {
         setLoading(true);
         setError(null);
 
+        console.log('🔄 Carregando chats...');
         const result = await getChats();
         
         if (result.success) {
+          console.log('✅ Chats carregados com sucesso:', result.data?.length || 0);
+          console.log('📊 Dados dos chats:', result.data);
+          
+          // Verificar se os chats têm last_message_content
+          if (result.data) {
+            result.data.forEach((chat, index) => {
+              console.log(`Chat ${index + 1}:`, {
+                id: chat.id,
+                name: chat.masked_user_name,
+                last_message_content: chat.last_message_content,
+                last_message_at: chat.last_message_at,
+                last_message_sender_type: chat.last_message_sender_type,
+                last_message_sender_name: chat.last_message_sender_name
+              });
+            });
+          }
+          
           // Garantir que sempre temos um array, mesmo que vazio
           setChats(result.data || []);
         } else {
+          console.error('❌ Erro ao carregar chats:', result.error);
           // Se o erro for sobre tabela não existir, mostrar mensagem específica
           if (result.error && result.error.includes('relation') && result.error.includes('does not exist')) {
             setError('Sistema de chat ainda não foi configurado. Entre em contacto com o administrador.');
@@ -534,7 +628,7 @@ export default function PsicologosPage() {
                           </div>
                         </div>
                       
-                      {chat.last_message_content && (
+                      {(chat.last_message_content && chat.last_message_content.trim() !== '') ? (
                         <div className="mb-3">
                           <p className="text-sm text-gray-600 line-clamp-2">
                             <span className={`font-medium ${
@@ -547,6 +641,12 @@ export default function PsicologosPage() {
                             <span className="text-gray-600 ml-1">
                               {chat.last_message_content}
                             </span>
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="mb-3">
+                          <p className="text-sm text-gray-400 italic">
+                            Nenhuma mensagem ainda
                           </p>
                         </div>
                       )}
