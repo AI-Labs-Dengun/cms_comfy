@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Chat, Message } from '@/services/chat';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface UseChatRealtimeProps {
   onChatUpdate?: (updatedChat: Chat) => void;
@@ -15,7 +16,7 @@ export function useChatRealtime({
   onChatCreated,
   onChatDeleted
 }: UseChatRealtimeProps = {}) {
-  const subscriptionsRef = useRef<any[]>([]);
+  const subscriptionsRef = useRef<RealtimeChannel[]>([]);
 
   useEffect(() => {
     // Configurar subscription para atualizações de chats
