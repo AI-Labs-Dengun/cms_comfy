@@ -130,6 +130,9 @@ export default function PsicologosPage() {
     if (message.chat_id) {
       console.log('🔄 Atualizando chat', message.chat_id, 'com nova mensagem:', message.content);
       
+      // Verificar se o chat está selecionado (aberto)
+      const isChatSelected = selectedChat?.id === message.chat_id;
+      
       // Atualizar imediatamente o chat na lista com a nova mensagem
       setChats(prevChats => {
         const chatIndex = prevChats.findIndex(c => c.id === message.chat_id);
@@ -140,25 +143,34 @@ export default function PsicologosPage() {
           console.log('📝 Chat atual antes da atualização:', {
             id: chat.id,
             last_message_content: chat.last_message_content,
-            last_message_at: chat.last_message_at
+            last_message_at: chat.last_message_at,
+            isSelected: isChatSelected
           });
           
-          // Atualizar o chat com a nova mensagem (sem alterar unread_count_psicologo aqui)
+          // Se o chat está selecionado (aberto), não incrementar o contador de não lidas
+          const newUnreadCount = isChatSelected && message.sender_type === 'app_user' 
+            ? (chat.unread_count_psicologo || 0) 
+            : message.sender_type === 'app_user' 
+              ? (chat.unread_count_psicologo || 0) + 1 
+              : (chat.unread_count_psicologo || 0);
+          
+          // Atualizar o chat com a nova mensagem
           updatedChats[chatIndex] = {
             ...chat,
             last_message_at: message.created_at,
             last_message_content: message.content,
             last_message_sender_type: message.sender_type,
             last_message_sender_name: message.sender_type === 'psicologo' ? 'Você' : chat.masked_user_name,
-            // NÃO incrementar unread_count_psicologo aqui - será atualizado via API
-            unread_count_psicologo: chat.unread_count_psicologo || 0
+            unread_count_psicologo: newUnreadCount
           };
           
           console.log('✅ Chat atualizado com nova mensagem:', {
             id: updatedChats[chatIndex].id,
             last_message_content: updatedChats[chatIndex].last_message_content,
             last_message_at: updatedChats[chatIndex].last_message_at,
-            sender: updatedChats[chatIndex].last_message_sender_name
+            sender: updatedChats[chatIndex].last_message_sender_name,
+            unread_count: updatedChats[chatIndex].unread_count_psicologo,
+            isSelected: isChatSelected
           });
           
           return updatedChats;
@@ -166,11 +178,13 @@ export default function PsicologosPage() {
         return prevChats;
       });
       
-      // Atualizar via API para obter o unread_count_psicologo correto da base de dados
-      await updateChatInList(message.chat_id);
+      // Se o chat não está selecionado, atualizar via API para obter o contador correto
+      if (!isChatSelected) {
+        await updateChatInList(message.chat_id);
+      }
       
-      // Mostrar notificação sutil se a mensagem não for do psicólogo atual
-      if (message.sender_type === 'app_user') {
+      // Mostrar notificação sutil se a mensagem não for do psicólogo atual e o chat não estiver aberto
+      if (message.sender_type === 'app_user' && !isChatSelected) {
         // Encontrar o chat na lista para mostrar o nome do usuário
         const chat = chats.find(c => c.id === message.chat_id);
         if (chat) {
@@ -193,7 +207,7 @@ export default function PsicologosPage() {
     
     // Resetar o indicador após 3 segundos
     setTimeout(() => setIsRealtimeActive(false), 3000);
-  }, [updateChatInList, chats]);
+  }, [updateChatInList, chats, selectedChat]);
 
   // Função para lidar com atualização de chat
   const handleChatUpdate = useCallback(async (updatedChat: Chat) => {
@@ -403,13 +417,24 @@ export default function PsicologosPage() {
     }
   }, []);
 
+  // Marcar mensagens como lidas quando um chat é selecionado
+  useEffect(() => {
+    if (selectedChat && selectedChat.unread_count_psicologo && selectedChat.unread_count_psicologo > 0) {
+      console.log('📖 Chat selecionado tem mensagens não lidas, marcando como lidas...');
+      // O ChatInterface irá marcar as mensagens como lidas automaticamente
+    }
+  }, [selectedChat]);
+
   // Atualizar contadores de mensagens não lidas periodicamente
   useEffect(() => {
     const updateUnreadCounts = async () => {
       if (chats.length > 0) {
         console.log('🔄 Atualizando contadores de mensagens não lidas...');
         for (const chat of chats) {
-          await updateChatInList(chat.id);
+          // Não atualizar o chat selecionado aqui, pois ele será atualizado pelo ChatInterface
+          if (chat.id !== selectedChat?.id) {
+            await updateChatInList(chat.id);
+          }
         }
       }
     };
@@ -418,7 +443,7 @@ export default function PsicologosPage() {
     const interval = setInterval(updateUnreadCounts, 30000);
 
     return () => clearInterval(interval);
-  }, [chats.length, updateChatInList]);
+  }, [chats.length, updateChatInList, selectedChat]);
 
   // Função para formatar data
   const formatDate = (dateString: string) => {
@@ -465,11 +490,27 @@ export default function PsicologosPage() {
     setSelectedChat(chat);
     setShowChatList(false);
     
-    // Atualizar o contador de mensagens não lidas para este chat
-    // (será atualizado quando o ChatInterface marcar as mensagens como lidas)
-    setTimeout(async () => {
-      await updateChatInList(chat.id);
-    }, 1000);
+    // Marcar mensagens como lidas imediatamente quando o chat é selecionado
+    if (chat.unread_count_psicologo && chat.unread_count_psicologo > 0) {
+      console.log('📖 Marcando mensagens como lidas ao selecionar chat:', chat.id);
+      try {
+        // Atualizar o chat na lista imediatamente para refletir que não há mais mensagens não lidas
+        setChats(prevChats => 
+          prevChats.map(c => 
+            c.id === chat.id 
+              ? { ...c, unread_count_psicologo: 0 }
+              : c
+          )
+        );
+        
+        // Chamar a API para marcar como lidas no banco de dados
+        setTimeout(async () => {
+          await updateChatInList(chat.id);
+        }, 500);
+      } catch (error) {
+        console.error('❌ Erro ao marcar mensagens como lidas ao selecionar chat:', error);
+      }
+    }
   };
 
   // Função para voltar à lista de chats (mobile)
@@ -479,9 +520,14 @@ export default function PsicologosPage() {
 
   // Função para sair do chat (limpar seleção)
   const handleCloseChat = async () => {
-    // Se havia um chat selecionado, atualizar o contador de mensagens não lidas
+    // Se havia um chat selecionado, garantir que as mensagens foram marcadas como lidas
     if (selectedChat) {
-      await updateChatInList(selectedChat.id);
+      console.log('📖 Fechando chat, garantindo que mensagens foram marcadas como lidas:', selectedChat.id);
+      try {
+        await updateChatInList(selectedChat.id);
+      } catch (error) {
+        console.error('❌ Erro ao atualizar chat ao fechar:', error);
+      }
     }
     setSelectedChat(null);
     setShowChatList(true);
@@ -586,7 +632,7 @@ export default function PsicologosPage() {
                     isRealtimeActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'
                   }`}></div>
                   <span className="text-xs text-gray-400">
-                    {isRealtimeActive ? 'Ativo' : 'Online'}
+                    {isRealtimeActive ? 'Atualizando...' : 'Online'}
                   </span>
                 </div>
               </div>
@@ -777,6 +823,7 @@ export default function PsicologosPage() {
             chatId={selectedChat.id} 
             onBack={handleBackToList}
             onClose={handleCloseChat}
+            onChatUpdate={updateChatInList}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
