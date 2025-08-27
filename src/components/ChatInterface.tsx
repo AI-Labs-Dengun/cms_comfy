@@ -11,6 +11,9 @@ interface ChatInterfaceProps {
   onBack?: () => void;
   onClose?: () => void;
   onChatUpdate?: (chatId: string) => void; // Callback para atualizar a lista de chats
+  onNewMessageReceived?: (message: Message) => void; // Callback para quando uma nova mensagem é recebida
+  showNewMessageIndicator?: boolean; // Prop para controlar o indicador de nova mensagem
+  messages?: Message[]; // Prop para receber mensagens da página pai
 }
 
 // Interface para mensagens agrupadas
@@ -20,7 +23,7 @@ interface GroupedMessages {
   messages: Message[];
 }
 
-export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }: ChatInterfaceProps) {
+export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, onNewMessageReceived, showNewMessageIndicator = true, messages: externalMessages }: ChatInterfaceProps) {
   const { profile } = useAuth();
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -28,7 +31,6 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
   const [error, setError] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [newMessageReceived, setNewMessageReceived] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -242,9 +244,9 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
         const messagesResult = await getChatMessages(chatId);
         if (messagesResult.success && messagesResult.data) {
           // Adicionar chaves únicas para todas as mensagens carregadas
-          const messagesWithUniqueKeys = messagesResult.data.map(message => ({
+          const messagesWithUniqueKeys = messagesResult.data.map((message, index) => ({
             ...message,
-            _uniqueKey: `${message.id}-${Date.now()}-${Math.random()}`
+            _uniqueKey: `${message.id}-${message.created_at}-${index}`
           }));
           setMessages(messagesWithUniqueKeys);
         } else {
@@ -294,25 +296,49 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
     try {
       setSending(true);
       
+      // Criar uma mensagem temporária para exibir imediatamente
+      const tempMessage: Message = {
+        id: `temp-${Date.now()}`,
+        chat_id: chatId,
+        sender_id: profile?.id || '',
+        sender_type: 'psicologo',
+        content: newMessage.trim(),
+        created_at: new Date().toISOString(),
+        is_read: false,
+        is_deleted: false,
+        _uniqueKey: `temp-${Date.now()}-${Math.random()}`
+      };
+
+      // Adicionar a mensagem temporária ao estado local imediatamente
+      setMessages(prevMessages => [...prevMessages, tempMessage]);
+      
+      // Limpar o campo de entrada
+      setNewMessage('');
+      
+      // Scroll suave para a nova mensagem enviada
+      setTimeout(() => {
+        scrollToBottom();
+      }, 50);
+      
+      // Marcar mensagens como lidas quando o usuário envia uma mensagem
+      handleUserInteraction();
+      
       const result = await sendMessage(chatId, newMessage.trim());
       
       if (result.success && result.data) {
-        // Criar uma nova mensagem com timestamp único para evitar conflitos de key
-        const newMessage = {
-          ...result.data,
-          _uniqueKey: `${result.data.id}-${Date.now()}-${Math.random()}`
-        };
-        
-        setMessages(prev => [...prev, newMessage]);
-        setNewMessage('');
-        // Marcar mensagens como lidas quando o usuário envia uma mensagem
-        handleUserInteraction();
-        // Scroll suave para a nova mensagem enviada
-        setTimeout(() => {
-          scrollToBottom();
-        }, 50);
+        // Substituir a mensagem temporária pela mensagem real do servidor
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === tempMessage.id 
+              ? { ...result.data!, _uniqueKey: `${result.data!.id}-${result.data!.created_at}-${Math.random()}` }
+              : msg
+          )
+        );
       } else {
         console.error('Erro ao enviar mensagem:', result.error);
+        // Remover a mensagem temporária se houve erro
+        setMessages(prevMessages => prevMessages.filter(msg => msg.id !== tempMessage.id));
+        alert('Erro ao enviar mensagem. Tente novamente.');
       }
 
     } catch (error) {
@@ -323,7 +349,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
     }
   };
 
-  // Formatar hora da mensagem
+  // Função para formatar hora da mensagem
   const formatMessageTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('pt-BR', { 
@@ -339,18 +365,24 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
     console.log('🔍 Mensagem chat_id:', message.chat_id);
     console.log('🔍 Chat ativo:', isChatActive);
     
-    // Só adicionar a mensagem se ela pertence ao chat atual
+    // Só processar a mensagem se ela pertence ao chat atual
     if (message.chat_id === chatId) {
+      // Adicionar a mensagem ao estado local do ChatInterface
       setMessages(prevMessages => {
         // Verificar se a mensagem já existe para evitar duplicatas
-        const messageExists = prevMessages.some(m => m.id === message.id);
+        const messageExists = prevMessages.some(m => 
+          m.id === message.id && 
+          m.created_at === message.created_at &&
+          m.content === message.content
+        );
+        
         if (!messageExists) {
-          console.log('✅ Adicionando nova mensagem ao chat:', message.content);
+          console.log('✅ Adicionando nova mensagem ao ChatInterface:', message.content);
           
-          // Criar uma nova mensagem com timestamp único para evitar conflitos de key
+          // Criar uma nova mensagem com chave única
           const newMessage = {
             ...message,
-            _uniqueKey: `${message.id}-${Date.now()}-${Math.random()}`
+            _uniqueKey: `${message.id}-${message.created_at}-${message.content?.substring(0, 10)}-${prevMessages.length}`
           };
           
           // Ordenar mensagens por data de criação
@@ -358,18 +390,16 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
             (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
           );
           
-          // Mostrar indicador de nova mensagem se não for do psicólogo atual
-          if (message.sender_type === 'app_user') {
-            setNewMessageReceived(true);
-            // Esconder o indicador após 3 segundos
-            setTimeout(() => setNewMessageReceived(false), 3000);
-          }
-          
           return updatedMessages;
         }
-        console.log('⚠️ Mensagem já existe, ignorando duplicata:', message.id);
+        console.log('⚠️ Mensagem já existe no ChatInterface, ignorando duplicata:', message.id);
         return prevMessages;
       });
+      
+      // Usar a prop para processar a mensagem na página pai
+      if (onNewMessageReceived) {
+        onNewMessageReceived(message);
+      }
       
       // Se a mensagem é do usuário e o chat está ativo, marcar como lida automaticamente
       if (message.sender_type === 'app_user' && isChatActive) {
@@ -390,7 +420,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
         }, 1000); // Pequeno delay para garantir que a mensagem foi processada
       }
     }
-  }, [chatId, isChatActive, onChatUpdate]);
+  }, [chatId, isChatActive, onChatUpdate, onNewMessageReceived]);
 
   // Atualizar as refs quando as funções mudam
   useEffect(() => {
@@ -419,6 +449,36 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
     onChatCreated: () => {}, // Adicionar handlers vazios para evitar warnings
     onChatDeleted: () => {},
     chatId: chatId
+  });
+
+  // Usar mensagens externas se fornecidas, senão usar estado local
+  // Combinar mensagens externas com mensagens locais para garantir que mensagens enviadas sejam exibidas
+  const displayMessages = React.useMemo(() => {
+    if (externalMessages && externalMessages.length > 0) {
+      // Combinar mensagens externas com mensagens locais, removendo duplicatas
+      const allMessages = [...externalMessages, ...messages];
+      const uniqueMessages = allMessages.filter((message, index, self) => 
+        index === self.findIndex(m => 
+          m.id === message.id && 
+          m.created_at === message.created_at &&
+          m.content === message.content
+        )
+      );
+      
+      // Ordenar por data de criação
+      return uniqueMessages.sort((a, b) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+    }
+    return messages;
+  }, [externalMessages, messages]);
+  
+  // Debug: verificar mensagens
+  console.log('🔍 ChatInterface - Mensagens recebidas:', {
+    externalMessages: externalMessages?.length || 0,
+    localMessages: messages.length,
+    displayMessages: displayMessages.length,
+    chatId
   });
 
   if (loading) {
@@ -453,7 +513,17 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
   }
 
   // Agrupar mensagens por data
-  const groupedMessages = groupMessagesByDate(messages);
+  const groupedMessages = groupMessagesByDate(displayMessages);
+  
+  // Debug: verificar mensagens agrupadas
+  console.log('🔍 ChatInterface - Mensagens agrupadas:', {
+    totalGroups: groupedMessages.length,
+    totalMessages: groupedMessages.reduce((sum, group) => sum + group.messages.length, 0),
+    groups: groupedMessages.map(group => ({
+      date: group.dateLabel,
+      messageCount: group.messages.length
+    }))
+  });
 
   return (
     <div className="h-full flex flex-col bg-white chat-interface">
@@ -527,7 +597,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
         }}
       >
         {/* Indicador de nova mensagem */}
-        {newMessageReceived && (
+        {showNewMessageIndicator && (
           <div className="absolute top-4 right-4 z-10 bg-green-500 text-white px-3 py-2 rounded-full text-sm font-medium shadow-lg animate-bounce">
             💬 Nova mensagem!
           </div>
@@ -544,10 +614,10 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
             {/* Mensagens do grupo */}
             {group.messages.map((message) => (
               <div
-                key={message.id}
+                key={message._uniqueKey || message.id}
                 className={`flex ${message.sender_type === 'psicologo' ? 'justify-end' : 'justify-start'} message-enter`}
               >
-                <div className={`relative max-w-xs lg:max-w-md xl:max-w-lg ${
+                <div className={`relative max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl 2xl:max-w-2xl ${
                   message.sender_type === 'psicologo' ? 'order-2' : 'order-1'
                 }`}>
                   <div
@@ -557,7 +627,19 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
                         : 'bg-white text-gray-900 border border-gray-200'
                     }`}
                   >
-                    <p className="text-sm leading-relaxed">{message.content}</p>
+                    {/* 
+                      Melhorias implementadas para quebra de texto:
+                      - whitespace-pre-wrap: preserva quebras de linha do texto original
+                      - word-wrap: break-word: quebra palavras longas quando necessário
+                      - word-break: break-word: quebra palavras em qualquer lugar se necessário
+                      - overflow-wrap: break-word: quebra palavras para evitar overflow
+                      - hyphens: auto: adiciona hífens quando apropriado
+                      - line-height: 1.5: espaçamento adequado entre linhas
+                      - max-width: 100%: garante que não ultrapasse o container
+                    */}
+                    <div className="message-content text-sm">
+                      {message.content}
+                    </div>
                     <p
                       className={`text-xs mt-2 ${
                         message.sender_type === 'psicologo' ? 'text-blue-100' : 'text-gray-400'
@@ -594,7 +676,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Digite sua mensagem..."
-              className="w-full border border-gray-300 rounded-2xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all duration-200 text-black"
+              className="w-full border border-gray-300 rounded-2xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all duration-200 text-black message-content"
               rows={3}
               disabled={sending}
               onKeyDown={(e) => {
@@ -602,6 +684,11 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate }:
                   e.preventDefault();
                   handleSendMessage(e);
                 }
+              }}
+              style={{
+                wordWrap: 'break-word',
+                wordBreak: 'break-word',
+                overflowWrap: 'break-word'
               }}
             />
             
