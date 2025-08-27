@@ -4,8 +4,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ChatInterface from '@/components/ChatInterface';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
-import { getChats, updateChatStatus, Chat as ChatType, Message } from '@/services/chat';
+import { getChats, updateChatStatus, Chat as ChatType, Message, getChatMessages } from '@/services/chat';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { supabase } from '@/lib/supabase';
 
 // Tipos para os chats
@@ -22,6 +23,11 @@ export default function PsicologosPage() {
   const [activeFilters, setActiveFilters] = useState<ChatStatus[]>([]);
   const [isRealtimeActive, setIsRealtimeActive] = useState(false);
   const [recentlyUpdatedChats, setRecentlyUpdatedChats] = useState<Set<string>>(new Set());
+  const [pageIsVisible, setPageIsVisible] = useState(!document.hidden);
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [selectedChatMessages, setSelectedChatMessages] = useState<Message[]>([]);
+  const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
 
   // Debug temporário - remover depois
   console.log('🔍 PsicologosPage Debug:', {
@@ -31,6 +37,46 @@ export default function PsicologosPage() {
     selectedChat: !!selectedChat,
     showChatList
   });
+
+  // Função para processar novas mensagens no chat selecionado
+  const handleNewMessageInSelectedChat = useCallback((message: Message) => {
+    console.log('💬 Nova mensagem no chat selecionado:', message);
+    
+    setSelectedChatMessages(prevMessages => {
+      // Verificar se a mensagem já existe para evitar duplicatas
+      const messageExists = prevMessages.some(m => 
+        m.id === message.id && 
+        m.created_at === message.created_at &&
+        m.content === message.content
+      );
+      
+      if (!messageExists) {
+        console.log('✅ Adicionando nova mensagem ao chat selecionado:', message.content);
+        
+        // Criar uma nova mensagem com chave única
+        const newMessage = {
+          ...message,
+          _uniqueKey: `${message.id}-${message.created_at}-${message.content?.substring(0, 10)}-${prevMessages.length}`
+        };
+        
+        // Ordenar mensagens por data de criação
+        const updatedMessages = [...prevMessages, newMessage].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        
+        // Mostrar indicador de nova mensagem se não for do psicólogo atual
+        if (message.sender_type === 'app_user') {
+          setShowNewMessageIndicator(true);
+          // Esconder o indicador após 3 segundos
+          setTimeout(() => setShowNewMessageIndicator(false), 3000);
+        }
+        
+        return updatedMessages;
+      }
+      console.log('⚠️ Mensagem já existe no chat selecionado, ignorando duplicata:', message.id);
+      return prevMessages;
+    });
+  }, []);
 
   // Função para atualizar um chat específico na lista
   const updateChatInList = useCallback(async (chatId: string) => {
@@ -122,6 +168,11 @@ export default function PsicologosPage() {
   }, []);
 
   // Função para lidar com nova mensagem
+  // Melhorias implementadas:
+  // 1. Notificações do navegador quando a página está em background
+  // 2. Notificações visuais na interface quando a página está visível mas chat não aberto
+  // 3. Busca direta dos dados do chat na base de dados para garantir informações atualizadas
+  // 4. Detecção de visibilidade da página para otimizar notificações
   const handleNewMessage = useCallback(async (message: Message) => {
     console.log('💬 Nova mensagem recebida:', message);
     setIsRealtimeActive(true);
@@ -181,33 +232,92 @@ export default function PsicologosPage() {
       // Se o chat não está selecionado, atualizar via API para obter o contador correto
       if (!isChatSelected) {
         await updateChatInList(message.chat_id);
+      } else {
+        // Se o chat está selecionado, processar a mensagem no chat selecionado
+        handleNewMessageInSelectedChat(message);
       }
       
       // Mostrar notificação sutil se a mensagem não for do psicólogo atual e o chat não estiver aberto
-      if (message.sender_type === 'app_user' && !isChatSelected) {
-        // Encontrar o chat na lista para mostrar o nome do usuário
-        const chat = chats.find(c => c.id === message.chat_id);
-        if (chat) {
-          // Criar notificação do navegador se permitido
-          if ('Notification' in window && Notification.permission === 'granted') {
-            const userName = chat.masked_user_name || 'Utilizador';
-            const messageContent = message.content || 'Nova mensagem';
-            const preview = messageContent.length > 50 
-              ? messageContent.substring(0, 50) + '...' 
-              : messageContent;
-            
-            new Notification('Nova mensagem', {
-              body: `${userName}: ${preview}`,
-              icon: '/cms-logo.png'
-            });
+      // OU se a página não estiver visível (background)
+      const shouldShowNotification = message.sender_type === 'app_user' && 
+        (!isChatSelected || !pageIsVisible || document.hidden);
+      
+      if (shouldShowNotification) {
+        // Buscar informações do chat diretamente da base de dados para garantir dados atualizados
+        try {
+          const { data: chatData, error: chatError } = await supabase
+            .from('chats')
+            .select('masked_user_name')
+            .eq('id', message.chat_id)
+            .single();
+
+          if (!chatError && chatData) {
+            // Criar notificação do navegador se permitido
+            if ('Notification' in window && Notification.permission === 'granted') {
+              const userName = chatData.masked_user_name || 'Utilizador';
+              const messageContent = message.content || 'Nova mensagem';
+              const preview = messageContent.length > 50 
+                ? messageContent.substring(0, 50) + '...' 
+                : messageContent;
+              
+                             console.log('🔔 Exibindo notificação para chat fechado:', {
+                 userName,
+                 preview,
+                 chatId: message.chat_id,
+                 pageVisible: pageIsVisible
+               });
+               
+               // Notificação do navegador (sempre que possível)
+               new Notification('Nova mensagem', {
+                 body: `${userName}: ${preview}`,
+                 icon: '/cms-logo.png',
+                 tag: `chat-${message.chat_id}`, // Evitar notificações duplicadas
+                 requireInteraction: false,
+                 silent: false
+               });
+
+               // Notificação visual na interface (se a página estiver visível mas chat não aberto)
+               if (pageIsVisible && !isChatSelected) {
+                 setNotificationMessage(`${userName}: ${preview}`);
+                 setShowNotification(true);
+                 
+                 // Esconder a notificação após 5 segundos
+                 setTimeout(() => {
+                   setShowNotification(false);
+                 }, 5000);
+               }
+            } else if ('Notification' in window && Notification.permission === 'default') {
+              // Se a permissão ainda não foi solicitada, solicitar
+              console.log('🔔 Solicitando permissão para notificações...');
+              Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                  // Tentar novamente após obter permissão
+                  const userName = chatData.masked_user_name || 'Utilizador';
+                  const messageContent = message.content || 'Nova mensagem';
+                  const preview = messageContent.length > 50 
+                    ? messageContent.substring(0, 50) + '...' 
+                    : messageContent;
+                  
+                  new Notification('Nova mensagem', {
+                    body: `${userName}: ${preview}`,
+                    icon: '/cms-logo.png',
+                    tag: `chat-${message.chat_id}`,
+                    requireInteraction: false,
+                    silent: false
+                  });
+                }
+              });
+            }
           }
+        } catch (error) {
+          console.error('❌ Erro ao buscar dados do chat para notificação:', error);
         }
       }
     }
     
     // Resetar o indicador após 3 segundos
     setTimeout(() => setIsRealtimeActive(false), 3000);
-  }, [updateChatInList, chats, selectedChat]);
+  }, [updateChatInList, chats, selectedChat, handleNewMessageInSelectedChat]);
 
   // Função para lidar com atualização de chat
   const handleChatUpdate = useCallback(async (updatedChat: Chat) => {
@@ -349,6 +459,26 @@ export default function PsicologosPage() {
     onChatDeleted: handleChatDeleted
   });
 
+  // Configurar detecção de visibilidade da página
+  usePageVisibility({
+    onVisible: () => {
+      console.log('👁️ Página ficou visível - atualizando chats...');
+      setPageIsVisible(true);
+      // Atualizar todos os chats quando a página ficar visível
+      if (chats.length > 0) {
+        chats.forEach(chat => {
+          if (chat.id !== selectedChat?.id) {
+            updateChatInList(chat.id);
+          }
+        });
+      }
+    },
+    onHidden: () => {
+      console.log('👁️ Página ficou oculta');
+      setPageIsVisible(false);
+    }
+  });
+
   // Carregar chats disponíveis
   useEffect(() => {
     const loadChats = async () => {
@@ -412,8 +542,17 @@ export default function PsicologosPage() {
 
   // Solicitar permissão de notificação
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+    if ('Notification' in window) {
+      if (Notification.permission === 'default') {
+        console.log('🔔 Solicitando permissão para notificações...');
+        Notification.requestPermission().then(permission => {
+          console.log('🔔 Permissão de notificação:', permission);
+        });
+      } else if (Notification.permission === 'granted') {
+        console.log('🔔 Notificações já permitidas');
+      } else {
+        console.log('🔔 Notificações bloqueadas pelo usuário');
+      }
     }
   }, []);
 
@@ -490,6 +629,27 @@ export default function PsicologosPage() {
     setSelectedChat(chat);
     setShowChatList(false);
     
+    // Carregar mensagens do chat selecionado
+    try {
+      console.log('📥 Carregando mensagens do chat:', chat.id);
+      const messagesResult = await getChatMessages(chat.id);
+      if (messagesResult.success && messagesResult.data) {
+        // Adicionar chaves únicas para todas as mensagens carregadas
+        const messagesWithUniqueKeys = messagesResult.data.map((message: Message, index: number) => ({
+          ...message,
+          _uniqueKey: `${message.id}-${message.created_at}-${index}`
+        }));
+        setSelectedChatMessages(messagesWithUniqueKeys);
+        console.log('✅ Mensagens carregadas:', messagesWithUniqueKeys.length);
+      } else {
+        console.error('❌ Erro ao carregar mensagens:', messagesResult.error);
+        setSelectedChatMessages([]);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar mensagens do chat:', error);
+      setSelectedChatMessages([]);
+    }
+    
     // Marcar mensagens como lidas imediatamente quando o chat é selecionado
     if (chat.unread_count_psicologo && chat.unread_count_psicologo > 0) {
       console.log('📖 Marcando mensagens como lidas ao selecionar chat:', chat.id);
@@ -530,6 +690,7 @@ export default function PsicologosPage() {
       }
     }
     setSelectedChat(null);
+    setSelectedChatMessages([]); // Limpar mensagens do chat
     setShowChatList(true);
   };
 
@@ -610,7 +771,31 @@ export default function PsicologosPage() {
   }
 
   return (
-    <div className="flex-1 flex bg-gray-50 min-h-0 h-screen">
+    <div className="flex-1 flex bg-gray-50 min-h-0 h-screen relative">
+      {/* Notificação visual para novas mensagens */}
+      {showNotification && (
+        <div className="fixed top-4 right-4 z-50 bg-blue-600 text-white px-6 py-4 rounded-lg shadow-lg max-w-sm animate-in slide-in-from-right duration-300">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">Nova mensagem</p>
+              <p className="text-xs opacity-90 mt-1 line-clamp-2">{notificationMessage}</p>
+            </div>
+            <button
+              onClick={() => setShowNotification(false)}
+              className="flex-shrink-0 text-white opacity-70 hover:opacity-100 transition-opacity"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
       {/* Coluna da lista de chats - visível sempre no desktop, condicional no mobile */}
       <div className={`w-full lg:w-96 lg:flex-shrink-0 bg-white border-r border-gray-200 flex flex-col ${
         showChatList ? 'flex' : 'hidden lg:flex'
@@ -761,7 +946,7 @@ export default function PsicologosPage() {
                       
                       {(chat.last_message_content && chat.last_message_content.trim() !== '') ? (
                         <div className="mb-3">
-                          <p className="text-sm text-gray-600 line-clamp-2">
+                          <p className="text-sm text-gray-600 line-clamp-2 message-content">
                             <span className={`font-medium ${
                               chat.last_message_sender_type === 'psicologo' 
                                 ? 'text-blue-600' 
@@ -824,6 +1009,9 @@ export default function PsicologosPage() {
             onBack={handleBackToList}
             onClose={handleCloseChat}
             onChatUpdate={updateChatInList}
+            onNewMessageReceived={handleNewMessageInSelectedChat}
+            showNewMessageIndicator={showNewMessageIndicator}
+            messages={selectedChatMessages}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
