@@ -46,6 +46,18 @@ export function useChatRealtime({
   useEffect(() => {
     console.log('🚀 useChatRealtime - Configurando subscriptions...');
     console.log('🔍 Verificando configuração do Supabase Realtime...');
+    console.log('🔍 ChatId fornecido:', chatId);
+    
+    // Limpar subscriptions existentes antes de criar novas
+    if (subscriptionsRef.current.length > 0) {
+      console.log('🧹 Limpando subscriptions existentes antes de criar novas...');
+      subscriptionsRef.current.forEach(subscription => {
+        if (subscription) {
+          supabase.removeChannel(subscription);
+        }
+      });
+      subscriptionsRef.current = [];
+    }
     
     // Verificar se o Supabase está configurado corretamente
     if (!supabase) {
