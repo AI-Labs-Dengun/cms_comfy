@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ChatInterface from '@/components/ChatInterface';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
-import { getChats, updateChatStatus, Chat as ChatType, getChatInfo } from '@/services/chat';
+import { getChats, updateChatStatus, Chat as ChatType, getChatInfo, Message } from '@/services/chat';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
 
 // Tipos para os chats
@@ -19,7 +19,6 @@ export default function PsicologosPage() {
   const [error, setError] = useState<string | null>(null);
   const [showChatList, setShowChatList] = useState(true);
   const [activeFilters, setActiveFilters] = useState<ChatStatus[]>([]);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isRealtimeActive, setIsRealtimeActive] = useState(false);
   const [recentlyUpdatedChats, setRecentlyUpdatedChats] = useState<Set<string>>(new Set());
 
@@ -75,9 +74,8 @@ export default function PsicologosPage() {
   }, []);
 
   // Função para lidar com nova mensagem
-  const handleNewMessage = useCallback(async (message: any) => {
+  const handleNewMessage = useCallback(async (message: Message) => {
     console.log('💬 Nova mensagem recebida:', message);
-    setLastUpdate(new Date());
     setIsRealtimeActive(true);
     
     // Atualizar o chat correspondente à mensagem
@@ -113,7 +111,6 @@ export default function PsicologosPage() {
   // Função para lidar com atualização de chat
   const handleChatUpdate = useCallback(async (updatedChat: Chat) => {
     console.log('🔄 Chat atualizado:', updatedChat);
-    setLastUpdate(new Date());
     setIsRealtimeActive(true);
     
     // Garantir que todos os campos obrigatórios estejam presentes
@@ -257,7 +254,6 @@ export default function PsicologosPage() {
   // Função para formatar data
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    const now = new Date();
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
