@@ -443,7 +443,7 @@ export default function PsicologosPage() {
     const interval = setInterval(updateUnreadCounts, 30000);
 
     return () => clearInterval(interval);
-  }, [chats.length, updateChatInList, selectedChat]);
+  }, [chats, updateChatInList, selectedChat]);
 
   // Função para formatar data
   const formatDate = (dateString: string) => {
