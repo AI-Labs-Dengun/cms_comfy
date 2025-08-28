@@ -34,6 +34,7 @@ export default function PsicologosPage() {
   const [messagesLimit] = useState(20);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [isInitialChatLoad, setIsInitialChatLoad] = useState(false);
+  const [isRefreshingChats, setIsRefreshingChats] = useState(false);
 
   // Função para processar novas mensagens no chat selecionado
   const handleNewMessageInSelectedChat = useCallback((message: Message) => {
@@ -857,6 +858,50 @@ export default function PsicologosPage() {
     }
   };
 
+  // Função para atualizar apenas os chats (refresh)
+  const handleRefreshChats = async () => {
+    try {
+      setIsRefreshingChats(true);
+      console.log('🔄 Atualizando lista de chats...');
+      
+      const result = await getChats();
+      
+      if (result.success) {
+        // Verificar se os chats têm last_message_content
+        if (result.data) {
+          result.data.forEach((chat, index) => {
+            console.log(`Chat ${index + 1} (refresh):`, {
+              id: chat.id,
+              name: chat.masked_user_name,
+              last_message_content: chat.last_message_content,
+              last_message_at: chat.last_message_at,
+              last_message_sender_type: chat.last_message_sender_type,
+              last_message_sender_name: chat.last_message_sender_name
+            });
+          });
+        }
+        
+        // Atualizar a lista de chats
+        setChats(result.data || []);
+        console.log('✅ Lista de chats atualizada com sucesso');
+        
+        // Mostrar indicador de atualização
+        setIsRealtimeActive(true);
+        setTimeout(() => setIsRealtimeActive(false), 2000);
+        
+      } else {
+        console.error('❌ Erro ao atualizar chats:', result.error);
+        // Não mostrar erro na interface, apenas no console
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao atualizar chats:', error);
+      // Não mostrar erro na interface, apenas no console
+    } finally {
+      setIsRefreshingChats(false);
+    }
+  };
+
   // Função para voltar à lista de chats (mobile)
   const handleBackToList = () => {
     setShowChatList(true);
@@ -996,24 +1041,52 @@ export default function PsicologosPage() {
         {/* Cabeçalho da lista */}
         <div className="p-4 border-b border-gray-100 bg-white flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900">
-                Conversas
-              </h1>
-              <div className="flex items-center space-x-2 mt-0.5">
-                <p className="text-xs text-gray-500">
-                  {filteredChats.length} de {chats.length} ativas
-                </p>
-                {/* Indicador de tempo real */}
-                <div className="flex items-center space-x-1">
-                  <div className={`w-2 h-2 rounded-full ${
-                    isRealtimeActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'
-                  }`}></div>
-                  <span className="text-xs text-gray-400">
-                    {isRealtimeActive ? 'Atualizando...' : 'Online'}
-                  </span>
+            <div className="flex items-center space-x-3">
+              <div>
+                <h1 className="text-lg font-semibold text-gray-900">
+                  Conversas
+                </h1>
+                <div className="flex items-center space-x-2 mt-0.5">
+                  <p className="text-xs text-gray-500">
+                    {filteredChats.length} de {chats.length} ativas
+                  </p>
+                  {/* Indicador de tempo real */}
+                  <div className="flex items-center space-x-1">
+                    <div className={`w-2 h-2 rounded-full ${
+                      isRealtimeActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'
+                    }`}></div>
+                    <span className="text-xs text-gray-400">
+                      {isRealtimeActive ? 'Atualizando...' : 'Online'}
+                    </span>
+                  </div>
                 </div>
               </div>
+              
+              {/* Botão de refresh */}
+              <button
+                onClick={handleRefreshChats}
+                disabled={isRefreshingChats}
+                className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
+                  isRefreshingChats
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700'
+                }`}
+                title="Atualizar conversas"
+              >
+                <svg 
+                  className={`w-4 h-4 ${isRefreshingChats ? 'animate-spin' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+                  />
+                </svg>
+              </button>
             </div>
             
             {/* Estatísticas rápidas */}
