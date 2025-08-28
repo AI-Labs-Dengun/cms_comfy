@@ -58,9 +58,7 @@ export default function PsicologosNavbar() {
 
   // Mostrar modal quando status foi alterado automaticamente
   useEffect(() => {
-    console.log('🔍 PsicologosNavbar - useEffect wasAutoOffline:', wasAutoOffline);
     if (wasAutoOffline) {
-      console.log('🔍 PsicologosNavbar - Mostrando modal de auto-offline');
       setShowAutoOfflineModal(true);
     }
   }, [wasAutoOffline]);
@@ -93,14 +91,12 @@ export default function PsicologosNavbar() {
 
   // Função para fechar modal e limpar flag
   const handleCloseAutoOfflineModal = () => {
-    console.log('🔍 PsicologosNavbar - Fechando modal (Ok)');
     setShowAutoOfflineModal(false);
     clearAutoOfflineFlag();
   };
 
   // Função para alterar para online e fechar modal
   const handleSetOnlineAndClose = async () => {
-    console.log('🔍 PsicologosNavbar - Alterando para online e fechando modal');
     try {
       await updateOnlineStatus(true);
       setShowAutoOfflineModal(false);
@@ -169,15 +165,12 @@ export default function PsicologosNavbar() {
 
   const handleLogout = async () => {
     try {
-      console.log('🚪 PsicologosNavbar - Iniciando logout...');
       
       const result = await signOut();
       
       if (result.success) {
-        console.log('✅ PsicologosNavbar - Logout bem-sucedido');
         router.replace('/login');
       } else {
-        console.error('❌ PsicologosNavbar - Erro no logout:', result.error);
         alert('Erro ao fazer logout: ' + result.error);
       }
     } catch (error) {
