@@ -33,6 +33,7 @@ export default function PsicologosPage() {
   const [messagesOffset, setMessagesOffset] = useState(0);
   const [messagesLimit] = useState(20);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [isInitialChatLoad, setIsInitialChatLoad] = useState(false);
 
   // Função para processar novas mensagens no chat selecionado
   const handleNewMessageInSelectedChat = useCallback((message: Message) => {
@@ -622,6 +623,7 @@ export default function PsicologosPage() {
     setMessagesOffset(0);
     setHasMoreMessages(true);
     setSelectedChatMessages([]);
+    setIsInitialChatLoad(true); // Marcar como carregamento inicial
     
     // Carregar primeiras mensagens do chat selecionado
     await loadMoreMessages(chat.id, 0, true);
@@ -713,6 +715,20 @@ export default function PsicologosPage() {
           // Carregamento inicial - substituir todas as mensagens
           setSelectedChatMessages(newMessages);
           console.log('✅ Mensagens iniciais carregadas:', newMessages.length);
+          
+          // Scroll automático para última mensagem após carregamento inicial
+          setTimeout(() => {
+            const messagesContainer = messagesContainerRef.current || document.querySelector('.chat-messages-container') as HTMLElement;
+            if (messagesContainer) {
+              console.log('📜 PsicologosPage - Scroll automático para última mensagem após carregamento');
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+          }, 150);
+          
+          // Resetar flag de carregamento inicial após um pequeno delay
+          setTimeout(() => {
+            setIsInitialChatLoad(false);
+          }, 300);
         } else {
           // Carregamento de mais mensagens - adicionar ao início
           setSelectedChatMessages(prevMessages => {
@@ -797,6 +813,7 @@ export default function PsicologosPage() {
     setSelectedChat(null);
     setSelectedChatMessages([]); // Limpar mensagens do chat
     setShowChatList(true);
+    setIsInitialChatLoad(false); // Resetar estado de carregamento inicial
     
     // Se havia um chat selecionado, atualizar em background (sem bloquear a UI)
     if (selectedChat) {
@@ -1135,6 +1152,7 @@ export default function PsicologosPage() {
             hasMoreMessages={hasMoreMessages}
             isLoadingMoreMessages={isLoadingMoreMessages}
             messagesContainerRef={messagesContainerRef}
+            isInitialLoad={isInitialChatLoad}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
