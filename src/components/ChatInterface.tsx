@@ -7,6 +7,7 @@ import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
 import { getChatInfo, sendMessage, updateChatStatus, markMessagesAsRead, ChatInfo, Message, Chat } from '@/services/chat';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
 import { supabase } from '@/lib/supabase';
+import SelfAssignButton from '@/components/SelfAssignButton';
 
 interface ChatInterfaceProps {
   chatId: string;
@@ -34,6 +35,15 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
   const { profile } = useAuth();
   const { isOnline } = useOnlineStatus();
   const [localIsOnline, setLocalIsOnline] = useState(false);
+  const [assignedPsicologo, setAssignedPsicologo] = useState<{
+    id: string;
+    name: string;
+    username: string;
+    is_online: boolean;
+    assigned_at: string;
+    is_primary_assignment: boolean;
+  } | null>(null);
+  const [loadingPsicologo, setLoadingPsicologo] = useState(false);
   
   // Atualizar estado local quando profile ou hook mudar
   useEffect(() => {
@@ -626,6 +636,82 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     chatId
   });
 
+  // Função para buscar psicólogo associado à conversa
+  const loadAssignedPsicologo = async () => {
+    try {
+      setLoadingPsicologo(true);
+      
+      const { data: chatData, error: chatError } = await supabase
+        .from('chats')
+        .select(`
+          assigned_psicologo_id,
+          assigned_at,
+          is_primary_assignment,
+          profiles:assigned_psicologo_id (
+            id,
+            name,
+            username,
+            is_online
+          )
+        `)
+        .eq('id', chatId)
+        .single();
+
+      if (chatError) {
+        console.error('Erro ao buscar psicólogo associado:', chatError);
+        return;
+      }
+
+      if (chatData?.assigned_psicologo_id && chatData.profiles) {
+        const profile = Array.isArray(chatData.profiles) ? chatData.profiles[0] : chatData.profiles;
+        setAssignedPsicologo({
+          id: profile.id,
+          name: profile.name,
+          username: profile.username,
+          is_online: profile.is_online,
+          assigned_at: chatData.assigned_at,
+          is_primary_assignment: chatData.is_primary_assignment
+        });
+      } else {
+        setAssignedPsicologo(null);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar psicólogo associado:', err);
+    } finally {
+      setLoadingPsicologo(false);
+    }
+  };
+
+  // Função para atualizar psicólogo associado após auto-associação
+  const handleSelfAssignSuccess = () => {
+    // Forçar atualização com um pequeno delay para garantir que a DB foi atualizada
+    setTimeout(() => {
+      loadAssignedPsicologo();
+    }, 500);
+    
+    if (onChatUpdate) {
+      onChatUpdate(chatId);
+    }
+  };
+
+  // Carregar psicólogo associado quando o chat mudar
+  useEffect(() => {
+    if (chatId) {
+      loadAssignedPsicologo();
+    }
+  }, [chatId]);
+
+  // Verificar periodicamente se há mudanças na associação
+  useEffect(() => {
+    if (!chatId) return;
+
+    const interval = setInterval(() => {
+      loadAssignedPsicologo();
+    }, 3000); // Verificar a cada 3 segundos
+
+    return () => clearInterval(interval);
+  }, [chatId]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-full">
@@ -700,6 +786,42 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
                 <p className="text-sm text-gray-600">
                   Conversa iniciada em {new Date(chatInfo.created_at).toLocaleDateString('pt-BR')}
                 </p>
+                {/* Tag do psicólogo associado - mais visível */}
+                {assignedPsicologo && (
+                  <div className="mt-2">
+                    <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-2 h-2 rounded-full ${
+                          assignedPsicologo.is_online ? 'bg-green-300 animate-pulse' : 'bg-gray-300'
+                        }`}></div>
+                        <span className="text-sm font-medium">
+                          👨‍⚕️ {assignedPsicologo.name}
+                        </span>
+                        <span className="text-xs text-blue-100">
+                          @{assignedPsicologo.username}
+                        </span>
+                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/20">
+                          {assignedPsicologo.is_online ? 'Online' : 'Offline'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {loadingPsicologo && (
+                  <div className="mt-2">
+                    <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-gray-100 text-gray-600">
+                      <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                      <span className="text-sm">Carregando psicólogo...</span>
+                    </div>
+                  </div>
+                )}
+                {!assignedPsicologo && !loadingPsicologo && (
+                  <div className="mt-2">
+                    <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+                      <span className="text-sm font-medium">⚠️ Nenhum psicólogo assinado</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -716,6 +838,13 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
                 {localIsOnline ? 'Online' : 'Offline'}
               </span>
             </div>
+
+            {/* Botão de auto-associação */}
+            <SelfAssignButton 
+              chatId={chatId} 
+              variant="icon"
+              onSuccess={handleSelfAssignSuccess}
+            />
 
             {/* Tags de Status - Integradas na barra principal */}
             {chatInfo && (
