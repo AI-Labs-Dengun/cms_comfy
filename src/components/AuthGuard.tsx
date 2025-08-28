@@ -279,6 +279,5 @@ export default function AuthGuard({
   }
 
   // Acesso autorizado - renderizar conteúdo
-  console.log('✅ AuthGuard - Acesso autorizado, renderizando conteúdo');
   return <>{children}</>;
 } 

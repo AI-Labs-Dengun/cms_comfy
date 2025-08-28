@@ -155,14 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🔍 AuthContext - Verificando acesso de role:', { email: user.email, requiredRole });
       const authCheck = await AuthService.canUserLoginWithRole(user.email, requiredRole);
       const result = authCheck.success;
-      
-      console.log('✅ AuthContext - Resultado da verificação de role:', { 
-        email: user.email, 
-        requiredRole, 
-        result,
-        authInfo: authCheck 
-      });
-      
+            
       return result;
     } catch (error) {
       console.error('❌ AuthContext - Erro ao verificar role:', error);
