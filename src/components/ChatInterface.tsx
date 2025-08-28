@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
 import { getChatInfo, sendMessage, updateChatStatus, markMessagesAsRead, ChatInfo, Message, Chat } from '@/services/chat';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
+import { supabase } from '@/lib/supabase';
 
 interface ChatInterfaceProps {
   chatId: string;
@@ -29,6 +31,109 @@ interface GroupedMessages {
 
 export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, onNewMessageReceived, showNewMessageIndicator = true, messages: externalMessages, onLoadMoreMessages, hasMoreMessages = false, isLoadingMoreMessages = false, messagesContainerRef }: ChatInterfaceProps) {
   const { profile } = useAuth();
+  const { isOnline } = useOnlineStatus();
+  const [localIsOnline, setLocalIsOnline] = useState(false);
+  
+  // Atualizar estado local quando profile ou hook mudar
+  useEffect(() => {
+    // Verificar tanto o hook quanto o profile para garantir consistência
+    const profileOnline = profile?.is_online === true;
+    const hookOnline = isOnline === true;
+    const actualOnline = profileOnline && hookOnline;
+    
+    setLocalIsOnline(actualOnline);
+    
+    console.log('🔍 ChatInterface - Status Debug:', {
+      profileId: profile?.id,
+      profileRole: profile?.user_role,
+      profileIsOnline: profile?.is_online,
+      hookIsOnline: isOnline,
+      actualOnline,
+      shouldBlock: !actualOnline,
+      chatId
+    });
+  }, [profile?.is_online, isOnline, profile?.id, profile?.user_role, chatId]);
+
+  // Verificar status online diretamente da base de dados periodicamente
+  useEffect(() => {
+    if (!profile?.id || profile?.user_role !== 'psicologo') return;
+
+    const checkOnlineStatusFromDB = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('is_online')
+          .eq('id', profile.id)
+          .single();
+
+        if (!error && data) {
+          const dbIsOnline = data.is_online === true;
+          const hookOnline = isOnline === true;
+          const actualOnline = dbIsOnline && hookOnline;
+          
+          if (actualOnline !== localIsOnline) {
+            console.log('🔄 ChatInterface - Status atualizado da DB:', {
+              dbIsOnline,
+              hookOnline, 
+              actualOnline,
+              previousLocal: localIsOnline
+            });
+            setLocalIsOnline(actualOnline);
+          }
+        }
+      } catch (error) {
+        console.error('❌ ChatInterface - Erro ao verificar status online:', error);
+      }
+    };
+
+    // Verificar imediatamente
+    checkOnlineStatusFromDB();
+
+    // Verificar a cada 10 segundos
+    const interval = setInterval(checkOnlineStatusFromDB, 10000);
+
+    return () => clearInterval(interval);
+  }, [profile?.id, profile?.user_role, isOnline, localIsOnline]);
+
+  // Escutar mudanças na tabela profiles em tempo real
+  useEffect(() => {
+    if (!profile?.id || profile?.user_role !== 'psicologo') return;
+
+    const channel = supabase
+      .channel('profile-status-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${profile.id}`,
+        },
+        (payload) => {
+          console.log('🔄 ChatInterface - Profile atualizado em tempo real:', payload);
+          if (payload.new && typeof payload.new.is_online === 'boolean') {
+            const dbIsOnline = payload.new.is_online === true;
+            const hookOnline = isOnline === true;
+            const actualOnline = dbIsOnline && hookOnline;
+            
+            console.log('🔄 ChatInterface - Atualizando status com dados em tempo real:', {
+              dbIsOnline,
+              hookOnline,
+              actualOnline,
+              previousLocal: localIsOnline
+            });
+            
+            setLocalIsOnline(actualOnline);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id, profile?.user_role, isOnline, localIsOnline]);
+
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
   // Remover estado local de mensagens - usar apenas mensagens externas
   const [loading, setLoading] = useState(true);
@@ -50,6 +155,41 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
   const handleNewMessageRef = useRef<(message: Message) => void>(() => {});
   const handleChatUpdateRef = useRef<(updatedChat: Chat) => void>(() => {});
 
+  // Função helper para fechar o chat instantaneamente
+  const handleCloseChat = useCallback(() => {
+    if (!onClose) return;
+    
+    console.log('🔍 ChatInterface - Fechando chat instantaneamente');
+    
+    // Fechar imediatamente sem delay
+    onClose();
+  }, [onClose]);
+
+  // Event listener para tecla ESC - fechar chat
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Verificar se não está digitando em um campo de entrada
+      const target = event.target as HTMLElement;
+      const isInputField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true';
+      
+      if (event.key === 'Escape' && onClose && !isInputField) {
+        console.log('🔍 ChatInterface - Tecla ESC pressionada, fechando chat');
+        event.preventDefault();
+        event.stopPropagation();
+        handleCloseChat();
+      }
+    };
+
+    // Adicionar listener sempre que o componente estiver montado e onClose existir
+    if (onClose) {
+      document.addEventListener('keydown', handleKeyDown, true); // Use capture para prioridade
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [onClose, handleCloseChat]);
+
   // Auto-scroll para a última mensagem (apenas para novas mensagens)
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -58,7 +198,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
   };
 
   // Posicionar o scroll na última mensagem sem animação
-  const positionAtBottom = () => {
+  const positionAtBottom = useCallback(() => {
     if (containerRef.current) {
       const container = containerRef.current;
       // Forçar o scroll para o final
@@ -72,7 +212,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
         }, 0);
       }
     }
-  };
+  }, [containerRef]);
 
   // Marcar mensagens como lidas quando o usuário realmente visualiza o chat
   const markMessagesAsReadWhenViewed = useCallback(async () => {
@@ -152,7 +292,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
       positionAtBottom();
       setIsInitialLoad(false);
     }
-  }, [externalMessages, isInitialLoad]);
+  }, [externalMessages, isInitialLoad, positionAtBottom]);
 
   // Marcar mensagens como lidas quando o usuário interage com o chat
   useEffect(() => {
@@ -303,6 +443,12 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
   // Enviar nova mensagem
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Verificar se o psicólogo está online
+    if (!localIsOnline) {
+      alert('Você precisa estar online para enviar mensagens. Altere seu status para "Online" na barra de navegação.');
+      return;
+    }
     
     if (!newMessage.trim() || sending) return;
 
@@ -522,6 +668,18 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
           </div>
 
           <div className="flex items-center space-x-4">
+            {/* Indicador de status online/offline */}
+            <div className="flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200">
+              <div className={`w-2 h-2 rounded-full animate-pulse ${
+                localIsOnline ? 'bg-green-400' : 'bg-red-400'
+              }`}></div>
+              <span className={`font-medium ${
+                localIsOnline ? 'text-green-700' : 'text-red-700'
+              }`}>
+                {localIsOnline ? 'Online' : 'Offline'}
+              </span>
+            </div>
+
             {/* Tags de Status - Integradas na barra principal */}
             {chatInfo && (
               <ChatStatusTag
@@ -536,9 +694,15 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
             {/* Botão X para fechar o chat */}
             {onClose && (
               <button
-                onClick={onClose}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('🔍 ChatInterface - Botão X clicado, fechando chat');
+                  handleCloseChat();
+                }}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 title="Fechar conversa (ESC)"
+                aria-label="Fechar conversa"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -695,21 +859,50 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
 
       {/* Área de envio de mensagem */}
       <div className="p-6 border-t border-gray-200 bg-white flex-shrink-0">
+        {/* Aviso quando offline */}
+        {!localIsOnline && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-red-800">
+                  Status Offline
+                </h3>
+                <p className="text-sm text-red-700 mt-1">
+                  Você precisa estar online para enviar mensagens. Altere seu status para &quot;Online&quot; na barra de navegação.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSendMessage} className="space-y-4">
           <div className="relative">
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder={sending ? "Enviando mensagem..." : "Digite sua mensagem..."}
+              placeholder={
+                !localIsOnline 
+                  ? "Você precisa estar online para enviar mensagens..." 
+                  : sending 
+                    ? "Enviando mensagem..." 
+                    : "Digite sua mensagem..."
+              }
               className={`w-full border border-gray-300 rounded-2xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all duration-200 text-black message-content ${
-                sending ? 'bg-gray-50 cursor-not-allowed' : ''
+                sending || !localIsOnline ? 'bg-gray-50 cursor-not-allowed' : ''
               }`}
               rows={3}
-              disabled={sending}
+              disabled={sending || !localIsOnline}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  handleSendMessage(e);
+                  if (localIsOnline) {
+                    handleSendMessage(e);
+                  }
                 }
               }}
               style={{
@@ -722,11 +915,22 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
             {/* Botão de envio flutuante */}
             <button
               type="submit"
-              disabled={!newMessage.trim() || sending}
-              className="absolute bottom-3 right-3 p-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white rounded-full transition-all duration-200 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+              disabled={!newMessage.trim() || sending || !localIsOnline}
+              className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-200 shadow-lg hover:shadow-xl ${
+                !localIsOnline
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : !newMessage.trim() || sending
+                    ? 'bg-gray-300 cursor-not-allowed'
+                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
+              title={!localIsOnline ? "Você precisa estar online para enviar mensagens" : "Enviar mensagem"}
             >
               {sending ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : !localIsOnline ? (
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
+                </svg>
               ) : (
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -737,15 +941,22 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
           
           <div className="flex items-center justify-between text-xs text-gray-500">
             <span>
-              Pressione Enter para enviar, Shift+Enter para nova linha
+              {!localIsOnline 
+                ? "Status offline - envio de mensagens bloqueado" 
+                : "Pressione Enter para enviar, Shift+Enter para nova linha"
+              }
             </span>
             <span className="flex items-center space-x-4">
-              <span className="hidden sm:inline">
+              <span className="text-xs text-gray-400">
                 Pressione ESC para sair
               </span>
               <span className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="font-medium">Online</span>
+                <div className={`w-2 h-2 rounded-full animate-pulse ${
+                  localIsOnline ? 'bg-green-400' : 'bg-red-400'
+                }`}></div>
+                <span className="font-medium">
+                  {localIsOnline ? 'Online' : 'Offline'}
+                </span>
               </span>
             </span>
           </div>
