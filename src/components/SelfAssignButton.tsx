@@ -34,14 +34,14 @@ export default function SelfAssignButton({
       setSuccess(false);
 
       // OTIMIZAÇÃO: Atualizar estado visual imediatamente (otimisticamente)
-      const wasCurrentlyAssigned = isCurrentlyAssigned;
+      // const wasCurrentlyAssigned = isCurrentlyAssigned; // Removido - não utilizado
       
       let result;
       
       if (isCurrentlyAssigned) {
         // Se já está associado, desassociar
         console.log('🔄 Desassociando psicólogo do chat:', chatId);
-        result = await disassociatePsicologoFromChat(chatId, profile?.id || '');
+        result = await disassociatePsicologoFromChat(chatId);
       } else {
         // Se não está associado, associar
         console.log('🔄 Associando psicólogo ao chat:', chatId);
