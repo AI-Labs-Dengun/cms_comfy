@@ -834,18 +834,6 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Indicador de status online/offline */}
-            <div className="flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200">
-              <div className={`w-2 h-2 rounded-full animate-pulse ${
-                localIsOnline ? 'bg-green-400' : 'bg-red-400'
-              }`}></div>
-              <span className={`font-medium ${
-                localIsOnline ? 'text-green-700' : 'text-red-700'
-              }`}>
-                {localIsOnline ? 'Online' : 'Offline'}
-              </span>
-            </div>
-
             {/* Botão de auto-associação */}
             <SelfAssignButton 
               chatId={chatId} 
@@ -1123,14 +1111,6 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
             <span className="flex items-center space-x-4">
               <span className="text-xs text-gray-400">
                 Pressione ESC para sair
-              </span>
-              <span className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full animate-pulse ${
-                  localIsOnline ? 'bg-green-400' : 'bg-red-400'
-                }`}></div>
-                <span className="font-medium">
-                  {localIsOnline ? 'Online' : 'Offline'}
-                </span>
               </span>
             </span>
           </div>
