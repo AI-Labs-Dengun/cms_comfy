@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ChatInterface from '@/components/ChatInterface';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
+import PsicologoAssignedTag from '@/components/PsicologoAssignedTag';
 import { getChats, updateChatStatus, Chat as ChatType, Message, getChatMessages } from '@/services/chat';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
@@ -1245,6 +1246,14 @@ export default function PsicologosPage() {
                           status={chat.status}
                           onStatusChange={(newStatus) => handleStatusChange(chat.id, newStatus)}
                           isEditable={true}
+                          className="mr-2"
+                        />
+                        
+                        {/* Tag de psicólogo associado */}
+                        <PsicologoAssignedTag
+                          chatId={chat.id}
+                          onUpdate={() => updateChatInList(chat.id)}
+                          variant="compact"
                           className="mr-2"
                         />
                         
