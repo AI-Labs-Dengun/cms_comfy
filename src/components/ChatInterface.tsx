@@ -20,6 +20,7 @@ interface ChatInterfaceProps {
   hasMoreMessages?: boolean; // Indica se há mais mensagens para carregar
   isLoadingMoreMessages?: boolean; // Indica se está carregando mais mensagens
   messagesContainerRef?: React.RefObject<HTMLDivElement | null>; // Ref para o container de mensagens
+  isInitialLoad?: boolean; // Indica se é o carregamento inicial do chat
 }
 
 // Interface para mensagens agrupadas
@@ -29,7 +30,7 @@ interface GroupedMessages {
   messages: Message[];
 }
 
-export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, onNewMessageReceived, showNewMessageIndicator = true, messages: externalMessages, onLoadMoreMessages, hasMoreMessages = false, isLoadingMoreMessages = false, messagesContainerRef }: ChatInterfaceProps) {
+export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, onNewMessageReceived, showNewMessageIndicator = true, messages: externalMessages, onLoadMoreMessages, hasMoreMessages = false, isLoadingMoreMessages = false, messagesContainerRef, isInitialLoad = false }: ChatInterfaceProps) {
   const { profile } = useAuth();
   const { isOnline } = useOnlineStatus();
   const [localIsOnline, setLocalIsOnline] = useState(false);
@@ -143,7 +144,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const internalMessagesContainerRef = useRef<HTMLDivElement>(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [internalIsInitialLoad, setInternalIsInitialLoad] = useState(true);
   const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false);
   const [isChatActive, setIsChatActive] = useState(true); // Controla se o chat está ativo/visível
   const [showLoadMoreButton, setShowLoadMoreButton] = useState(false);
@@ -201,16 +202,30 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
   const positionAtBottom = useCallback(() => {
     if (containerRef.current) {
       const container = containerRef.current;
+      console.log('📜 Aplicando scroll para última mensagem:', {
+        scrollTop: container.scrollTop,
+        scrollHeight: container.scrollHeight,
+        clientHeight: container.clientHeight
+      });
+      
       // Forçar o scroll para o final
       container.scrollTop = container.scrollHeight;
       
       // Verificação adicional para garantir que o scroll foi aplicado
-      if (container.scrollTop < container.scrollHeight - container.clientHeight) {
-        // Se ainda não está no final, tentar novamente
-        setTimeout(() => {
+      setTimeout(() => {
+        if (container.scrollTop < container.scrollHeight - container.clientHeight) {
+          console.log('📜 Reaplicando scroll - primeira tentativa não foi suficiente');
           container.scrollTop = container.scrollHeight;
-        }, 0);
-      }
+          
+          // Segunda verificação
+          setTimeout(() => {
+            if (container.scrollTop < container.scrollHeight - container.clientHeight) {
+              console.log('📜 Reaplicando scroll - segunda tentativa');
+              container.scrollTop = container.scrollHeight;
+            }
+          }, 50);
+        }
+      }, 50);
     }
   }, [containerRef]);
 
@@ -281,18 +296,35 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
 
   // Scroll suave para novas mensagens (não para carregamento inicial)
   useEffect(() => {
-    if (!isInitialLoad && externalMessages && externalMessages.length > 0) {
+    if (!internalIsInitialLoad && externalMessages && externalMessages.length > 0) {
       scrollToBottom();
     }
-  }, [externalMessages, isInitialLoad]);
+  }, [externalMessages, internalIsInitialLoad]);
 
   // Posicionar scroll no final após carregamento inicial
   useLayoutEffect(() => {
     if (isInitialLoad && externalMessages && externalMessages.length > 0) {
+      console.log('📜 ChatInterface - Scroll automático no carregamento inicial');
       positionAtBottom();
-      setIsInitialLoad(false);
+      setInternalIsInitialLoad(false);
     }
   }, [externalMessages, isInitialLoad, positionAtBottom]);
+
+  // Garantir scroll para última mensagem quando entrar no chat
+  useEffect(() => {
+    if (isInitialLoad && externalMessages && externalMessages.length > 0) {
+      console.log('📜 ChatInterface - Garantindo scroll para última mensagem ao entrar no chat');
+      
+      // Usar setTimeout para garantir que o DOM foi renderizado
+      setTimeout(() => {
+        if (containerRef.current) {
+          const container = containerRef.current;
+          container.scrollTop = container.scrollHeight;
+          console.log('✅ Scroll aplicado para última mensagem');
+        }
+      }, 100);
+    }
+  }, [isInitialLoad, externalMessages]);
 
   // Marcar mensagens como lidas quando o usuário interage com o chat
   useEffect(() => {
