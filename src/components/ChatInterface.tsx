@@ -334,7 +334,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
         }
       }, 100);
     }
-  }, [isInitialLoad, externalMessages]);
+  }, [isInitialLoad, externalMessages, containerRef]);
 
   // Marcar mensagens como lidas quando o usuário interage com o chat
   useEffect(() => {
@@ -637,7 +637,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
   });
 
   // Função para buscar psicólogo associado à conversa
-  const loadAssignedPsicologo = async () => {
+  const loadAssignedPsicologo = useCallback(async () => {
     try {
       setLoadingPsicologo(true);
       
@@ -680,7 +680,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     } finally {
       setLoadingPsicologo(false);
     }
-  };
+  }, [chatId]);
 
   // Função para atualizar psicólogo associado após auto-associação
   const handleSelfAssignSuccess = () => {
@@ -699,7 +699,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     if (chatId) {
       loadAssignedPsicologo();
     }
-  }, [chatId]);
+  }, [chatId, loadAssignedPsicologo]);
 
   // Verificar periodicamente se há mudanças na associação
   useEffect(() => {
@@ -710,7 +710,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     }, 3000); // Verificar a cada 3 segundos
 
     return () => clearInterval(interval);
-  }, [chatId]);
+  }, [chatId, loadAssignedPsicologo]);
 
   if (loading) {
     return (
