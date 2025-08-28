@@ -431,14 +431,14 @@ export default function PsicologosPage() {
     // Resetar o indicador após 3 segundos
     setTimeout(() => setIsRealtimeActive(false), 3000);
     
-    // Remover da lista de chats recentemente atualizados após 5 segundos
+    // Remover da lista de chats recentemente atualizados após 2 segundos (reduzido para minimizar piscar)
     setTimeout(() => {
       setRecentlyUpdatedChats(prev => {
         const newSet = new Set(prev);
         newSet.delete(sanitizedChat.id);
         return newSet;
       });
-    }, 5000);
+    }, 2000);
   }, [selectedChat]);
 
   // Função para lidar com novo chat criado
@@ -610,15 +610,39 @@ export default function PsicologosPage() {
     }
   }, [selectedChat]);
 
-  // Atualizar contadores de mensagens não lidas periodicamente
+  // Atualizar contadores de mensagens não lidas periodicamente (sem piscar)
   useEffect(() => {
     const updateUnreadCounts = async () => {
       if (chats.length > 0) {
-        console.log('🔄 Atualizando contadores de mensagens não lidas...');
+        console.log('🔄 Atualizando contadores de mensagens não lidas (background)...');
         for (const chat of chats) {
           // Não atualizar o chat selecionado aqui, pois ele será atualizado pelo ChatInterface
           if (chat.id !== selectedChat?.id) {
-            await updateChatInList(chat.id);
+            try {
+              // Buscar contador de mensagens não lidas diretamente sem atualizar toda a lista
+              const { data: unreadMessages, error: unreadError } = await supabase
+                .from('messages')
+                .select('id')
+                .eq('chat_id', chat.id)
+                .eq('sender_type', 'app_user')
+                .eq('is_read', false)
+                .eq('is_deleted', false);
+
+              if (!unreadError && unreadMessages) {
+                const unreadCount = unreadMessages.length;
+                
+                // Atualizar apenas o contador se mudou
+                setChats(prevChats => 
+                  prevChats.map(c => 
+                    c.id === chat.id && c.unread_count_psicologo !== unreadCount
+                      ? { ...c, unread_count_psicologo: unreadCount }
+                      : c
+                  )
+                );
+              }
+            } catch (error) {
+              console.error('❌ Erro ao atualizar contador de mensagens não lidas:', error);
+            }
           }
         }
       }
@@ -628,7 +652,7 @@ export default function PsicologosPage() {
     const interval = setInterval(updateUnreadCounts, 15000);
 
     return () => clearInterval(interval);
-  }, [chats, updateChatInList, selectedChat]);
+  }, [chats, selectedChat]);
 
   // Função para formatar data
   const formatDate = (dateString: string) => {
@@ -1172,7 +1196,7 @@ export default function PsicologosPage() {
                   className={`p-6 hover:bg-gray-50 cursor-pointer transition-all duration-200 ${
                     selectedChat?.id === chat.id ? 'bg-blue-50 border-r-4 border-blue-500 shadow-sm' : ''
                   } ${
-                    recentlyUpdatedChats.has(chat.id) ? 'bg-green-50 border-l-4 border-green-500 animate-pulse' : ''
+                    recentlyUpdatedChats.has(chat.id) ? 'bg-green-50 border-l-4 border-green-500' : ''
                   }`}
                   onClick={() => handleSelectChat(chat)}
                 >
@@ -1186,7 +1210,7 @@ export default function PsicologosPage() {
                         <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>
                       )}
                       {recentlyUpdatedChats.has(chat.id) && (chat.unread_count_psicologo || 0) === 0 && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-ping"></div>
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                       )}
                     </div>
                     
