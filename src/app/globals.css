@@ -85,8 +85,54 @@ body {
   .chat-messages-container {
     overflow-y: auto;
     overflow-x: hidden;
-    scroll-behavior: smooth;
+    scroll-behavior: auto; /* Alterado de smooth para auto para controle total */
     -webkit-overflow-scrolling: touch;
+    scroll-snap-type: none; /* Desabilitar snap scrolling */
+  }
+  
+  /* Prevenir scroll automático quando botões são clicados */
+  .chat-messages-container button:focus {
+    outline: none;
+    scroll-margin: 0;
+    scroll-padding: 0;
+  }
+  
+  /* Garantir que o scroll não seja afetado por cliques em botões */
+  .chat-messages-container button {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    scroll-margin: 0;
+    scroll-padding: 0;
+    touch-action: manipulation; /* Prevenir gestos que podem causar scroll */
+  }
+  
+  /* Prevenir scroll automático em qualquer elemento focável */
+  .chat-messages-container *:focus {
+    scroll-margin: 0;
+    scroll-padding: 0;
+  }
+  
+  /* Botão flutuante "Ver mais mensagens" */
+  .floating-load-more-button {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    pointer-events: none;
+  }
+  
+  .floating-load-more-button button {
+    pointer-events: auto;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  
+  /* Garantir que o botão flutuante não interfira no layout */
+  .chat-messages-container {
+    position: relative;
   }
   
   /* Prevenir scroll na página quando estiver na área de mensagens */

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ChatInterface from '@/components/ChatInterface';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
@@ -32,6 +32,7 @@ export default function PsicologosPage() {
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [messagesOffset, setMessagesOffset] = useState(0);
   const [messagesLimit] = useState(20);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Debug temporário - remover depois
   console.log('🔍 PsicologosPage Debug:', {
@@ -672,6 +673,50 @@ export default function PsicologosPage() {
       setIsLoadingMoreMessages(true);
       console.log(`📥 Carregando mensagens do chat ${chatId} (offset: ${offset}, limit: ${messagesLimit})`);
       
+      // Capturar informações precisas do scroll ANTES de carregar novas mensagens
+      let scrollInfo: {
+        container: HTMLElement;
+        scrollTop: number;
+        scrollHeight: number;
+        firstVisibleElement: Element | null;
+        firstVisibleElementTop: number;
+      } | null = null;
+      
+      if (!isInitialLoad) {
+        const messagesContainer = messagesContainerRef.current || document.querySelector('.chat-messages-container') as HTMLElement;
+        if (messagesContainer) {
+          // Desabilitar scroll suave imediatamente
+          messagesContainer.style.scrollBehavior = 'auto';
+          
+          // Capturar informações detalhadas do scroll
+          scrollInfo = {
+            container: messagesContainer,
+            scrollTop: messagesContainer.scrollTop,
+            scrollHeight: messagesContainer.scrollHeight,
+            firstVisibleElement: null,
+            firstVisibleElementTop: 0
+          };
+          
+          // Encontrar o primeiro elemento visível para usar como referência
+          const messages = messagesContainer.querySelectorAll('[data-message-id]');
+          for (const message of messages) {
+            const rect = message.getBoundingClientRect();
+            const containerRect = messagesContainer.getBoundingClientRect();
+            if (rect.top >= containerRect.top && rect.top <= containerRect.bottom) {
+              scrollInfo.firstVisibleElement = message;
+              scrollInfo.firstVisibleElementTop = rect.top - containerRect.top;
+              break;
+            }
+          }
+          
+          console.log('📊 Capturado estado do scroll antes de carregar:', {
+            scrollTop: scrollInfo.scrollTop,
+            scrollHeight: scrollInfo.scrollHeight,
+            firstVisibleElement: scrollInfo.firstVisibleElement ? scrollInfo.firstVisibleElement.getAttribute('data-message-id') : 'none'
+          });
+        }
+      }
+      
       const messagesResult = await getChatMessages(chatId, messagesLimit, offset);
       
       if (messagesResult.success && messagesResult.data) {
@@ -695,6 +740,48 @@ export default function PsicologosPage() {
             return uniqueMessages;
           });
           console.log('✅ Mais mensagens carregadas:', newMessages.length);
+          
+          // Restaurar posição do scroll de forma precisa
+          if (scrollInfo) {
+            // Aguardar o React renderizar as novas mensagens
+            setTimeout(() => {
+              try {
+                const container = scrollInfo!.container;
+                
+                if (scrollInfo!.firstVisibleElement) {
+                  // Método 1: Usar o elemento visível como referência
+                  const targetElement = container.querySelector(`[data-message-id="${scrollInfo!.firstVisibleElement.getAttribute('data-message-id')}"]`);
+                  if (targetElement) {
+                    const rect = targetElement.getBoundingClientRect();
+                    const containerRect = container.getBoundingClientRect();
+                    const newScrollTop = container.scrollTop + (rect.top - containerRect.top) - scrollInfo!.firstVisibleElementTop;
+                    
+                    container.scrollTop = newScrollTop;
+                    console.log('✅ Posição restaurada usando elemento de referência');
+                    return;
+                  }
+                }
+                
+                // Método 2: Usar diferença de altura (fallback)
+                const newScrollHeight = container.scrollHeight;
+                const heightDifference = newScrollHeight - scrollInfo!.scrollHeight;
+                
+                if (heightDifference > 0) {
+                  const newScrollTop = scrollInfo!.scrollTop + heightDifference;
+                  container.scrollTop = newScrollTop;
+                  console.log('✅ Posição restaurada usando diferença de altura:', {
+                    oldPosition: scrollInfo!.scrollTop,
+                    heightDifference,
+                    newPosition: newScrollTop
+                  });
+                } else {
+                  console.log('⚠️ Nenhum ajuste de scroll necessário');
+                }
+              } catch (error) {
+                console.error('❌ Erro ao restaurar posição do scroll:', error);
+              }
+            }, 100); // Aguardar o React renderizar
+          }
         }
         
         // Verificar se há mais mensagens para carregar
@@ -1061,6 +1148,7 @@ export default function PsicologosPage() {
             onLoadMoreMessages={() => loadMoreMessages(selectedChat.id, messagesOffset)}
             hasMoreMessages={hasMoreMessages}
             isLoadingMoreMessages={isLoadingMoreMessages}
+            messagesContainerRef={messagesContainerRef}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">

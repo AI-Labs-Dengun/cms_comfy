@@ -17,6 +17,7 @@ interface ChatInterfaceProps {
   onLoadMoreMessages?: () => void; // Callback para carregar mais mensagens
   hasMoreMessages?: boolean; // Indica se há mais mensagens para carregar
   isLoadingMoreMessages?: boolean; // Indica se está carregando mais mensagens
+  messagesContainerRef?: React.RefObject<HTMLDivElement | null>; // Ref para o container de mensagens
 }
 
 // Interface para mensagens agrupadas
@@ -26,7 +27,7 @@ interface GroupedMessages {
   messages: Message[];
 }
 
-export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, onNewMessageReceived, showNewMessageIndicator = true, messages: externalMessages, onLoadMoreMessages, hasMoreMessages = false, isLoadingMoreMessages = false }: ChatInterfaceProps) {
+export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, onNewMessageReceived, showNewMessageIndicator = true, messages: externalMessages, onLoadMoreMessages, hasMoreMessages = false, isLoadingMoreMessages = false, messagesContainerRef }: ChatInterfaceProps) {
   const { profile } = useAuth();
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
   // Remover estado local de mensagens - usar apenas mensagens externas
@@ -36,11 +37,14 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
   const [sending, setSending] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const internalMessagesContainerRef = useRef<HTMLDivElement>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false);
   const [isChatActive, setIsChatActive] = useState(true); // Controla se o chat está ativo/visível
   const [showLoadMoreButton, setShowLoadMoreButton] = useState(false);
+  
+  // Usar a ref externa se fornecida, senão usar a interna
+  const containerRef = messagesContainerRef || internalMessagesContainerRef;
   
   // Usar refs para armazenar as funções de callback e evitar recriações
   const handleNewMessageRef = useRef<(message: Message) => void>(() => {});
@@ -55,8 +59,8 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
 
   // Posicionar o scroll na última mensagem sem animação
   const positionAtBottom = () => {
-    if (messagesContainerRef.current) {
-      const container = messagesContainerRef.current;
+    if (containerRef.current) {
+      const container = containerRef.current;
       // Forçar o scroll para o final
       container.scrollTop = container.scrollHeight;
       
@@ -184,22 +188,28 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     };
   }, [handleUserInteraction]);
 
-  // Detectar scroll para mostrar botão "Carregar mais"
+  // Detectar scroll para mostrar botão "Ver mais mensagens"
   useEffect(() => {
     const handleScroll = () => {
-      if (messagesContainerRef.current && hasMoreMessages) {
-        const { scrollTop } = messagesContainerRef.current;
-        // Mostrar botão quando o usuário fizer scroll para cima (próximo ao topo)
-        setShowLoadMoreButton(scrollTop < 100);
+      if (containerRef.current && hasMoreMessages) {
+        const { scrollTop } = containerRef.current;
+        
+        // Mostrar botão apenas quando estiver no topo absoluto (scrollTop = 0)
+        // ou muito próximo do topo (para dar uma pequena margem)
+        const isAtTop = scrollTop <= 10;
+        
+        setShowLoadMoreButton(isAtTop);
       }
     };
 
-    const container = messagesContainerRef.current;
+    const container = containerRef.current;
     if (container) {
       container.addEventListener('scroll', handleScroll);
+      // Verificar estado inicial
+      handleScroll();
       return () => container.removeEventListener('scroll', handleScroll);
     }
-  }, [hasMoreMessages]);
+  }, [hasMoreMessages, externalMessages, containerRef]);
 
   // Função para agrupar mensagens por data
   const groupMessagesByDate = (messages: Message[]): GroupedMessages[] => {
@@ -541,11 +551,11 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
 
       {/* Área de mensagens - com altura fixa e scroll independente */}
       <div 
-        ref={messagesContainerRef}
+        ref={containerRef}
         className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-gray-50 to-white custom-scrollbar chat-messages-container relative" 
         style={{ 
           maxHeight: 'calc(100vh - 280px)',
-          scrollBehavior: isInitialLoad ? 'auto' : 'smooth'
+          scrollBehavior: 'auto' // Sempre auto para controle total do scroll
         }}
       >
         {/* Indicador de nova mensagem */}
@@ -555,21 +565,54 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
           </div>
         )}
 
-        {/* Botão "Carregar mais" */}
+        {/* Botão "Ver mais mensagens" - Completamente Flutuante */}
         {hasMoreMessages && showLoadMoreButton && (
-          <div className="flex justify-center py-4">
+          <div className="floating-load-more-button">
             <button
-              onClick={onLoadMoreMessages}
+              onClick={(e) => {
+                // Prevenir TODOS os comportamentos padrão
+                e.preventDefault();
+                e.stopPropagation();
+                // Prevenir outros event handlers
+                if (e.nativeEvent && e.nativeEvent.stopImmediatePropagation) {
+                  e.nativeEvent.stopImmediatePropagation();
+                }
+                
+                // Verificar se a função existe antes de chamar
+                if (!onLoadMoreMessages) return;
+                
+                // Capturar posição atual antes de qualquer ação
+                const container = containerRef.current;
+                if (container) {
+                  // Desabilitar completamente qualquer scroll automático
+                  container.style.scrollBehavior = 'auto';
+                  container.style.overflow = 'hidden'; // Bloquear scroll temporariamente
+                  
+                  // Chamar a função de carregar mais mensagens
+                  onLoadMoreMessages();
+                  
+                  // Reabilitar scroll após carregamento
+                  setTimeout(() => {
+                    if (container) {
+                      container.style.overflow = 'auto';
+                      container.style.scrollBehavior = 'auto'; // Manter auto para evitar animações
+                    }
+                  }, 200);
+                } else {
+                  // Se não conseguir acessar o container, chamar normalmente
+                  onLoadMoreMessages();
+                }
+              }}
               disabled={isLoadingMoreMessages}
-              className={`flex items-center space-x-2 px-6 py-3 rounded-full text-sm font-medium transition-all duration-200 ${
+              className={`flex items-center space-x-2 px-6 py-3 rounded-full text-sm font-medium transition-all duration-200 shadow-xl backdrop-blur-md border-2 pointer-events-auto ${
                 isLoadingMoreMessages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:shadow-md'
+                  ? 'bg-gray-100/95 text-gray-500 cursor-not-allowed border-gray-200/50'
+                  : 'bg-blue-500/95 text-white hover:bg-blue-600/95 hover:shadow-2xl transform hover:scale-105 border-white/30 hover:border-white/50'
               }`}
             >
               {isLoadingMoreMessages ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
                   <span>Carregando...</span>
                 </>
               ) : (
@@ -577,7 +620,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                   </svg>
-                  <span>Carregar mais mensagens</span>
+                  <span>Ver mais mensagens</span>
                 </>
               )}
             </button>
@@ -596,6 +639,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
             {group.messages.map((message) => (
               <div
                 key={message._uniqueKey || message.id}
+                data-message-id={message.id}
                 className={`flex ${message.sender_type === 'psicologo' ? 'justify-end' : 'justify-start'} message-enter`}
               >
                 <div className={`relative max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl 2xl:max-w-2xl ${
