@@ -58,8 +58,6 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
       };
     }
 
-    console.log('👤 Usuário autenticado:', user.id);
-
     // Verificar se o usuário é um psicólogo autorizado
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -75,8 +73,6 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
       };
     }
 
-    console.log('✅ Psicólogo autorizado:', profile);
-
     // ✅ IMPLEMENTAÇÃO REAL: Buscar chats do banco de dados
     const { data, error } = await supabase.rpc('get_psicologo_chats', {
       psicologo_id_param: user.id
@@ -89,8 +85,6 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
         error: 'Erro ao carregar chats: ' + error.message
       };
     }
-
-    console.log('📊 Resposta do get_psicologo_chats:', data);
 
     // Verificar se data existe
     if (!data) {
@@ -112,8 +106,6 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
     // Garantir que sempre retornamos um array
     const chats = Array.isArray(data.chats) ? data.chats : [];
     
-    console.log('✅ Chats encontrados:', chats.length);
-    console.log('📋 Dados dos chats:', chats);
     
     // Buscar a última mensagem de cada chat para garantir que temos a mais recente
     const chatsWithLastMessage = await Promise.all(
@@ -134,7 +126,6 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
           }
 
           if (lastMessage) {
-            console.log('📝 Última mensagem encontrada para chat', chat.id, ':', lastMessage);
             
             // Atualizar o chat com a última mensagem real
             return {
@@ -154,8 +145,6 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
         }
       })
     );
-    
-    console.log('✅ Chats com última mensagem atualizada:', chatsWithLastMessage);
     
     return {
       success: true,

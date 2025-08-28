@@ -62,8 +62,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('✅ Usuário autenticado:', user.id);
-
     // Verificar se usuário tem permissão (deve ser CMS)
     const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('profiles')
