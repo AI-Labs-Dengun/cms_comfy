@@ -28,6 +28,10 @@ export default function PsicologosPage() {
   const [notificationMessage, setNotificationMessage] = useState('');
   const [selectedChatMessages, setSelectedChatMessages] = useState<Message[]>([]);
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
+  const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [messagesOffset, setMessagesOffset] = useState(0);
+  const [messagesLimit] = useState(20);
 
   // Debug temporário - remover depois
   console.log('🔍 PsicologosPage Debug:', {
@@ -629,26 +633,13 @@ export default function PsicologosPage() {
     setSelectedChat(chat);
     setShowChatList(false);
     
-    // Carregar mensagens do chat selecionado
-    try {
-      console.log('📥 Carregando mensagens do chat:', chat.id);
-      const messagesResult = await getChatMessages(chat.id);
-      if (messagesResult.success && messagesResult.data) {
-        // Adicionar chaves únicas para todas as mensagens carregadas
-        const messagesWithUniqueKeys = messagesResult.data.map((message: Message, index: number) => ({
-          ...message,
-          _uniqueKey: `${message.id}-${message.created_at}-${index}`
-        }));
-        setSelectedChatMessages(messagesWithUniqueKeys);
-        console.log('✅ Mensagens carregadas:', messagesWithUniqueKeys.length);
-      } else {
-        console.error('❌ Erro ao carregar mensagens:', messagesResult.error);
-        setSelectedChatMessages([]);
-      }
-    } catch (error) {
-      console.error('❌ Erro ao carregar mensagens do chat:', error);
-      setSelectedChatMessages([]);
-    }
+    // Resetar estado de paginação
+    setMessagesOffset(0);
+    setHasMoreMessages(true);
+    setSelectedChatMessages([]);
+    
+    // Carregar primeiras mensagens do chat selecionado
+    await loadMoreMessages(chat.id, 0, true);
     
     // Marcar mensagens como lidas imediatamente quando o chat é selecionado
     if (chat.unread_count_psicologo && chat.unread_count_psicologo > 0) {
@@ -670,6 +661,55 @@ export default function PsicologosPage() {
       } catch (error) {
         console.error('❌ Erro ao marcar mensagens como lidas ao selecionar chat:', error);
       }
+    }
+  };
+
+  // Função para carregar mais mensagens
+  const loadMoreMessages = async (chatId: string, offset: number, isInitialLoad: boolean = false) => {
+    if (isLoadingMoreMessages) return;
+    
+    try {
+      setIsLoadingMoreMessages(true);
+      console.log(`📥 Carregando mensagens do chat ${chatId} (offset: ${offset}, limit: ${messagesLimit})`);
+      
+      const messagesResult = await getChatMessages(chatId, messagesLimit, offset);
+      
+      if (messagesResult.success && messagesResult.data) {
+        const newMessages = messagesResult.data.map((message: Message, index: number) => ({
+          ...message,
+          _uniqueKey: `${message.id}-${message.created_at}-${offset + index}`
+        }));
+        
+        if (isInitialLoad) {
+          // Carregamento inicial - substituir todas as mensagens
+          setSelectedChatMessages(newMessages);
+          console.log('✅ Mensagens iniciais carregadas:', newMessages.length);
+        } else {
+          // Carregamento de mais mensagens - adicionar ao início
+          setSelectedChatMessages(prevMessages => {
+            // Combinar mensagens antigas com novas, evitando duplicatas
+            const combinedMessages = [...newMessages, ...prevMessages];
+            const uniqueMessages = combinedMessages.filter((message, index, self) => 
+              index === self.findIndex(m => m.id === message.id)
+            );
+            return uniqueMessages;
+          });
+          console.log('✅ Mais mensagens carregadas:', newMessages.length);
+        }
+        
+        // Verificar se há mais mensagens para carregar
+        setHasMoreMessages(newMessages.length === messagesLimit);
+        setMessagesOffset(offset + newMessages.length);
+        
+      } else {
+        console.error('❌ Erro ao carregar mensagens:', messagesResult.error);
+        setHasMoreMessages(false);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar mensagens do chat:', error);
+      setHasMoreMessages(false);
+    } finally {
+      setIsLoadingMoreMessages(false);
     }
   };
 
@@ -1018,6 +1058,9 @@ export default function PsicologosPage() {
             onNewMessageReceived={handleNewMessageInSelectedChat}
             showNewMessageIndicator={showNewMessageIndicator}
             messages={selectedChatMessages}
+            onLoadMoreMessages={() => loadMoreMessages(selectedChat.id, messagesOffset)}
+            hasMoreMessages={hasMoreMessages}
+            isLoadingMoreMessages={isLoadingMoreMessages}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
