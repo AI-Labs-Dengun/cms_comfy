@@ -149,7 +149,9 @@ export function useChatRealtime({
               
               // Processar imediatamente usando setTimeout com delay mínimo para garantir que seja processado
               setTimeout(() => {
-                onNewMessageRef.current(message);
+                if (onNewMessageRef.current) {
+                  onNewMessageRef.current(message);
+                }
               }, 0);
             } else {
               console.log('⚠️ Mensagem ignorada - não pertence ao chat atual');
