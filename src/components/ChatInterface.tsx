@@ -637,9 +637,11 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
   });
 
   // Função para buscar psicólogo associado à conversa
-  const loadAssignedPsicologo = useCallback(async () => {
+  const loadAssignedPsicologo = useCallback(async (showLoading = false) => {
     try {
-      setLoadingPsicologo(true);
+      if (showLoading) {
+        setLoadingPsicologo(true);
+      }
       
       const { data: chatData, error: chatError } = await supabase
         .from('chats')
@@ -678,7 +680,9 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     } catch (err) {
       console.error('Erro ao carregar psicólogo associado:', err);
     } finally {
-      setLoadingPsicologo(false);
+      if (showLoading) {
+        setLoadingPsicologo(false);
+      }
     }
   }, [chatId]);
 
@@ -686,7 +690,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
   const handleSelfAssignSuccess = () => {
     // Forçar atualização com um pequeno delay para garantir que a DB foi atualizada
     setTimeout(() => {
-      loadAssignedPsicologo();
+      loadAssignedPsicologo(false); // Não mostrar loading após auto-associação
     }, 500);
     
     if (onChatUpdate) {
@@ -697,7 +701,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
   // Carregar psicólogo associado quando o chat mudar
   useEffect(() => {
     if (chatId) {
-      loadAssignedPsicologo();
+      loadAssignedPsicologo(true); // Mostrar loading apenas no carregamento inicial
     }
   }, [chatId, loadAssignedPsicologo]);
 
@@ -706,7 +710,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     if (!chatId) return;
 
     const interval = setInterval(() => {
-      loadAssignedPsicologo();
+      loadAssignedPsicologo(false); // Não mostrar loading nas verificações periódicas
     }, 3000); // Verificar a cada 3 segundos
 
     return () => clearInterval(interval);
@@ -844,6 +848,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
               chatId={chatId} 
               variant="icon"
               onSuccess={handleSelfAssignSuccess}
+              isCurrentlyAssigned={assignedPsicologo?.id === profile?.id}
             />
 
             {/* Tags de Status - Integradas na barra principal */}
