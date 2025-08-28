@@ -75,8 +75,9 @@ export function useChatRealtime({
       })
       .subscribe();
     // Configurar subscription para atualizações de chats
+    // OTIMIZAÇÃO: Canal mais eficiente sem timestamp
     const chatsSubscription = supabase
-      .channel(`chats-realtime-${Date.now()}`)
+      .channel('chats-realtime')
       .on(
         'postgres_changes',
         {
@@ -124,8 +125,9 @@ export function useChatRealtime({
       });
 
     // Configurar subscription para novas mensagens
+    // OTIMIZAÇÃO: Canal mais eficiente sem timestamp
     const messagesSubscription = supabase
-      .channel(`messages-realtime-${Date.now()}`)
+      .channel('messages-realtime')
       .on(
         'postgres_changes',
         {
@@ -133,14 +135,22 @@ export function useChatRealtime({
           schema: 'public',
           table: 'messages'
         },
-        (payload) => {          
+        (payload) => {
+          const realtimeTimestamp = performance.now();
+          console.log('📡 Realtime: Mensagem recebida do Supabase em:', new Date().toISOString());
+          
           if (onNewMessageRef.current) {
             const message = payload.new as Message;
             
             // Se chatId foi especificado, só processar mensagens desse chat
             if (!chatId || message.chat_id === chatId) {
               console.log('✅ Processando nova mensagem para o chat atual');
-              onNewMessageRef.current(message);
+              console.log(`⏱️ Realtime delay: ${(performance.now() - realtimeTimestamp).toFixed(2)}ms`);
+              
+              // Processar imediatamente usando setTimeout com delay mínimo para garantir que seja processado
+              setTimeout(() => {
+                onNewMessageRef.current(message);
+              }, 0);
             } else {
               console.log('⚠️ Mensagem ignorada - não pertence ao chat atual');
             }
