@@ -218,8 +218,57 @@ export async function getChatInfo(chatId: string): Promise<ApiResponse<ChatInfo>
   }
 }
 
-// Função para buscar mensagens de um chat
-export async function getChatMessages(chatId: string): Promise<ApiResponse<Message[]>> {
+// Função para buscar mensagens de um chat com paginação
+export async function getChatMessages(chatId: string, limit: number = 20, offset: number = 0): Promise<ApiResponse<Message[]>> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return {
+        success: false,
+        error: 'Usuário não autenticado'
+      };
+    }
+
+    // ✅ IMPLEMENTAÇÃO REAL: Buscar mensagens do banco de dados com paginação
+    const { data, error } = await supabase.rpc('get_chat_messages_paginated', {
+      chat_id_param: chatId,
+      user_id_param: user.id,
+      limit_param: limit,
+      offset_param: offset
+    });
+
+    if (error) {
+      console.error('Erro ao buscar mensagens:', error);
+      return {
+        success: false,
+        error: 'Erro ao carregar mensagens: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao carregar mensagens'
+      };
+    }
+
+    return {
+      success: true,
+      data: data.messages || []
+    };
+
+  } catch (error) {
+    console.error('Erro inesperado ao buscar mensagens:', error);
+    return {
+      success: false,
+      error: 'Erro inesperado ao carregar mensagens'
+    };
+  }
+}
+
+// Função para buscar mensagens de um chat (versão sem paginação para compatibilidade)
+export async function getChatMessagesAll(chatId: string): Promise<ApiResponse<Message[]>> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
