@@ -366,7 +366,7 @@ export default function PsicologosPage() {
     // Log do tempo total de processamento
     const endTime = performance.now();
     console.log(`⏱️ Tempo total de processamento da mensagem: ${(endTime - startTime).toFixed(2)}ms`);
-  }, [updateChatInList, chats, selectedChat, handleNewMessageInSelectedChat]);
+  }, [updateChatInList, selectedChat, handleNewMessageInSelectedChat, pageIsVisible]);
 
   // Função para lidar com atualização de chat
   const handleChatUpdate = useCallback(async (updatedChat: Chat) => {
