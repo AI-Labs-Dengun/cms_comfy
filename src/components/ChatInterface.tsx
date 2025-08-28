@@ -508,6 +508,11 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
         setTimeout(() => {
           scrollToBottom();
         }, 100);
+        
+        // Notificar a página pai para atualizar a lista de chats
+        if (onChatUpdate) {
+          onChatUpdate(chatId);
+        }
       } else {
         console.error('Erro ao enviar mensagem:', result.error);
         // Restaurar a mensagem no campo de entrada se houve erro
