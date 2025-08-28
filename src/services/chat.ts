@@ -1208,7 +1208,7 @@ export async function disassociatePsicologoFromChat(chatId: string, psicologoId:
 }
 
 // Função para buscar psicólogos disponíveis para associar a um chat
-export async function getAvailablePsicologosForChat(chatId: string): Promise<ApiResponse<AvailablePsicologo[]>> {
+export async function getAvailablePsicologosForChat(): Promise<ApiResponse<AvailablePsicologo[]>> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
