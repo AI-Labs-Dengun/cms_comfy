@@ -22,7 +22,6 @@ export default function PsicologosPage() {
   const [error, setError] = useState<string | null>(null);
   const [showChatList, setShowChatList] = useState(true);
   const [activeFilters, setActiveFilters] = useState<ChatStatus[]>([]);
-  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
   const [recentlyUpdatedChats, setRecentlyUpdatedChats] = useState<Set<string>>(new Set());
   const [pageIsVisible, setPageIsVisible] = useState(!document.hidden);
   const [showNotification, setShowNotification] = useState(false);
@@ -185,7 +184,6 @@ export default function PsicologosPage() {
     const startTime = performance.now();
     console.log('💬 Nova mensagem recebida:', message);
     console.log('⏱️ Timestamp de processamento:', new Date().toISOString());
-    setIsRealtimeActive(true);
     
     // Atualizar o chat correspondente à mensagem
     if (message.chat_id) {
@@ -361,9 +359,6 @@ export default function PsicologosPage() {
       }
     }
     
-    // Resetar o indicador após 3 segundos
-    setTimeout(() => setIsRealtimeActive(false), 3000);
-    
     // Log do tempo total de processamento
     const endTime = performance.now();
     console.log(`⏱️ Tempo total de processamento da mensagem: ${(endTime - startTime).toFixed(2)}ms`);
@@ -372,7 +367,6 @@ export default function PsicologosPage() {
   // Função para lidar com atualização de chat
   const handleChatUpdate = useCallback(async (updatedChat: Chat) => {
     console.log('🔄 Chat atualizado:', updatedChat);
-    setIsRealtimeActive(true);
     
     // Buscar o contador real de mensagens não lidas da base de dados
     let realUnreadCount = 0;
@@ -427,9 +421,6 @@ export default function PsicologosPage() {
     if (selectedChat?.id === sanitizedChat.id) {
       setSelectedChat(sanitizedChat);
     }
-    
-    // Resetar o indicador após 3 segundos
-    setTimeout(() => setIsRealtimeActive(false), 3000);
     
     // Remover da lista de chats recentemente atualizados após 2 segundos (reduzido para minimizar piscar)
     setTimeout(() => {
@@ -910,9 +901,7 @@ export default function PsicologosPage() {
         setChats(result.data || []);
         console.log('✅ Lista de chats atualizada com sucesso');
         
-        // Mostrar indicador de atualização
-        setIsRealtimeActive(true);
-        setTimeout(() => setIsRealtimeActive(false), 2000);
+
         
       } else {
         console.error('❌ Erro ao atualizar chats:', result.error);
@@ -1075,15 +1064,6 @@ export default function PsicologosPage() {
                   <p className="text-xs text-gray-500">
                     {filteredChats.length} de {chats.length} ativas
                   </p>
-                  {/* Indicador de tempo real */}
-                  <div className="flex items-center space-x-1">
-                    <div className={`w-2 h-2 rounded-full ${
-                      isRealtimeActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'
-                    }`}></div>
-                    <span className="text-xs text-gray-400">
-                      {isRealtimeActive ? 'Atualizando...' : 'Online'}
-                    </span>
-                  </div>
                 </div>
               </div>
               
@@ -1249,12 +1229,6 @@ export default function PsicologosPage() {
                               {chat.last_message_content}
                             </span>
                           </p>
-                          {/* Debug temporário - remover depois */}
-                          {process.env.NODE_ENV === 'development' && (
-                            <div className="text-xs text-gray-400 mt-1">
-                              Debug: {chat.last_message_sender_type} | {chat.last_message_content?.substring(0, 20)}...
-                            </div>
-                          )}
                         </div>
                       ) : (
                         <div className="mb-3 min-h-0">
