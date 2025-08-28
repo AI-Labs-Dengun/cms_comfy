@@ -38,6 +38,13 @@ export default function PsicologosPage() {
   // Função para processar novas mensagens no chat selecionado
   const handleNewMessageInSelectedChat = useCallback((message: Message) => {
     console.log('💬 Nova mensagem no chat selecionado:', message);
+    console.log('🔍 handleNewMessageInSelectedChat chamada - detalhes:', {
+      messageId: message.id,
+      chatId: message.chat_id,
+      content: message.content,
+      senderType: message.sender_type,
+      timestamp: message.created_at
+    });
     
     setSelectedChatMessages(prevMessages => {
       // Verificar se a mensagem já existe para evitar duplicatas
@@ -61,11 +68,16 @@ export default function PsicologosPage() {
           (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
         
-        // Mostrar indicador de nova mensagem se não for do psicólogo atual
-        if (message.sender_type === 'app_user') {
+        // Mostrar indicador de nova mensagem APENAS se:
+        // 1. A mensagem não é do psicólogo atual
+        // 2. E a página não está visível (está em background/minimizada)
+        if (message.sender_type === 'app_user' && (!pageIsVisible || document.hidden)) {
+          console.log('🔔 Mostrando indicador de nova mensagem no chat (página não visível)');
           setShowNewMessageIndicator(true);
           // Esconder o indicador após 3 segundos
           setTimeout(() => setShowNewMessageIndicator(false), 3000);
+        } else if (message.sender_type === 'app_user') {
+          console.log('⚠️ Não mostrando indicador - chat está visível e ativo');
         }
         
         return updatedMessages;
@@ -73,7 +85,7 @@ export default function PsicologosPage() {
       console.log('⚠️ Mensagem já existe no chat selecionado, ignorando duplicata:', message.id);
       return prevMessages;
     });
-  }, []);
+  }, [pageIsVisible]);
 
   // Função para atualizar um chat específico na lista
   const updateChatInList = useCallback(async (chatId: string) => {
@@ -168,7 +180,9 @@ export default function PsicologosPage() {
   // 3. Busca direta dos dados do chat na base de dados para garantir informações atualizadas
   // 4. Detecção de visibilidade da página para otimizar notificações
   const handleNewMessage = useCallback(async (message: Message) => {
+    const startTime = performance.now();
     console.log('💬 Nova mensagem recebida:', message);
+    console.log('⏱️ Timestamp de processamento:', new Date().toISOString());
     setIsRealtimeActive(true);
     
     // Atualizar o chat correspondente à mensagem
@@ -178,7 +192,8 @@ export default function PsicologosPage() {
       // Verificar se o chat está selecionado (aberto)
       const isChatSelected = selectedChat?.id === message.chat_id;
       
-      // Atualizar imediatamente o chat na lista com a nova mensagem
+      // OTIMIZAÇÃO: Atualizar imediatamente o chat na lista com a nova mensagem
+      // Usar flushSync para forçar atualização imediata da UI
       setChats(prevChats => {
         const chatIndex = prevChats.findIndex(c => c.id === message.chat_id);
         if (chatIndex >= 0) {
@@ -214,8 +229,11 @@ export default function PsicologosPage() {
             last_message_content: updatedChats[chatIndex].last_message_content,
             last_message_at: updatedChats[chatIndex].last_message_at,
             sender: updatedChats[chatIndex].last_message_sender_name,
+            sender_type: updatedChats[chatIndex].last_message_sender_type,
             unread_count: updatedChats[chatIndex].unread_count_psicologo,
-            isSelected: isChatSelected
+            isSelected: isChatSelected,
+            message_sender_type: message.sender_type,
+            message_content: message.content
           });
           
           return updatedChats;
@@ -223,13 +241,45 @@ export default function PsicologosPage() {
         return prevChats;
       });
       
-      // Se o chat não está selecionado, atualizar via API para obter o contador correto
-      if (!isChatSelected) {
-        await updateChatInList(message.chat_id);
-      } else {
+      // CORREÇÃO: SEMPRE processar a mensagem no chat selecionado E atualizar a lista
+      if (isChatSelected) {
         // Se o chat está selecionado, processar a mensagem no chat selecionado
         handleNewMessageInSelectedChat(message);
+        console.log('📝 Chat selecionado: processando mensagem no chat E atualizando lista');
+        
+        // ATUALIZAÇÃO ADICIONAL: Também atualizar a última mensagem na lista imediatamente
+        console.log('🔥 ATUALIZAÇÃO IMEDIATA da lista para chat selecionado:', {
+          chatId: message.chat_id,
+          messageContent: message.content,
+          senderType: message.sender_type
+        });
+        setChats(prevChats => {
+          const updatedChats = prevChats.map(chat => 
+            chat.id === message.chat_id 
+              ? {
+                  ...chat,
+                  last_message_at: message.created_at,
+                  last_message_content: message.content,
+                  last_message_sender_type: message.sender_type,
+                  last_message_sender_name: message.sender_type === 'psicologo' ? 'Você' : chat.masked_user_name
+                }
+              : chat
+          );
+          
+          // GARANTIR reordenação imediata por data da última mensagem
+          return updatedChats.sort((a, b) => {
+            const dateA = new Date(a.last_message_at || a.created_at).getTime();
+            const dateB = new Date(b.last_message_at || b.created_at).getTime();
+            return dateB - dateA;
+          });
+        });
       }
+      
+      // SEMPRE atualizar a lista de chats para manter sincronização via API
+      // Executar em background sem bloquear a interface
+      updateChatInList(message.chat_id).catch(error => {
+        console.error('❌ Erro ao atualizar chat em background:', error);
+      });
       
       // Mostrar notificação sutil se a mensagem não for do psicólogo atual e o chat não estiver aberto
       // OU se a página não estiver visível (background)
@@ -311,6 +361,10 @@ export default function PsicologosPage() {
     
     // Resetar o indicador após 3 segundos
     setTimeout(() => setIsRealtimeActive(false), 3000);
+    
+    // Log do tempo total de processamento
+    const endTime = performance.now();
+    console.log(`⏱️ Tempo total de processamento da mensagem: ${(endTime - startTime).toFixed(2)}ms`);
   }, [updateChatInList, chats, selectedChat, handleNewMessageInSelectedChat]);
 
   // Função para lidar com atualização de chat
@@ -568,8 +622,8 @@ export default function PsicologosPage() {
       }
     };
 
-    // Atualizar a cada 30 segundos para garantir sincronização
-    const interval = setInterval(updateUnreadCounts, 30000);
+    // OTIMIZAÇÃO: Atualizar a cada 15 segundos para melhor sincronização
+    const interval = setInterval(updateUnreadCounts, 15000);
 
     return () => clearInterval(interval);
   }, [chats, updateChatInList, selectedChat]);
@@ -642,9 +696,12 @@ export default function PsicologosPage() {
         );
         
         // Chamar a API para marcar como lidas no banco de dados
-        setTimeout(async () => {
-          await updateChatInList(chat.id);
-        }, 500);
+        // OTIMIZAÇÃO: Reduzir delay e executar em background
+        setTimeout(() => {
+          updateChatInList(chat.id).catch(error => {
+            console.error('❌ Erro ao atualizar chat após marcar como lido:', error);
+          });
+        }, 100); // Reduzido de 500ms para 100ms
       } catch (error) {
         console.error('❌ Erro ao marcar mensagens como lidas ao selecionar chat:', error);
       }
@@ -865,10 +922,16 @@ export default function PsicologosPage() {
     setActiveFilters([]);
   };
 
-  // Filtrar chats baseado nos filtros ativos
-  const filteredChats = activeFilters.length > 0 
+  // Filtrar chats baseado nos filtros ativos e ordenar por última mensagem
+  const filteredChats = (activeFilters.length > 0 
     ? chats.filter(chat => activeFilters.includes(chat.status))
-    : chats;
+    : chats)
+    .sort((a, b) => {
+      // Ordenar por data da última mensagem (mais recente primeiro)
+      const dateA = new Date(a.last_message_at || a.created_at).getTime();
+      const dateB = new Date(b.last_message_at || b.created_at).getTime();
+      return dateB - dateA;
+    });
 
   if (loading) {
     return (
