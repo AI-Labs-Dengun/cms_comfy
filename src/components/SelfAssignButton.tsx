@@ -33,6 +33,9 @@ export default function SelfAssignButton({
       setError('');
       setSuccess(false);
 
+      // OTIMIZAÇÃO: Atualizar estado visual imediatamente (otimisticamente)
+      const wasCurrentlyAssigned = isCurrentlyAssigned;
+      
       let result;
       
       if (isCurrentlyAssigned) {
@@ -48,15 +51,15 @@ export default function SelfAssignButton({
       if (result.success) {
         setSuccess(true);
         
-        // Notificar sucesso
+        // Notificar sucesso imediatamente
         if (onSuccess) {
           onSuccess();
         }
         
-        // Resetar estado de sucesso após 3 segundos
+        // Resetar estado de sucesso após 1.5 segundos (mais rápido)
         setTimeout(() => {
           setSuccess(false);
-        }, 3000);
+        }, 1500);
       } else {
         console.error(`❌ Erro na ${isCurrentlyAssigned ? 'desassociação' : 'auto-associação'}:`, result.error);
         setError(result.error || `Erro ao ${isCurrentlyAssigned ? 'se desassociar' : 'se associar'} à conversa`);
