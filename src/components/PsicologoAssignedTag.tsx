@@ -159,16 +159,76 @@ export default function PsicologoAssignedTag({
     }
   }, [chatId, loadAssignedPsicologo]);
 
-  // Verificar periodicamente se há mudanças na associação
+  // Verificar periodicamente se há mudanças na associação (sem piscar)
   useEffect(() => {
     if (!chatId) return;
 
-    const interval = setInterval(() => {
-      loadAssignedPsicologo();
+    const interval = setInterval(async () => {
+      try {
+        // Buscar dados sem mostrar loading
+        const { data: chatData, error: chatError } = await supabase
+          .from('chats')
+          .select(`
+            assigned_psicologo_id,
+            assigned_at,
+            is_primary_assignment,
+            profiles:assigned_psicologo_id (
+              id,
+              name,
+              username,
+              is_online
+            )
+          `)
+          .eq('id', chatId)
+          .single();
+
+        if (chatError) {
+          console.error('Erro ao buscar psicólogo associado (background):', chatError);
+          return;
+        }
+
+        // Atualizar estado apenas se houve mudança real
+        if (chatData?.assigned_psicologo_id && chatData.profiles) {
+          const psicologoProfile = Array.isArray(chatData.profiles) ? chatData.profiles[0] : chatData.profiles;
+          const newAssignedPsicologo = {
+            id: psicologoProfile.id,
+            name: psicologoProfile.name,
+            username: psicologoProfile.username,
+            is_online: psicologoProfile.is_online,
+            assigned_at: chatData.assigned_at,
+            is_primary_assignment: chatData.is_primary_assignment
+          };
+          
+          // Só atualizar se os dados realmente mudaram
+          setAssignedPsicologo(prev => {
+            if (!prev || 
+                prev.id !== newAssignedPsicologo.id ||
+                prev.name !== newAssignedPsicologo.name ||
+                prev.is_online !== newAssignedPsicologo.is_online ||
+                prev.assigned_at !== newAssignedPsicologo.assigned_at ||
+                prev.is_primary_assignment !== newAssignedPsicologo.is_primary_assignment) {
+              console.log('🔄 PsicologoAssignedTag - Dados atualizados em background:', newAssignedPsicologo);
+              return newAssignedPsicologo;
+            }
+            return prev;
+          });
+        } else {
+          // Se não há psicólogo associado, verificar se precisa atualizar
+          setAssignedPsicologo(prev => {
+            if (prev !== null) {
+              console.log('🔄 PsicologoAssignedTag - Psicólogo removido em background');
+              return null;
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.error('Erro ao verificar psicólogo associado em background:', err);
+      }
     }, 5000); // Verificar a cada 5 segundos
 
     return () => clearInterval(interval);
-  }, [chatId, loadAssignedPsicologo]);
+  }, [chatId]);
 
   // Escutar mudanças na tabela chats em tempo real
   useEffect(() => {
