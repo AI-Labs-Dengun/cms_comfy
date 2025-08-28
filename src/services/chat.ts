@@ -14,6 +14,10 @@ export interface Chat {
   status: 'novo_chat' | 'a_decorrer' | 'follow_up' | 'encerrado';
   created_at: string;
   updated_at: string;
+  // Novas colunas para associação de psicólogos
+  assigned_psicologo_id?: string;
+  assigned_at?: string;
+  is_primary_assignment?: boolean;
 }
 
 export interface Message {
@@ -36,6 +40,31 @@ export interface ChatInfo {
   status: 'novo_chat' | 'a_decorrer' | 'follow_up' | 'encerrado';
   created_at: string;
   updated_at: string;
+  // Novas colunas para associação de psicólogos
+  assigned_psicologo_id?: string;
+  assigned_at?: string;
+  is_primary_assignment?: boolean;
+}
+
+// Interface para psicólogo associado a um chat
+export interface AssignedPsicologo {
+  id: string;
+  name: string;
+  username: string;
+  is_online: boolean;
+  last_seen?: string;
+  assigned_at: string;
+  is_primary_assignment: boolean;
+}
+
+// Interface para informações de psicólogos disponíveis
+export interface AvailablePsicologo {
+  id: string;
+  name: string;
+  username: string;
+  is_online: boolean;
+  last_seen?: string;
+  assigned_chats_count: number;
 }
 
 export interface ApiResponse<T> {
@@ -888,6 +917,352 @@ export async function simulateNewMessage(chatId: string, content: string): Promi
     return {
       success: false,
       error: 'Erro inesperado ao simular nova mensagem'
+    };
+  }
+}
+
+// Função para buscar psicólogos associados a um chat
+export async function getChatPsicologos(chatId: string): Promise<ApiResponse<AssignedPsicologo[]>> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return {
+        success: false,
+        error: 'Usuário não autenticado'
+      };
+    }
+
+    // Verificar se o usuário é um psicólogo autorizado
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_role, authorized')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile || profile.user_role !== 'psicologo' || !profile.authorized) {
+      return {
+        success: false,
+        error: 'Acesso negado. Apenas psicólogos autorizados podem ver associações.'
+      };
+    }
+
+    // Buscar psicólogo associado ao chat usando a nova função SQL
+    const { data, error } = await supabase.rpc('get_chat_assigned_psicologo', {
+      chat_id_param: chatId
+    });
+
+    if (error) {
+      console.error('Erro ao buscar psicólogo associado:', error);
+      return {
+        success: false,
+        error: 'Erro ao carregar psicólogo associado: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao carregar psicólogo associado'
+      };
+    }
+
+    // Se não há psicólogo associado, retornar array vazio
+    if (!data.data) {
+      return {
+        success: true,
+        data: []
+      };
+    }
+
+    // Retornar o psicólogo associado como array
+    const psicologo: AssignedPsicologo = {
+      id: data.data.id,
+      name: data.data.name,
+      username: data.data.username,
+      is_online: data.data.is_online,
+      last_seen: data.data.last_seen,
+      assigned_at: data.data.assigned_at,
+      is_primary_assignment: data.data.is_primary_assignment
+    };
+
+    return {
+      success: true,
+      data: [psicologo]
+    };
+
+  } catch (error) {
+    console.error('Erro inesperado ao buscar psicólogo associado:', error);
+    return {
+      success: false,
+      error: 'Erro inesperado ao carregar psicólogo associado'
+    };
+  }
+}
+
+// Função para associar um psicólogo a um chat
+export async function associatePsicologoToChat(chatId: string, psicologoId: string): Promise<ApiResponse<AssignedPsicologo>> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return {
+        success: false,
+        error: 'Usuário não autenticado'
+      };
+    }
+
+    // Verificar se o usuário é um psicólogo autorizado
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_role, authorized')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile || profile.user_role !== 'psicologo' || !profile.authorized) {
+      return {
+        success: false,
+        error: 'Acesso negado. Apenas psicólogos autorizados podem associar-se a chats.'
+      };
+    }
+
+    // Associar psicólogo ao chat usando a nova função SQL
+    const { data, error } = await supabase.rpc('assign_psicologo_to_chat', {
+      chat_id_param: chatId,
+      psicologo_id_param: psicologoId
+    });
+
+    if (error) {
+      console.error('Erro ao associar psicólogo:', error);
+      return {
+        success: false,
+        error: 'Erro ao associar psicólogo: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao associar psicólogo'
+      };
+    }
+
+    // Buscar informações do psicólogo associado
+    const psicologo: AssignedPsicologo = {
+      id: data.data.psicologo_id,
+      name: data.data.psicologo_name,
+      username: data.data.psicologo_username,
+      is_online: false, // Será atualizado na próxima consulta
+      assigned_at: data.data.assigned_at,
+      is_primary_assignment: true
+    };
+
+    return {
+      success: true,
+      data: psicologo
+    };
+
+  } catch (error) {
+    console.error('Erro inesperado ao associar psicólogo:', error);
+    return {
+      success: false,
+      error: 'Erro inesperado ao associar psicólogo'
+    };
+  }
+}
+
+// Função para o psicólogo se auto-associar a um chat
+export async function selfAssignToChat(chatId: string): Promise<ApiResponse<AssignedPsicologo>> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return {
+        success: false,
+        error: 'Usuário não autenticado'
+      };
+    }
+
+    // Auto-associar psicólogo ao chat usando a nova função SQL
+    const { data, error } = await supabase.rpc('self_assign_to_chat', {
+      chat_id_param: chatId
+    });
+
+    if (error) {
+      console.error('Erro ao se auto-associar:', error);
+      return {
+        success: false,
+        error: 'Erro ao se associar à conversa: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao se associar à conversa'
+      };
+    }
+
+    // Buscar informações do psicólogo associado
+    const psicologo: AssignedPsicologo = {
+      id: data.data.psicologo_id,
+      name: data.data.psicologo_name,
+      username: data.data.psicologo_username,
+      is_online: false, // Será atualizado na próxima consulta
+      assigned_at: data.data.assigned_at,
+      is_primary_assignment: true
+    };
+
+    return {
+      success: true,
+      data: psicologo
+    };
+
+  } catch (error) {
+    console.error('Erro inesperado ao se auto-associar:', error);
+    return {
+      success: false,
+      error: 'Erro inesperado ao se associar à conversa'
+    };
+  }
+}
+
+// Função para desassociar um psicólogo de um chat
+export async function disassociatePsicologoFromChat(chatId: string, psicologoId: string): Promise<ApiResponse<boolean>> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return {
+        success: false,
+        error: 'Usuário não autenticado'
+      };
+    }
+
+    // Verificar se o usuário é um psicólogo autorizado
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_role, authorized')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile || profile.user_role !== 'psicologo' || !profile.authorized) {
+      return {
+        success: false,
+        error: 'Acesso negado. Apenas psicólogos autorizados podem desassociar-se de chats.'
+      };
+    }
+
+    // Verificar se o psicólogo está realmente associado ao chat
+    const { data: chatData, error: chatError } = await supabase.rpc('get_chat_assigned_psicologo', {
+      chat_id_param: chatId
+    });
+
+    if (chatError) {
+      console.error('Erro ao verificar associação:', chatError);
+      return {
+        success: false,
+        error: 'Erro ao verificar associação: ' + chatError.message
+      };
+    }
+
+    if (!chatData.success || !chatData.data || chatData.data.id !== psicologoId) {
+      return {
+        success: false,
+        error: 'Psicólogo não está associado a esta conversa'
+      };
+    }
+
+    // Desassociar psicólogo do chat usando a nova função SQL
+    const { data, error } = await supabase.rpc('unassign_psicologo_from_chat', {
+      chat_id_param: chatId
+    });
+
+    if (error) {
+      console.error('Erro ao desassociar psicólogo:', error);
+      return {
+        success: false,
+        error: 'Erro ao desassociar psicólogo: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao desassociar psicólogo'
+      };
+    }
+
+    return {
+      success: true,
+      data: true
+    };
+
+  } catch (error) {
+    console.error('Erro inesperado ao desassociar psicólogo:', error);
+    return {
+      success: false,
+      error: 'Erro inesperado ao desassociar psicólogo'
+    };
+  }
+}
+
+// Função para buscar psicólogos disponíveis para associar a um chat
+export async function getAvailablePsicologosForChat(chatId: string): Promise<ApiResponse<AvailablePsicologo[]>> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return {
+        success: false,
+        error: 'Usuário não autenticado'
+      };
+    }
+
+    // Verificar se o usuário é um psicólogo autorizado
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_role, authorized')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile || profile.user_role !== 'psicologo' || !profile.authorized) {
+      return {
+        success: false,
+        error: 'Acesso negado. Apenas psicólogos autorizados podem ver psicólogos disponíveis.'
+      };
+    }
+
+    // Buscar psicólogos disponíveis usando a nova função SQL
+    const { data, error } = await supabase.rpc('get_available_psicologos');
+
+    if (error) {
+      console.error('Erro ao buscar psicólogos disponíveis:', error);
+      return {
+        success: false,
+        error: 'Erro ao carregar psicólogos disponíveis: ' + error.message
+      };
+    }
+
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Erro desconhecido ao carregar psicólogos disponíveis'
+      };
+    }
+
+    const psicologos: AvailablePsicologo[] = data.data || [];
+
+    return {
+      success: true,
+      data: psicologos
+    };
+
+  } catch (error) {
+    console.error('Erro inesperado ao buscar psicólogos disponíveis:', error);
+    return {
+      success: false,
+      error: 'Erro inesperado ao carregar psicólogos disponíveis'
     };
   }
 }
