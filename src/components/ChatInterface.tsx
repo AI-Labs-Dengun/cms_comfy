@@ -688,10 +688,13 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
 
   // Função para atualizar psicólogo associado após auto-associação
   const handleSelfAssignSuccess = () => {
-    // Forçar atualização com um pequeno delay para garantir que a DB foi atualizada
+    // Atualização imediata para melhor responsividade
+    loadAssignedPsicologo(false); // Não mostrar loading após auto-associação
+    
+    // Atualização adicional com pequeno delay para garantir sincronização
     setTimeout(() => {
-      loadAssignedPsicologo(false); // Não mostrar loading após auto-associação
-    }, 500);
+      loadAssignedPsicologo(false);
+    }, 100);
     
     if (onChatUpdate) {
       onChatUpdate(chatId);
@@ -705,13 +708,13 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     }
   }, [chatId, loadAssignedPsicologo]);
 
-  // Verificar periodicamente se há mudanças na associação
+  // Verificar periodicamente se há mudanças na associação (menos frequente para melhor performance)
   useEffect(() => {
     if (!chatId) return;
 
     const interval = setInterval(() => {
       loadAssignedPsicologo(false); // Não mostrar loading nas verificações periódicas
-    }, 3000); // Verificar a cada 3 segundos
+    }, 5000); // Verificar a cada 5 segundos (reduzido de 3s para 5s)
 
     return () => clearInterval(interval);
   }, [chatId, loadAssignedPsicologo]);
