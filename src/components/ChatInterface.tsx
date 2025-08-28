@@ -14,6 +14,9 @@ interface ChatInterfaceProps {
   onNewMessageReceived?: (message: Message) => void; // Callback para quando uma nova mensagem é recebida
   showNewMessageIndicator?: boolean; // Prop para controlar o indicador de nova mensagem
   messages?: Message[]; // Prop para receber mensagens da página pai
+  onLoadMoreMessages?: () => void; // Callback para carregar mais mensagens
+  hasMoreMessages?: boolean; // Indica se há mais mensagens para carregar
+  isLoadingMoreMessages?: boolean; // Indica se está carregando mais mensagens
 }
 
 // Interface para mensagens agrupadas
@@ -23,7 +26,7 @@ interface GroupedMessages {
   messages: Message[];
 }
 
-export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, onNewMessageReceived, showNewMessageIndicator = true, messages: externalMessages }: ChatInterfaceProps) {
+export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, onNewMessageReceived, showNewMessageIndicator = true, messages: externalMessages, onLoadMoreMessages, hasMoreMessages = false, isLoadingMoreMessages = false }: ChatInterfaceProps) {
   const { profile } = useAuth();
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
   // Remover estado local de mensagens - usar apenas mensagens externas
@@ -37,6 +40,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false);
   const [isChatActive, setIsChatActive] = useState(true); // Controla se o chat está ativo/visível
+  const [showLoadMoreButton, setShowLoadMoreButton] = useState(false);
   
   // Usar refs para armazenar as funções de callback e evitar recriações
   const handleNewMessageRef = useRef<(message: Message) => void>(() => {});
@@ -179,6 +183,23 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
       window.removeEventListener('keypress', handleActivity);
     };
   }, [handleUserInteraction]);
+
+  // Detectar scroll para mostrar botão "Carregar mais"
+  useEffect(() => {
+    const handleScroll = () => {
+      if (messagesContainerRef.current && hasMoreMessages) {
+        const { scrollTop } = messagesContainerRef.current;
+        // Mostrar botão quando o usuário fizer scroll para cima (próximo ao topo)
+        setShowLoadMoreButton(scrollTop < 100);
+      }
+    };
+
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [hasMoreMessages]);
 
   // Função para agrupar mensagens por data
   const groupMessagesByDate = (messages: Message[]): GroupedMessages[] => {
@@ -531,6 +552,35 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
         {showNewMessageIndicator && (
           <div className="absolute top-4 right-4 z-10 bg-green-500 text-white px-3 py-2 rounded-full text-sm font-medium shadow-lg animate-bounce">
             💬 Nova mensagem!
+          </div>
+        )}
+
+        {/* Botão "Carregar mais" */}
+        {hasMoreMessages && showLoadMoreButton && (
+          <div className="flex justify-center py-4">
+            <button
+              onClick={onLoadMoreMessages}
+              disabled={isLoadingMoreMessages}
+              className={`flex items-center space-x-2 px-6 py-3 rounded-full text-sm font-medium transition-all duration-200 ${
+                isLoadingMoreMessages
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:shadow-md'
+              }`}
+            >
+              {isLoadingMoreMessages ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Carregando...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                  <span>Carregar mais mensagens</span>
+                </>
+              )}
+            </button>
           </div>
         )}
         {groupedMessages.map((group) => (
