@@ -44,7 +44,6 @@ export function usePageVisibility(options: UsePageVisibilityOptions = {}) {
         
         // Só executar onVisible se a página ficou oculta por tempo suficiente
         if (wasHidden && hiddenDuration >= minHiddenTime) {
-          console.log(`👁️ usePageVisibility - Página visível novamente após ${Math.round(hiddenDuration / 1000)}s`);
           
           if (onVisible) {
             // Limpar timeout anterior se existir
@@ -58,7 +57,6 @@ export function usePageVisibility(options: UsePageVisibilityOptions = {}) {
             }, 100);
           }
         } else if (wasHidden) {
-          console.log(`👁️ usePageVisibility - Página visível novamente (oculta por ${Math.round(hiddenDuration / 1000)}s, ignorando)`);
         }
       }
     };

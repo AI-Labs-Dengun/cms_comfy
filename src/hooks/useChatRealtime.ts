@@ -74,7 +74,6 @@ export function useChatRealtime({
         console.log('✅ Realtime está funcionando corretamente');
       })
       .subscribe();
-
     // Configurar subscription para atualizações de chats
     const chatsSubscription = supabase
       .channel(`chats-realtime-${Date.now()}`)
@@ -134,12 +133,7 @@ export function useChatRealtime({
           schema: 'public',
           table: 'messages'
         },
-        (payload) => {
-          console.log('💬 Nova mensagem em tempo real:', payload);
-          console.log('🔍 ChatId atual:', chatId);
-          console.log('🔍 Mensagem chat_id:', payload.new?.chat_id);
-          console.log('🔍 onNewMessageRef.current existe:', !!onNewMessageRef.current);
-          
+        (payload) => {          
           if (onNewMessageRef.current) {
             const message = payload.new as Message;
             

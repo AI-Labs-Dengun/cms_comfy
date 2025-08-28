@@ -24,15 +24,6 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
   const [isInactivityTimerActive, setIsInactivityTimerActive] = useState(false);
   const [lastActivityTime, setLastActivityTime] = useState(Date.now());
 
-  // Debug logs
-  console.log('🔍 useOnlineStatus - Render:', {
-    profileId: profile?.id,
-    profileRole: profile?.user_role,
-    isOnline,
-    wasAutoOffline,
-    inactivityTimeout: inactivityTimeout / 1000 / 60,
-    isInactivityTimerActive
-  });
 
   // Carregar status inicial
   useEffect(() => {
@@ -45,7 +36,6 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
   // Função para atualizar status
   const updateStatus = useCallback(async (newStatus: boolean) => {
     if (!profile?.id || profile.user_role !== 'psicologo') {
-      console.log('🔍 useOnlineStatus - updateStatus ignorado:', { profileId: profile?.id, role: profile?.user_role });
       return;
     }
 
@@ -64,7 +54,6 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
       }
 
       setIsOnline(newStatus);
-      console.log('✅ Status atualizado:', newStatus ? 'Online' : 'Offline');
     } catch (error) {
       console.error('❌ Erro inesperado ao atualizar status:', error);
       throw error;
@@ -75,7 +64,6 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
 
   // Função para limpar flag de auto-offline
   const clearAutoOfflineFlag = useCallback(() => {
-    console.log('🔍 useOnlineStatus - Limpando flag de auto-offline');
     setWasAutoOffline(false);
   }, []);
 
@@ -112,10 +100,8 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
 
   // Timer para auto-offline - VERSÃO COMPLETA COM DETECÇÃO DE INATIVIDADE
   useEffect(() => {
-    console.log('🔍 useOnlineStatus - useEffect timer (versão completa)');
 
     if (!profile?.id || profile.user_role !== 'psicologo' || !isOnline) {
-      console.log('🔍 useOnlineStatus - Timer não iniciado (condições não atendidas)');
       setIsInactivityTimerActive(false);
       return;
     }
@@ -134,7 +120,6 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
       // Só resetar se passou pelo menos 1 segundo desde a última atividade
       // Isso evita resetar o timer constantemente
       if (timeSinceLastActivity > 1000) {
-        console.log('🔍 useOnlineStatus - Atividade detectada, resetando timer');
         currentLastActivityTime = now;
         setLastActivityTime(now);
         
@@ -144,7 +129,6 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
         
         // Iniciar novo timer
         timeoutId = setTimeout(async () => {
-          console.log('⏰ useOnlineStatus - Timer executado, alterando para offline');
           try {
             await updateStatus(false);
             setWasAutoOffline(true);
@@ -159,16 +143,12 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
 
     // Função para lidar com mudança de visibilidade
     const handleVisibilityChange = () => {
-      console.log('🔍 useOnlineStatus - Visibility change:', { hidden: document.hidden });
-
       if (document.hidden) {
         // Página oculta - iniciar timer imediatamente
-        console.log(`⏰ useOnlineStatus - Página oculta, iniciando timer de ${inactivityTimeout / 1000 / 60} minutos`);
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
         timeoutId = setTimeout(async () => {
-          console.log('⏰ useOnlineStatus - Timer executado, alterando para offline');
           try {
             await updateStatus(false);
             setWasAutoOffline(true);
@@ -180,7 +160,6 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
         }, inactivityTimeout);
       } else {
         // Página visível - resetar timer com base na última atividade
-        console.log('🔍 useOnlineStatus - Página visível, resetando timer');
         resetTimer();
       }
     };
@@ -202,9 +181,7 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
     // Iniciar timer inicial
     resetTimer();
 
-    return () => {
-      console.log('🔍 useOnlineStatus - Cleanup timer');
-      
+    return () => {      
       // Remover listeners de atividade
       activityEvents.forEach(event => {
         document.removeEventListener(event, resetTimer);
