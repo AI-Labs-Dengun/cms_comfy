@@ -1128,7 +1128,7 @@ export async function selfAssignToChat(chatId: string): Promise<ApiResponse<Assi
 }
 
 // Função para desassociar um psicólogo de um chat
-export async function disassociatePsicologoFromChat(chatId: string, psicologoId: string): Promise<ApiResponse<boolean>> {
+export async function disassociatePsicologoFromChat(chatId: string): Promise<ApiResponse<boolean>> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
