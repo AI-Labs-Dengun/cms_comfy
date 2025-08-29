@@ -146,23 +146,43 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
     }
 
     // Transformar os dados para o formato esperado
-    const chats = chatsData.map((chat: any) => ({
-      id: chat.id,
-      app_user_id: chat.app_user_id,
-      masked_user_name: chat.profiles?.name || 'Utilizador',
-      status: chat.status,
-      is_active: chat.is_active,
-      last_message_at: chat.last_message_at,
-      last_message_content: chat.last_message_content,
-      last_message_sender_type: chat.last_message_sender_type,
-      last_message_sender_name: chat.last_message_sender_name,
-      unread_count_psicologo: chat.unread_count_psicologo || 0,
-      created_at: chat.created_at,
-      updated_at: chat.updated_at,
-      assigned_psicologo_id: chat.assigned_psicologo_id,
-      assigned_at: chat.assigned_at,
-      is_primary_assignment: chat.is_primary_assignment
-    }));
+    const chats = chatsData.map((chat: unknown) => {
+      const chatData = chat as {
+        id: string;
+        app_user_id: string;
+        profiles?: { name: string };
+        status: string;
+        is_active: boolean;
+        last_message_at: string | null;
+        last_message_content: string | null;
+        last_message_sender_type: string | null;
+        last_message_sender_name: string | null;
+        unread_count_psicologo: number;
+        created_at: string;
+        updated_at: string;
+        assigned_psicologo_id: string | null;
+        assigned_at: string | null;
+        is_primary_assignment: boolean;
+      };
+      
+      return {
+        id: chatData.id,
+        app_user_id: chatData.app_user_id,
+        masked_user_name: chatData.profiles?.name || 'Utilizador',
+        status: chatData.status as 'novo_chat' | 'a_decorrer' | 'follow_up' | 'encerrado',
+        is_active: chatData.is_active,
+        last_message_at: chatData.last_message_at || '',
+        last_message_content: chatData.last_message_content || '',
+        last_message_sender_type: chatData.last_message_sender_type as 'psicologo' | 'app_user' | undefined,
+        last_message_sender_name: chatData.last_message_sender_name || '',
+        unread_count_psicologo: chatData.unread_count_psicologo || 0,
+        created_at: chatData.created_at,
+        updated_at: chatData.updated_at,
+        assigned_psicologo_id: chatData.assigned_psicologo_id || undefined,
+        assigned_at: chatData.assigned_at || undefined,
+        is_primary_assignment: chatData.is_primary_assignment
+      };
+    });
     
     
     // Buscar a última mensagem de cada chat para garantir que temos a mais recente
