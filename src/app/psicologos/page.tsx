@@ -15,11 +15,13 @@ import { useAuth } from '@/context/AuthContext';
 const customStyles = `
   .chat-card-hover {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1;
   }
   
   .chat-card-hover:hover {
     transform: translateY(-2px);
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    z-index: 5;
   }
   
   .filter-button-active {
@@ -70,6 +72,24 @@ const customStyles = `
   
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(156, 163, 175, 0.8);
+  }
+  
+  /* Garantir que cards de chat nunca sobreponham dropdowns */
+  .chat-card-container {
+    z-index: 1 !important;
+  }
+  
+  .chat-card-container:hover {
+    z-index: 5 !important;
+  }
+  
+  /* Dropdowns sempre no topo */
+  .dropdown-overlay {
+    z-index: 9998 !important;
+  }
+  
+  .dropdown-menu {
+    z-index: 9999 !important;
   }
 `;
 
@@ -1151,23 +1171,21 @@ export default function PsicologosPage() {
         {/* Cabeçalho da lista */}
         <div className="bg-white border-b border-gray-200 flex-shrink-0">
           {/* Header principal */}
-          <div className="px-6 py-4 border-b border-gray-100">
+          <div className="px-4 py-3 border-b border-gray-100">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">
-                    Conversas
-                  </h1>
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    {filteredChats.length} de {chats.length} ativas
-                  </p>
-                </div>
+              <div className="flex items-center space-x-3">
+                <h1 className="text-lg font-bold text-gray-900">
+                  Conversas
+                </h1>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                  {filteredChats.length}/{chats.length}
+                </span>
                 
                 {/* Botão de refresh */}
                 <button
                   onClick={handleRefreshChats}
                   disabled={isRefreshingChats}
-                  className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200 ${
+                  className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
                     isRefreshingChats
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       : 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 hover:scale-105'
@@ -1175,7 +1193,7 @@ export default function PsicologosPage() {
                   title="Atualizar conversas"
                 >
                   <svg 
-                    className={`w-5 h-5 ${isRefreshingChats ? 'animate-spin' : ''}`} 
+                    className={`w-4 h-4 ${isRefreshingChats ? 'animate-spin' : ''}`} 
                     fill="none" 
                     stroke="currentColor" 
                     viewBox="0 0 24 24"
@@ -1194,7 +1212,7 @@ export default function PsicologosPage() {
               {(activeFilters.length > 0 || assignmentFilter !== 'all') && (
                 <button
                   onClick={clearFilters}
-                  className="text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors px-3 py-1.5 rounded-lg hover:bg-gray-50"
+                  className="text-xs text-gray-500 hover:text-gray-700 font-medium transition-colors px-2 py-1 rounded-md hover:bg-gray-50"
                 >
                   Limpar filtros
                 </button>
@@ -1307,7 +1325,7 @@ export default function PsicologosPage() {
               {filteredChats.filter(chat => chat && chat.id).map((chat) => (
                 <div
                   key={chat.id}
-                  className={`bg-white rounded-xl p-5 hover:shadow-md cursor-pointer transition-all duration-200 border chat-card-hover ${
+                  className={`bg-white rounded-xl p-5 hover:shadow-md cursor-pointer transition-all duration-200 border chat-card-hover chat-card-container ${
                     selectedChat?.id === chat.id 
                       ? 'ring-2 ring-blue-500 shadow-lg border-blue-200' 
                       : 'border-gray-200 hover:border-gray-300'
