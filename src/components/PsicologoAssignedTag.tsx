@@ -332,7 +332,7 @@ export default function PsicologoAssignedTag({
         </button>
         
         {error && (
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-red-100 text-red-700 text-xs rounded-lg shadow-lg z-10 whitespace-nowrap">
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-red-100 text-red-700 text-xs rounded-lg shadow-lg z-[9999] whitespace-nowrap">
             {error}
             <button
               onClick={(e) => {
@@ -399,7 +399,7 @@ export default function PsicologoAssignedTag({
       </button>
       
       {error && (
-        <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-red-100 text-red-700 text-xs rounded-lg shadow-lg z-10 whitespace-nowrap">
+        <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-red-100 text-red-700 text-xs rounded-lg shadow-lg z-[9999] whitespace-nowrap">
           {error}
           <button
             onClick={(e) => {
