@@ -102,10 +102,31 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
       };
     }
 
-    // ✅ IMPLEMENTAÇÃO REAL: Buscar chats do banco de dados
-    const { data, error } = await supabase.rpc('get_psicologo_chats', {
-      psicologo_id_param: user.id
-    });
+    // ✅ IMPLEMENTAÇÃO REAL: Buscar chats diretamente da tabela
+    const { data: chatsData, error } = await supabase
+      .from('chats')
+      .select(`
+        id,
+        app_user_id,
+        status,
+        is_active,
+        last_message_at,
+        last_message_content,
+        last_message_sender_type,
+        last_message_sender_name,
+        unread_count_psicologo,
+        created_at,
+        updated_at,
+        assigned_psicologo_id,
+        assigned_at,
+        is_primary_assignment,
+        profiles!app_user_id (
+          name
+        )
+      `)
+      .eq('is_active', true)
+      .order('last_message_at', { ascending: false })
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('❌ Erro ao buscar chats:', error);
@@ -116,7 +137,7 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
     }
 
     // Verificar se data existe
-    if (!data) {
+    if (!chatsData) {
       console.error('❌ Resposta vazia do servidor');
       return {
         success: false,
@@ -124,16 +145,24 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
       };
     }
 
-    if (!data.success) {
-      console.error('❌ Erro na resposta:', data.error);
-      return {
-        success: false,
-        error: data.error || 'Erro desconhecido ao carregar chats'
-      };
-    }
-
-    // Garantir que sempre retornamos um array
-    const chats = Array.isArray(data.chats) ? data.chats : [];
+    // Transformar os dados para o formato esperado
+    const chats = chatsData.map((chat: any) => ({
+      id: chat.id,
+      app_user_id: chat.app_user_id,
+      masked_user_name: chat.profiles?.name || 'Utilizador',
+      status: chat.status,
+      is_active: chat.is_active,
+      last_message_at: chat.last_message_at,
+      last_message_content: chat.last_message_content,
+      last_message_sender_type: chat.last_message_sender_type,
+      last_message_sender_name: chat.last_message_sender_name,
+      unread_count_psicologo: chat.unread_count_psicologo || 0,
+      created_at: chat.created_at,
+      updated_at: chat.updated_at,
+      assigned_psicologo_id: chat.assigned_psicologo_id,
+      assigned_at: chat.assigned_at,
+      is_primary_assignment: chat.is_primary_assignment
+    }));
     
     
     // Buscar a última mensagem de cada chat para garantir que temos a mais recente
