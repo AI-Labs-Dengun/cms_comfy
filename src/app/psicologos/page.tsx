@@ -9,19 +9,25 @@ import { getChats, updateChatStatus, Chat as ChatType, Message, getChatMessages 
 import { useChatRealtime } from '@/hooks/useChatRealtime';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 // Tipos para os chats
 interface Chat extends ChatType {
   tags?: string[];
 }
 
+// Tipos para os filtros de associação
+type AssignmentFilter = 'all' | 'available' | 'assigned_to_me';
+
 export default function PsicologosPage() {
+  const { profile } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showChatList, setShowChatList] = useState(true);
   const [activeFilters, setActiveFilters] = useState<ChatStatus[]>([]);
+  const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>('all');
   const [recentlyUpdatedChats, setRecentlyUpdatedChats] = useState<Set<string>>(new Set());
   const [pageIsVisible, setPageIsVisible] = useState(!document.hidden);
   const [showNotification, setShowNotification] = useState(false);
@@ -979,12 +985,36 @@ export default function PsicologosPage() {
   // Função para limpar todos os filtros
   const clearFilters = () => {
     setActiveFilters([]);
+    setAssignmentFilter('all');
   };
 
-  // Filtrar chats baseado nos filtros ativos e ordenar por última mensagem
-  const filteredChats = (activeFilters.length > 0 
-    ? chats.filter(chat => activeFilters.includes(chat.status))
-    : chats)
+  // Função para alternar filtro de associação
+  const toggleAssignmentFilter = (filter: AssignmentFilter) => {
+    setAssignmentFilter(filter);
+  };
+
+  // Filtrar chats baseado nos filtros ativos e filtro de associação
+  const filteredChats = chats
+    .filter(chat => {
+      // Aplicar filtros de status
+      if (activeFilters.length > 0 && !activeFilters.includes(chat.status)) {
+        return false;
+      }
+      
+      // Aplicar filtro de associação
+      switch (assignmentFilter) {
+        case 'available':
+          // Chats disponíveis (sem psicólogo assinado)
+          return !chat.assigned_psicologo_id || chat.assigned_psicologo_id === null;
+        case 'assigned_to_me':
+          // Chats onde o psicólogo atual está assinado
+          return chat.assigned_psicologo_id && profile?.id && chat.assigned_psicologo_id === profile.id;
+        case 'all':
+        default:
+          // Todos os chats
+          return true;
+      }
+    })
     .sort((a, b) => {
       // Ordenar por data da última mensagem (mais recente primeiro)
       const dateA = new Date(a.last_message_at || a.created_at).getTime();
@@ -1094,20 +1124,13 @@ export default function PsicologosPage() {
               </button>
             </div>
             
-            {/* Estatísticas rápidas */}
-            <div className="text-right">
-              <div className="text-xs text-gray-400 mb-1">Não lidas</div>
-              <div className="text-2xl font-bold text-red-600 bg-red-50 px-3 py-1 rounded-lg border border-red-200">
-                {chats.reduce((sum, chat) => sum + (chat.unread_count_psicologo || 0), 0)}
-              </div>
-            </div>
           </div>
 
           {/* Filtros de Status - Minimalista */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Filtros</span>
-              {activeFilters.length > 0 && (
+              <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Status</span>
+              {(activeFilters.length > 0 || assignmentFilter !== 'all') && (
                 <button
                   onClick={clearFilters}
                   className="text-xs text-gray-500 hover:text-gray-700 font-medium transition-colors"
@@ -1141,6 +1164,37 @@ export default function PsicologosPage() {
               ))}
             </div>
           </div>
+
+          {/* Filtros de Associação - Nova seção */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Associação</span>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              {[
+                { key: 'all', label: 'Todos', color: 'gray' },
+                { key: 'available', label: 'Disponíveis', color: 'orange' },
+                { key: 'assigned_to_me', label: 'Meus chats', color: 'blue' }
+              ].map((filter) => (
+                <button
+                  key={filter.key}
+                  onClick={() => toggleAssignmentFilter(filter.key as AssignmentFilter)}
+                  className={`flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
+                    assignmentFilter === filter.key
+                      ? 'text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                  } ${
+                    filter.color === 'gray' ? assignmentFilter === filter.key ? 'bg-gray-500' : 'bg-gray-50' :
+                    filter.color === 'orange' ? assignmentFilter === filter.key ? 'bg-orange-500' : 'bg-orange-50' :
+                    assignmentFilter === filter.key ? 'bg-blue-500' : 'bg-blue-50'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Lista de conversas */}
@@ -1153,13 +1207,13 @@ export default function PsicologosPage() {
                 </svg>
               </div>
               <p className="text-gray-500 font-medium">
-                {activeFilters.length > 0 
+                {(activeFilters.length > 0 || assignmentFilter !== 'all')
                   ? 'Nenhuma conversa encontrada com os filtros selecionados.' 
                   : chats.length === 0 
                     ? 'Ainda não existem conversas disponíveis. Os chats aparecerão aqui quando os utilizadores iniciarem conversas.'
                     : 'Nenhuma conversa disponível.'}
               </p>
-              {activeFilters.length > 0 && (
+              {(activeFilters.length > 0 || assignmentFilter !== 'all') && (
                 <button
                   onClick={clearFilters}
                   className="mt-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
