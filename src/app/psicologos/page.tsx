@@ -11,6 +11,68 @@ import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
+// Estilos CSS personalizados
+const customStyles = `
+  .chat-card-hover {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .chat-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+  
+  .filter-button-active {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .notification-slide-in {
+    animation: slideInRight 0.3s ease-out;
+  }
+  
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  .avatar-pulse {
+    animation: avatarPulse 2s infinite;
+  }
+  
+  @keyframes avatarPulse {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+    50% {
+      box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    }
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.5);
+    border-radius: 3px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 163, 175, 0.8);
+  }
+`;
+
 // Tipos para os chats
 interface Chat extends ChatType {
   tags?: string[];
@@ -1053,23 +1115,27 @@ export default function PsicologosPage() {
   }
 
   return (
-    <div className="flex-1 flex bg-gray-50 min-h-0 h-screen relative">
+    <>
+      <style jsx>{customStyles}</style>
+      <div className="flex-1 flex bg-gray-50 min-h-0 h-screen relative">
       {/* Notificação visual para novas mensagens */}
       {showNotification && (
-        <div className="fixed top-4 right-4 z-50 bg-blue-600 text-white px-6 py-4 rounded-lg shadow-lg max-w-sm animate-in slide-in-from-right duration-300">
-          <div className="flex items-start space-x-3">
+        <div className="fixed top-6 right-6 z-50 bg-white border border-gray-200 px-6 py-4 rounded-2xl shadow-2xl max-w-sm notification-slide-in backdrop-blur-sm">
+          <div className="flex items-start space-x-4">
             <div className="flex-shrink-0">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">Nova mensagem</p>
-              <p className="text-xs opacity-90 mt-1 line-clamp-2">{notificationMessage}</p>
+              <p className="text-sm font-bold text-gray-900 mb-1">Nova mensagem</p>
+              <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">{notificationMessage}</p>
             </div>
             <button
               onClick={() => setShowNotification(false)}
-              className="flex-shrink-0 text-white opacity-70 hover:opacity-100 transition-opacity"
+              className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1083,196 +1149,215 @@ export default function PsicologosPage() {
         showChatList ? 'flex' : 'hidden lg:flex'
       }`}>
         {/* Cabeçalho da lista */}
-        <div className="p-4 border-b border-gray-100 bg-white flex-shrink-0">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-3">
-              <div>
-                <h1 className="text-lg font-semibold text-gray-900">
-                  Conversas
-                </h1>
-                <div className="flex items-center space-x-2 mt-0.5">
-                  <p className="text-xs text-gray-500">
+        <div className="bg-white border-b border-gray-200 flex-shrink-0">
+          {/* Header principal */}
+          <div className="px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">
+                    Conversas
+                  </h1>
+                  <p className="text-sm text-gray-500 mt-0.5">
                     {filteredChats.length} de {chats.length} ativas
                   </p>
                 </div>
+                
+                {/* Botão de refresh */}
+                <button
+                  onClick={handleRefreshChats}
+                  disabled={isRefreshingChats}
+                  className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200 ${
+                    isRefreshingChats
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 hover:scale-105'
+                  }`}
+                  title="Atualizar conversas"
+                >
+                  <svg 
+                    className={`w-5 h-5 ${isRefreshingChats ? 'animate-spin' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+                    />
+                  </svg>
+                </button>
               </div>
               
-              {/* Botão de refresh */}
-              <button
-                onClick={handleRefreshChats}
-                disabled={isRefreshingChats}
-                className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
-                  isRefreshingChats
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700'
-                }`}
-                title="Atualizar conversas"
-              >
-                <svg 
-                  className={`w-4 h-4 ${isRefreshingChats ? 'animate-spin' : ''}`} 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
-                  />
-                </svg>
-              </button>
-            </div>
-            
-          </div>
-
-          {/* Filtros de Status - Minimalista */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Status</span>
+              {/* Botão limpar filtros */}
               {(activeFilters.length > 0 || assignmentFilter !== 'all') && (
                 <button
                   onClick={clearFilters}
-                  className="text-xs text-gray-500 hover:text-gray-700 font-medium transition-colors"
+                  className="text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors px-3 py-1.5 rounded-lg hover:bg-gray-50"
                 >
-                  Limpar
+                  Limpar filtros
                 </button>
               )}
             </div>
-            
-            <div className="flex items-center space-x-2">
-              {(['novo_chat', 'a_decorrer', 'follow_up', 'encerrado'] as ChatStatus[]).map((status) => (
-                <button
-                  key={status}
-                  onClick={() => toggleFilter(status)}
-                  className={`flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
-                    activeFilters.includes(status)
-                      ? 'text-white shadow-sm'
-                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-                  } ${
-                    status === 'novo_chat' ? activeFilters.includes(status) ? 'bg-green-500' : 'bg-green-50' :
-                    status === 'a_decorrer' ? activeFilters.includes(status) ? 'bg-blue-500' : 'bg-blue-50' :
-                    status === 'follow_up' ? activeFilters.includes(status) ? 'bg-purple-500' : 'bg-purple-50' :
-                    activeFilters.includes(status) ? 'bg-red-500' : 'bg-red-50'
-                  }`}
-                >
-                  {status === 'novo_chat' ? 'Novo chat' :
-                   status === 'a_decorrer' ? 'A decorrer' :
-                   status === 'follow_up' ? 'Follow up' :
-                   'Encerrado'}
-                </button>
-              ))}
-            </div>
           </div>
 
-          {/* Filtros de Associação - Nova seção */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Associação</span>
+          {/* Filtros */}
+          <div className="px-6 py-4 space-y-4">
+            {/* Filtros de Status */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-semibold text-gray-700">Status</span>
+                <div className="flex-1 h-px bg-gray-200"></div>
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                {(['novo_chat', 'a_decorrer', 'follow_up', 'encerrado'] as ChatStatus[]).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => toggleFilter(status)}
+                    className={`flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer border ${
+                      activeFilters.includes(status)
+                        ? 'text-white shadow-md scale-105'
+                        : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50 border-gray-200'
+                    } ${
+                      status === 'novo_chat' ? activeFilters.includes(status) ? 'bg-green-500 border-green-500' : 'bg-green-50 border-green-200' :
+                      status === 'a_decorrer' ? activeFilters.includes(status) ? 'bg-blue-500 border-blue-500' : 'bg-blue-50 border-blue-200' :
+                      status === 'follow_up' ? activeFilters.includes(status) ? 'bg-purple-500 border-purple-500' : 'bg-purple-50 border-purple-200' :
+                      activeFilters.includes(status) ? 'bg-red-500 border-red-500' : 'bg-red-50 border-red-200'
+                    }`}
+                  >
+                    {status === 'novo_chat' ? 'Novo chat' :
+                     status === 'a_decorrer' ? 'A decorrer' :
+                     status === 'follow_up' ? 'Follow up' :
+                     'Encerrado'}
+                  </button>
+                ))}
+              </div>
             </div>
-            
-            <div className="flex items-center space-x-2">
-              {[
-                { key: 'all', label: 'Todos', color: 'gray' },
-                { key: 'available', label: 'Disponíveis', color: 'orange' },
-                { key: 'assigned_to_me', label: 'Meus chats', color: 'blue' }
-              ].map((filter) => (
-                <button
-                  key={filter.key}
-                  onClick={() => toggleAssignmentFilter(filter.key as AssignmentFilter)}
-                  className={`flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
-                    assignmentFilter === filter.key
-                      ? 'text-white shadow-sm'
-                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-                  } ${
-                    filter.color === 'gray' ? assignmentFilter === filter.key ? 'bg-gray-500' : 'bg-gray-50' :
-                    filter.color === 'orange' ? assignmentFilter === filter.key ? 'bg-orange-500' : 'bg-orange-50' :
-                    assignmentFilter === filter.key ? 'bg-blue-500' : 'bg-blue-50'
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
+
+            {/* Filtros de Associação */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-semibold text-gray-700">Associação</span>
+                <div className="flex-1 h-px bg-gray-200"></div>
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'all', label: 'Todos', color: 'gray' },
+                  { key: 'available', label: 'Disponíveis', color: 'orange' },
+                  { key: 'assigned_to_me', label: 'Meus chats', color: 'blue' }
+                ].map((filter) => (
+                  <button
+                    key={filter.key}
+                    onClick={() => toggleAssignmentFilter(filter.key as AssignmentFilter)}
+                    className={`flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer border ${
+                      assignmentFilter === filter.key
+                        ? 'text-white shadow-md scale-105'
+                        : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50 border-gray-200'
+                    } ${
+                      filter.color === 'gray' ? assignmentFilter === filter.key ? 'bg-gray-500 border-gray-500' : 'bg-gray-50 border-gray-200' :
+                      filter.color === 'orange' ? assignmentFilter === filter.key ? 'bg-orange-500 border-orange-500' : 'bg-orange-50 border-orange-200' :
+                      assignmentFilter === filter.key ? 'bg-blue-500 border-blue-500' : 'bg-blue-50 border-blue-200'
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Lista de conversas */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
+        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 bg-gray-50">
           {filteredChats.length === 0 ? (
-            <div className="p-8 text-center">
-              <div className="text-gray-400 mb-4">
-                <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+              <div className="text-gray-300 mb-6">
+                <svg className="w-20 h-20 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </div>
-              <p className="text-gray-500 font-medium">
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">
                 {(activeFilters.length > 0 || assignmentFilter !== 'all')
-                  ? 'Nenhuma conversa encontrada com os filtros selecionados.' 
+                  ? 'Nenhuma conversa encontrada' 
                   : chats.length === 0 
-                    ? 'Ainda não existem conversas disponíveis. Os chats aparecerão aqui quando os utilizadores iniciarem conversas.'
-                    : 'Nenhuma conversa disponível.'}
+                    ? 'Nenhuma conversa disponível'
+                    : 'Nenhuma conversa disponível'}
+              </h3>
+              <p className="text-gray-500 text-sm max-w-sm">
+                {(activeFilters.length > 0 || assignmentFilter !== 'all')
+                  ? 'Tente ajustar os filtros para ver mais conversas.' 
+                  : chats.length === 0 
+                    ? 'Os chats aparecerão aqui quando os utilizadores iniciarem conversas.'
+                    : 'Nenhuma conversa corresponde aos critérios atuais.'}
               </p>
               {(activeFilters.length > 0 || assignmentFilter !== 'all') && (
                 <button
                   onClick={clearFilters}
-                  className="mt-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  className="mt-4 text-blue-600 hover:text-blue-800 text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
                 >
                   Limpar filtros
                 </button>
               )}
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="p-4 space-y-3">
               {filteredChats.filter(chat => chat && chat.id).map((chat) => (
                 <div
                   key={chat.id}
-                  className={`p-6 hover:bg-gray-50 cursor-pointer transition-all duration-200 ${
-                    selectedChat?.id === chat.id ? 'bg-blue-50 border-r-4 border-blue-500 shadow-sm' : ''
+                  className={`bg-white rounded-xl p-5 hover:shadow-md cursor-pointer transition-all duration-200 border chat-card-hover ${
+                    selectedChat?.id === chat.id 
+                      ? 'ring-2 ring-blue-500 shadow-lg border-blue-200' 
+                      : 'border-gray-200 hover:border-gray-300'
                   } ${
-                    recentlyUpdatedChats.has(chat.id) ? 'bg-green-50 border-l-4 border-green-500' : ''
+                    recentlyUpdatedChats.has(chat.id) ? 'ring-2 ring-green-500 border-green-200' : ''
                   }`}
                   onClick={() => handleSelectChat(chat)}
                 >
                   <div className="flex items-start space-x-4">
                     {/* Avatar do usuário */}
                     <div className="flex-shrink-0 relative">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-semibold text-lg">
+                      <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm ${
+                        (chat.unread_count_psicologo || 0) > 0
+                          ? 'bg-gradient-to-br from-red-400 to-red-600'
+                          : 'bg-gradient-to-br from-blue-400 to-indigo-500'
+                      }`}>
                         {(chat.masked_user_name || 'U').charAt(0).toUpperCase()}
                       </div>
                       {(chat.unread_count_psicologo || 0) > 0 && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>
+                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-white animate-pulse flex items-center justify-center">
+                          <span className="text-xs font-bold text-white">
+                            {Math.min(chat.unread_count_psicologo || 0, 99)}
+                          </span>
+                        </div>
                       )}
                       {recentlyUpdatedChats.has(chat.id) && (chat.unread_count_psicologo || 0) === 0 && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-ping"></div>
                       )}
                     </div>
                     
                     <div className="flex-1 min-w-0 flex flex-col">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className={`text-sm font-semibold truncate ${
+                      {/* Header com nome e timestamp */}
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className={`text-base font-bold truncate ${
                           (chat.unread_count_psicologo || 0) > 0 
-                            ? 'text-gray-900 font-bold' 
-                            : 'text-gray-700'
+                            ? 'text-gray-900' 
+                            : 'text-gray-800'
                         }`}>
                           {chat.masked_user_name || 'Utilizador'}
                         </h3>
-                        <div className="flex items-center space-x-2">
-                          {(chat.unread_count_psicologo || 0) > 0 && (
-                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-red-500 text-white shadow-sm animate-pulse">
-                              {chat.unread_count_psicologo || 0}
-                            </span>
-                          )}
-                          <span className="text-xs text-gray-400 font-medium">
-                            {chat.last_message_at ? formatDate(chat.last_message_at) : '--'}
-                          </span>
-                        </div>
+                        <span className="text-xs text-gray-400 font-medium bg-gray-100 px-2 py-1 rounded-full">
+                          {chat.last_message_at ? formatDate(chat.last_message_at) : '--'}
+                        </span>
                       </div>
                       
+                      {/* Última mensagem */}
                       {(chat.last_message_content && chat.last_message_content.trim() !== '') ? (
-                        <div className="mb-3 min-h-0">
+                        <div className="mb-4">
                           <p className="text-sm text-gray-600 line-clamp-2 message-content break-words leading-relaxed">
-                            <span className={`font-medium ${
+                            <span className={`font-semibold ${
                               chat.last_message_sender_type === 'psicologo' 
                                 ? 'text-blue-600' 
                                 : 'text-gray-700'
@@ -1285,29 +1370,32 @@ export default function PsicologosPage() {
                           </p>
                         </div>
                       ) : (
-                        <div className="mb-3 min-h-0">
+                        <div className="mb-4">
                           <p className="text-sm text-gray-400 italic">
                             Nenhuma mensagem ainda
                           </p>
                         </div>
                       )}
                       
-                      <div className="flex items-center justify-between mt-auto">
-                        {/* Tags de status */}
-                        <ChatStatusTag
-                          status={chat.status}
-                          onStatusChange={(newStatus) => handleStatusChange(chat.id, newStatus)}
-                          isEditable={true}
-                          className="mr-2"
-                        />
-                        
-                        {/* Tag de psicólogo associado */}
-                        <PsicologoAssignedTag
-                          chatId={chat.id}
-                          onUpdate={() => updateChatInList(chat.id)}
-                          variant="compact"
-                          className="mr-2"
-                        />
+                      {/* Tags e status */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          {/* Tags de status */}
+                          <ChatStatusTag
+                            status={chat.status}
+                            onStatusChange={(newStatus) => handleStatusChange(chat.id, newStatus)}
+                            isEditable={true}
+                            className="mr-2"
+                          />
+                          
+                          {/* Tag de psicólogo associado */}
+                          <PsicologoAssignedTag
+                            chatId={chat.id}
+                            onUpdate={() => updateChatInList(chat.id)}
+                            variant="compact"
+                            className="mr-2"
+                          />
+                        </div>
                         
                         {/* Tags adicionais */}
                         {chat.tags && chat.tags.length > 0 && (
@@ -1352,23 +1440,45 @@ export default function PsicologosPage() {
             isInitialLoad={isInitialChatLoad}
           />
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-            <div className="text-center max-w-md">
-              <div className="text-gray-400 mb-6">
-                <svg className="w-24 h-24 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
+          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+            <div className="text-center max-w-lg px-6">
+              <div className="relative mb-8">
+                <div className="w-32 h-32 mx-auto bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
+                  <svg className="w-16 h-16 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </div>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">
                 Selecione uma conversa
               </h2>
-              <p className="text-gray-600 text-lg">
+              <p className="text-gray-600 text-lg leading-relaxed mb-6">
                 Escolha uma conversa da lista para começar a responder e ajudar seus pacientes
               </p>
+              <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span>Novos chats</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span>Em andamento</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <span>Follow up</span>
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
     </div>
+    </>
   );
 }
