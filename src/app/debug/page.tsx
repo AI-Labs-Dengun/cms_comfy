@@ -1,10 +1,32 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
+// Definir tipo para os dados dos chats
+interface ChatData {
+  id: string;
+  app_user_id: string;
+  status: string;
+  is_active: boolean;
+  last_message_at: string | null;
+  last_message_content: string | null;
+  last_message_sender_type: string | null;
+  last_message_sender_name: string | null;
+  unread_count_psicologo: number;
+  created_at: string;
+  updated_at: string;
+  assigned_psicologo_id: string | null;
+  assigned_at: string | null;
+  is_primary_assignment: boolean;
+  profiles?: {
+    name: string;
+  };
+}
+
 export default function DebugPage() {
-  const [chatsData, setChatsData] = useState<any[]>([]);
+  const [chatsData, setChatsData] = useState<ChatData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
