@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 export type ChatStatus = 'novo_chat' | 'a_decorrer' | 'follow_up' | 'encerrado';
 
@@ -62,6 +63,8 @@ export default function ChatStatusTag({
   variant = 'dropdown' // 'dropdown' | 'horizontal'
 }: ChatStatusTagProps & { variant?: 'dropdown' | 'horizontal' }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const config = statusConfig[status];
 
   const handleStatusChange = (newStatus: ChatStatus) => {
@@ -70,6 +73,40 @@ export default function ChatStatusTag({
     }
     setIsDropdownOpen(false);
   };
+
+  const calculateDropdownPosition = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.right - 192 // 192px = w-48
+      });
+    }
+  };
+
+  const handleToggleDropdown = () => {
+    if (!isDropdownOpen) {
+      calculateDropdownPosition();
+    }
+    setIsDropdownOpen(!isDropdownOpen);
+  };
+
+  // Recalcular posição quando a janela for redimensionada
+  useEffect(() => {
+    if (isDropdownOpen) {
+      const handleResize = () => {
+        calculateDropdownPosition();
+      };
+      
+      window.addEventListener('resize', handleResize);
+      window.addEventListener('scroll', handleResize);
+      
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('scroll', handleResize);
+      };
+    }
+  }, [isDropdownOpen]);
 
   // Versão horizontal - todas as tags lado a lado
   if (variant === 'horizontal' && isEditable) {
@@ -106,7 +143,8 @@ export default function ChatStatusTag({
   return (
     <div className="relative">
       <button
-        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+        ref={buttonRef}
+        onClick={handleToggleDropdown}
         className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-200 cursor-pointer ${config.color} ${config.hoverColor} ${className}`}
       >
         {config.icon}
@@ -116,16 +154,22 @@ export default function ChatStatusTag({
         </svg>
       </button>
 
-      {isDropdownOpen && (
+      {isDropdownOpen && typeof window !== 'undefined' && createPortal(
         <>
           {/* Overlay para fechar dropdown */}
           <div 
-            className="fixed inset-0 z-10" 
+            className="fixed inset-0 z-[9998]" 
             onClick={() => setIsDropdownOpen(false)}
           />
           
           {/* Dropdown menu */}
-          <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20 overflow-hidden">
+          <div 
+            className="fixed w-48 bg-white rounded-lg shadow-2xl border border-gray-200 z-[9999] overflow-hidden"
+            style={{
+              top: dropdownPosition.top,
+              left: dropdownPosition.left
+            }}
+          >
             <div className="py-1">
               <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
@@ -156,7 +200,8 @@ export default function ChatStatusTag({
               ))}
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
