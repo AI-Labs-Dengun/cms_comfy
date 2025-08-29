@@ -22,7 +22,7 @@ interface ChatData {
   is_primary_assignment: boolean;
   profiles?: {
     name: string;
-  };
+  }[];
 }
 
 export default function DebugPage() {
@@ -127,7 +127,7 @@ export default function DebugPage() {
                     <span className="font-medium">Ativo:</span> {chat.is_active ? 'Sim' : 'Não'}
                   </div>
                   <div>
-                    <span className="font-medium">Usuário:</span> {chat.profiles?.name || 'N/A'}
+                    <span className="font-medium">Usuário:</span> {chat.profiles?.[0]?.name || 'N/A'}
                   </div>
                   <div>
                     <span className="font-medium">Assigned Psicologo ID:</span> 
