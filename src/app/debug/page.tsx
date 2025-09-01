@@ -127,7 +127,7 @@ export default function DebugPage() {
                     <span className="font-medium">Ativo:</span> {chat.is_active ? 'Sim' : 'Não'}
                   </div>
                   <div>
-                    <span className="font-medium">Usuário:</span> {chat.profiles?.[0]?.name || 'N/A'}
+                    <span className="font-medium">Usuário:</span> {chat.profiles?.[0]?.id ? `user${chat.profiles[0].id.slice(-4)}` : 'N/A'}
                   </div>
                   <div>
                     <span className="font-medium">Assigned Psicologo ID:</span> 
