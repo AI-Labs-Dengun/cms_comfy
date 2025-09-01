@@ -21,6 +21,7 @@ interface ChatData {
   assigned_at: string | null;
   is_primary_assignment: boolean;
   profiles?: {
+    id: string;
     name: string;
   }[];
 }
@@ -54,6 +55,7 @@ export default function DebugPage() {
             assigned_at,
             is_primary_assignment,
             profiles!app_user_id (
+              id,
               name
             )
           `)
