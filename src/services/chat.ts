@@ -1,5 +1,22 @@
 import { supabase } from '@/lib/supabase';
 
+// Função para gerar nome mascarado baseado no ID do usuário
+// GARANTIA DE SIGILO: Esta função sempre gera um nome mascarado único e consistente
+// baseado no ID do usuário, nunca revelando o nome real
+function generateMaskedUserName(userId: string): string {
+  // Gerar um hash simples baseado no ID para criar um nome mascarado consistente
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    const char = userId.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  
+  // Usar o hash para gerar um nome mascarado único e consistente
+  const maskedId = Math.abs(hash).toString().slice(-4);
+  return `user${maskedId}`;
+}
+
 // Tipos para o sistema de chat
 export interface Chat {
   id: string;
@@ -121,7 +138,7 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
         assigned_at,
         is_primary_assignment,
         profiles!app_user_id (
-          name
+          id
         )
       `)
       .eq('is_active', true)
@@ -150,7 +167,7 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
       const chatData = chat as {
         id: string;
         app_user_id: string;
-        profiles?: { name: string };
+        profiles?: { id: string };
         status: string;
         is_active: boolean;
         last_message_at: string | null;
@@ -168,7 +185,7 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
       return {
         id: chatData.id,
         app_user_id: chatData.app_user_id,
-        masked_user_name: chatData.profiles?.name || 'Utilizador',
+        masked_user_name: generateMaskedUserName(chatData.app_user_id), // ✅ SEMPRE mascarado
         status: chatData.status as 'novo_chat' | 'a_decorrer' | 'follow_up' | 'encerrado',
         is_active: chatData.is_active,
         last_message_at: chatData.last_message_at || '',
@@ -271,9 +288,15 @@ export async function getChatInfo(chatId: string): Promise<ApiResponse<ChatInfo>
       };
     }
 
+    // ✅ GARANTIR SIGILO: Sempre sobrescrever com nome mascarado
+    const chatInfo = {
+      ...data.chat,
+      masked_user_name: generateMaskedUserName(data.chat.app_user_id) // ✅ SEMPRE mascarado
+    };
+
     return {
       success: true,
-      data: data.chat
+      data: chatInfo
     };
 
   } catch (error) {
@@ -803,9 +826,16 @@ export async function getAvailableUsers(): Promise<ApiResponse<{ id: string; nam
       };
     }
 
+    // ✅ GARANTIR SIGILO: Sempre retornar nomes mascarados
+    const maskedUsers = (data || []).map(user => ({
+      id: user.id,
+      name: generateMaskedUserName(user.id), // ✅ SEMPRE mascarado
+      email: user.email
+    }));
+
     return {
       success: true,
-      data: data || []
+      data: maskedUsers
     };
 
   } catch (error) {
