@@ -3,6 +3,7 @@ import React from 'react';
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   text?: string;
+  secondaryText?: string;
   className?: string;
   color?: 'black' | 'white' | 'green' | 'blue';
 }
@@ -10,6 +11,7 @@ interface LoadingSpinnerProps {
 const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
   size = 'md', 
   text, 
+  secondaryText,
   className = '',
   color = 'black'
 }) => {
@@ -33,7 +35,10 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         className={`animate-spin rounded-full border-b-2 ${sizeClasses[size]} ${colorClasses[color]} mb-4`}
       />
       {text && (
-        <p className="text-gray-600 text-center text-sm">{text}</p>
+        <p className="text-gray-600 text-center text-sm mb-2">{text}</p>
+      )}
+      {secondaryText && (
+        <p className="text-gray-400 text-center text-sm">{secondaryText}</p>
       )}
     </div>
   );
