@@ -38,8 +38,8 @@ export default function AuthGuard({
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
     let retryTimeoutId: NodeJS.Timeout;
-    const maxRetries = 5; // Aumentado para 5 tentativas
-    const retryDelay = 1500; // 1.5 segundos entre tentativas
+    const maxRetries = 3; // Reduzido para 3 tentativas
+    const retryDelay = 2000; // 2 segundos entre tentativas
 
     const handleAuthCheck = async () => {
       console.log('🛡️ AuthGuard - Iniciando verificação de acesso...', {
@@ -64,7 +64,7 @@ export default function AuthGuard({
         setInitialLoadComplete(true);
       }
 
-      // Timeout de segurança aumentado para 12 segundos
+      // Timeout de segurança aumentado para 15 segundos
       timeoutId = setTimeout(() => {
         if (mounted && isChecking) {
           console.warn('⚠️ AuthGuard - Timeout na verificação, redirecionando...');
@@ -72,7 +72,7 @@ export default function AuthGuard({
           setErrorMessage('Verificação de acesso demorou muito. Redirecionando...');
           setTimeout(() => router.push(redirectTo), 1000);
         }
-      }, 12000);
+      }, 15000);
 
       try {
         // Verificar autenticação básica
@@ -210,7 +210,7 @@ export default function AuthGuard({
       <div className="min-h-screen flex items-center justify-center bg-white">
         <LoadingSpinner 
           size="lg" 
-          text={verificationAttempts > 0 ? `Verificando acesso... (${verificationAttempts}/5)` : "Verificando acesso..."}
+          text={verificationAttempts > 0 ? `Verificando acesso... (${verificationAttempts}/3)` : "Verificando acesso..."}
           color="black"
         />
       </div>
@@ -251,7 +251,7 @@ export default function AuthGuard({
   }
 
   // Acesso negado - só mostrar se o carregamento inicial foi concluído E todas as tentativas foram esgotadas
-  if (accessDenied && initialLoadComplete && verificationAttempts >= 5) {
+  if (accessDenied && initialLoadComplete && verificationAttempts >= 3) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center max-w-md mx-auto px-4">
