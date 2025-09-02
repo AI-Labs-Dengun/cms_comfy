@@ -83,26 +83,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     maxSessionAge: 8 * 60 * 60 * 1000 // 8 horas
   });
 
-  // Hook de visibilidade da página otimizado - reduzir verificações excessivas
+  // Hook de visibilidade da página otimizado - SEM verificações automáticas
   usePageVisibility({
     onVisible: () => {
-      console.log('👁️ AuthContext - Página visível, atualizando atividade da sessão...');
-      // Atualizar atividade da sessão (sempre fazer isso)
+      console.log('👁️ AuthContext - Página visível, mas não fazendo verificações automáticas');
+      // Apenas atualizar atividade da sessão, sem fazer verificações
       updateSessionActivity();
       updatePersistentActivity();
-      
-      // Só verificar auth se passou muito tempo (10 minutos)
-      const timeSinceLastCheck = Date.now() - lastAuthCheckRef.current;
-      if (timeSinceLastCheck > 600000) { // 10 minutos
-        console.log('⏰ AuthContext - Passou muito tempo, atualizando auth...');
-        refreshAuth(false);
-      }
     },
     onHidden: () => {
       console.log('👁️ AuthContext - Página oculta');
     },
-    minHiddenTime: 60000, // 1 minuto
-    enableAutoRefresh: false // Desabilitar auto-refresh automático
+    disableAutoRefresh: true, // Desabilitar verificações automáticas
+    minHiddenTime: 30000 // 30 segundos em vez de 10
   });
 
   // Função para salvar no sessionStorage
