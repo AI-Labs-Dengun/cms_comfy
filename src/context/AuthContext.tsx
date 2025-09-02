@@ -83,19 +83,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     maxSessionAge: 8 * 60 * 60 * 1000 // 8 horas
   });
 
-  // Hook de visibilidade da página otimizado - SEM verificações automáticas
+  // Hook de visibilidade da página - APENAS atualizar atividade
   usePageVisibility({
     onVisible: () => {
-      console.log('👁️ AuthContext - Página visível, mas não fazendo verificações automáticas');
-      // Apenas atualizar atividade da sessão, sem fazer verificações
+      console.log('👁️ AuthContext - Página visível, atualizando apenas atividade da sessão');
+      // APENAS atualizar atividade da sessão - ZERO verificações
       updateSessionActivity();
       updatePersistentActivity();
     },
     onHidden: () => {
       console.log('👁️ AuthContext - Página oculta');
     },
-    disableAutoRefresh: true, // Desabilitar verificações automáticas
-    minHiddenTime: 30000 // 30 segundos em vez de 10
+    disableAutoRefresh: true, // SEMPRE desabilitado
+    minHiddenTime: 30000
   });
 
   // Função para salvar no sessionStorage
@@ -255,18 +255,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Se usuário já está autenticado e não é refresh forçado, pular COMPLETAMENTE
-    if (!forceRefresh && user && profile && !loading) {
-      console.log('✅ AuthContext - Usuário já autenticado, pulando verificação completamente');
+    // OTIMIZAÇÃO PRINCIPAL: Se usuário já está autenticado, NUNCA fazer verificações
+    if (!forceRefresh && user && profile && authInfo?.success) {
+      console.log('✅ AuthContext - Usuário COMPLETAMENTE autenticado, ZERO verificações necessárias');
       return;
     }
 
-    // Verificar se já fizemos uma verificação recente (dentro de 10 segundos)
+    // Se não é refresh forçado E temos dados básicos, pular também
+    if (!forceRefresh && user && profile) {
+      console.log('✅ AuthContext - Dados básicos válidos, pulando verificação');
+      return;
+    }
+
+    // Verificar se já fizemos uma verificação recente (apenas para refreshes forçados)
     const now = Date.now();
     const timeSinceLastCheck = now - lastAuthCheckRef.current;
     
-    if (!forceRefresh && timeSinceLastCheck < 10000) { // 10 segundos
-      console.log('⏭️ AuthContext - Verificação recente, pulando... (última verificação há', Math.round(timeSinceLastCheck / 1000), 'segundos)');
+    if (timeSinceLastCheck < 5000) { // 5 segundos para qualquer verificação
+      console.log('⏭️ AuthContext - Verificação muito recente, pulando... (há', Math.round(timeSinceLastCheck / 1000), 'segundos)');
       return;
     }
     
@@ -381,7 +387,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       initializingRef.current = false;
       clearTimeout(forceTimeout);
     }
-  }, [loadUserProfile, saveToCache, clearCache]);
+  }, [loadUserProfile, saveToCache, clearCache, user, profile, authInfo]);
 
   // Inicialização otimizada
   useEffect(() => {
@@ -403,15 +409,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('📦 AuthContext - Dados persistentes válidos encontrados');
         sessionPersistentRef.current = true;
         
-        // Tentar restaurar dados da sessão
+        // Tentar restaurar dados da sessão PRIMEIRO
         const sessionData = getSessionData();
         if (sessionData && sessionData.user && sessionData.profile) {
-          console.log('🔄 AuthContext - Restaurando dados da sessão e parando verificações...');
+          console.log('🔄 AuthContext - Restaurando dados da sessão - PARANDO todas as verificações');
           setUser(sessionData.user as User);
           setProfile(sessionData.profile as UserProfile);
           setAuthInfo(sessionData.authInfo as AuthResponse);
           setLoading(false);
-          // NÃO fazer refreshAuth se já temos dados válidos
+          // PARAR COMPLETAMENTE - não fazer refreshAuth
+          console.log('✅ AuthContext - Inicialização concluída com dados de sessão - SEM verificações adicionais');
           return;
         }
       }
