@@ -86,14 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Hook de visibilidade da página otimizado - reduzir verificações excessivas
   usePageVisibility({
     onVisible: () => {
-      console.log('👁️ AuthContext - Página visível, verificando se precisa atualizar auth...');
-      // Atualizar atividade da sessão
+      console.log('👁️ AuthContext - Página visível, atualizando atividade da sessão...');
+      // Atualizar atividade da sessão (sempre fazer isso)
       updateSessionActivity();
       updatePersistentActivity();
       
-      // Só verificar se houve mudanças significativas ou se passou muito tempo
+      // Só verificar auth se passou muito tempo (10 minutos)
       const timeSinceLastCheck = Date.now() - lastAuthCheckRef.current;
-      if (timeSinceLastCheck > 300000) { // 5 minutos em vez de 1 minuto
+      if (timeSinceLastCheck > 600000) { // 10 minutos
         console.log('⏰ AuthContext - Passou muito tempo, atualizando auth...');
         refreshAuth(false);
       }
@@ -101,7 +101,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onHidden: () => {
       console.log('👁️ AuthContext - Página oculta');
     },
-    minHiddenTime: 30000 // 30 segundos em vez de 10
+    minHiddenTime: 60000, // 1 minuto
+    enableAutoRefresh: false // Desabilitar auto-refresh automático
   });
 
   // Função para salvar no sessionStorage
@@ -261,17 +262,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Verificar se já fizemos uma verificação recente (dentro de 30 segundos para login)
+    // Verificar se já fizemos uma verificação recente (dentro de 2 minutos para verificações normais)
     const now = Date.now();
     const timeSinceLastCheck = now - lastAuthCheckRef.current;
     
-    if (!forceRefresh && timeSinceLastCheck < 30000) {
+    if (!forceRefresh && timeSinceLastCheck < 120000) { // 2 minutos
       console.log('⏭️ AuthContext - Verificação recente, pulando... (última verificação há', Math.round(timeSinceLastCheck / 1000), 'segundos)');
       return;
     }
     
     console.log('🔄 AuthContext - Iniciando refreshAuth...', { forceRefresh, timeSinceLastCheck });
-    setLoading(true);
+    
+    // Só colocar em loading se for uma verificação forçada (login) ou se não temos dados ainda
+    if (forceRefresh || !user || !profile) {
+      setLoading(true);
+    }
+    
     setError(null);
     initializingRef.current = true;
     lastAuthCheckRef.current = now;
