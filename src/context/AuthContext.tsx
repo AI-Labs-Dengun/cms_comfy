@@ -255,16 +255,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Verificar se já fizemos uma verificação recente (dentro de 2 minutos para verificações normais)
+    // Se usuário já está autenticado e não é refresh forçado, pular COMPLETAMENTE
+    if (!forceRefresh && user && profile && !loading) {
+      console.log('✅ AuthContext - Usuário já autenticado, pulando verificação completamente');
+      return;
+    }
+
+    // Verificar se já fizemos uma verificação recente (dentro de 10 segundos)
     const now = Date.now();
     const timeSinceLastCheck = now - lastAuthCheckRef.current;
     
-    if (!forceRefresh && timeSinceLastCheck < 120000) { // 2 minutos
+    if (!forceRefresh && timeSinceLastCheck < 10000) { // 10 segundos
       console.log('⏭️ AuthContext - Verificação recente, pulando... (última verificação há', Math.round(timeSinceLastCheck / 1000), 'segundos)');
       return;
     }
     
     console.log('🔄 AuthContext - Iniciando refreshAuth...', { forceRefresh, timeSinceLastCheck });
+    
+    // TIMEOUT FORÇADO DE 5 SEGUNDOS PARA EVITAR TRAVAMENTO EM PRODUÇÃO
+    const forceTimeout = setTimeout(() => {
+      if (initializingRef.current) {
+        console.warn('⏰ AuthContext - TIMEOUT FORÇADO! Parando verificação após 5 segundos...');
+        initializingRef.current = false;
+        setLoading(false);
+        
+        // Se tem dados de sessão válidos, usar eles como fallback
+        const sessionData = getSessionData();
+        if (sessionData && sessionData.user && sessionData.profile) {
+          console.log('🔄 AuthContext - Usando dados de sessão válidos como fallback');
+          setUser(sessionData.user as User);
+          setProfile(sessionData.profile as UserProfile);
+          setAuthInfo(sessionData.authInfo as AuthResponse);
+        }
+      }
+    }, 5000); // 5 segundos
     
     // Só colocar em loading se for uma verificação forçada (login) ou se não temos dados ainda
     if (forceRefresh || !user || !profile) {
@@ -355,6 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
       initializingRef.current = false;
+      clearTimeout(forceTimeout);
     }
   }, [loadUserProfile, saveToCache, clearCache]);
 
@@ -381,11 +406,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Tentar restaurar dados da sessão
         const sessionData = getSessionData();
         if (sessionData && sessionData.user && sessionData.profile) {
-          console.log('🔄 AuthContext - Restaurando dados da sessão...');
+          console.log('🔄 AuthContext - Restaurando dados da sessão e parando verificações...');
           setUser(sessionData.user as User);
           setProfile(sessionData.profile as UserProfile);
           setAuthInfo(sessionData.authInfo as AuthResponse);
           setLoading(false);
+          // NÃO fazer refreshAuth se já temos dados válidos
           return;
         }
       }
