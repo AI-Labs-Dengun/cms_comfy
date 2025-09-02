@@ -39,7 +39,7 @@ export default function AuthGuard({
     let timeoutId: NodeJS.Timeout;
     let retryTimeoutId: NodeJS.Timeout;
     const maxRetries = 2; // Reduzido para 2 tentativas
-    const retryDelay = 3000; // 3 segundos entre tentativas
+    const retryDelay = 1000; // 1 segundo entre tentativas
 
     const handleAuthCheck = async () => {
       console.log('🛡️ AuthGuard - Iniciando verificação de acesso...', {
@@ -64,7 +64,7 @@ export default function AuthGuard({
         setInitialLoadComplete(true);
       }
 
-      // Timeout de segurança reduzido para 10 segundos
+      // Timeout de segurança reduzido para 8 segundos
       timeoutId = setTimeout(() => {
         if (mounted && isChecking) {
           console.warn('⚠️ AuthGuard - Timeout na verificação, redirecionando...');
@@ -72,7 +72,7 @@ export default function AuthGuard({
           setErrorMessage('Verificação de acesso demorou muito. Redirecionando...');
           setTimeout(() => router.push(redirectTo), 1000);
         }
-      }, 10000);
+      }, 8000);
 
       try {
         // Verificar autenticação básica
@@ -101,7 +101,7 @@ export default function AuthGuard({
           return;
         }
 
-        // Verificar acesso específico para CMS
+        // Se o usuário está autenticado, verificar acesso específico
         if (requiredRole === 'cms') {
           console.log('🔍 AuthGuard - Verificando acesso CMS...');
           
@@ -210,7 +210,7 @@ export default function AuthGuard({
       <div className="min-h-screen flex items-center justify-center bg-white">
         <LoadingSpinner 
           size="lg" 
-          text={verificationAttempts > 0 ? `Verificando acesso... (${verificationAttempts}/3)` : "Verificando acesso..."}
+          text={verificationAttempts > 0 ? `Verificando acesso... (${verificationAttempts}/2)` : "Verificando acesso..."}
           color="black"
         />
       </div>
@@ -251,7 +251,7 @@ export default function AuthGuard({
   }
 
   // Acesso negado - só mostrar se o carregamento inicial foi concluído E todas as tentativas foram esgotadas
-  if (accessDenied && initialLoadComplete && verificationAttempts >= 3) {
+  if (accessDenied && initialLoadComplete && verificationAttempts >= 2) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center max-w-md mx-auto px-4">
