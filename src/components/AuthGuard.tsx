@@ -64,15 +64,24 @@ export default function AuthGuard({
         setInitialLoadComplete(true);
       }
 
-      // Timeout de segurança reduzido para 8 segundos
+      // Timeout de segurança reduzido para 3 segundos em produção
       timeoutId = setTimeout(() => {
         if (mounted && isChecking) {
-          console.warn('⚠️ AuthGuard - Timeout na verificação, redirecionando...');
+          console.warn('⚠️ AuthGuard - Timeout na verificação após 3 segundos...');
+          
+          // Em produção, ser mais permissivo com timeouts
+          if (process.env.NODE_ENV === 'production' && isAuthenticated) {
+            console.log('🔓 AuthGuard - Modo produção: permitindo acesso para usuário autenticado');
+            setIsChecking(false);
+            clearTimeout(timeoutId);
+            return;
+          }
+          
           setAccessDenied(true);
           setErrorMessage('Verificação de acesso demorou muito. Redirecionando...');
           setTimeout(() => router.push(redirectTo), 1000);
         }
-      }, 8000);
+      }, 3000);
 
       try {
         // Verificar autenticação básica
