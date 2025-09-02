@@ -38,8 +38,8 @@ export default function AuthGuard({
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
     let retryTimeoutId: NodeJS.Timeout;
-    const maxRetries = 3; // Reduzido para 3 tentativas
-    const retryDelay = 2000; // 2 segundos entre tentativas
+    const maxRetries = 2; // Reduzido para 2 tentativas
+    const retryDelay = 3000; // 3 segundos entre tentativas
 
     const handleAuthCheck = async () => {
       console.log('🛡️ AuthGuard - Iniciando verificação de acesso...', {
@@ -64,7 +64,7 @@ export default function AuthGuard({
         setInitialLoadComplete(true);
       }
 
-      // Timeout de segurança aumentado para 15 segundos
+      // Timeout de segurança reduzido para 10 segundos
       timeoutId = setTimeout(() => {
         if (mounted && isChecking) {
           console.warn('⚠️ AuthGuard - Timeout na verificação, redirecionando...');
@@ -72,7 +72,7 @@ export default function AuthGuard({
           setErrorMessage('Verificação de acesso demorou muito. Redirecionando...');
           setTimeout(() => router.push(redirectTo), 1000);
         }
-      }, 15000);
+      }, 10000);
 
       try {
         // Verificar autenticação básica
