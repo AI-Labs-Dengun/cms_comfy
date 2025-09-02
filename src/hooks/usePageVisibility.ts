@@ -5,7 +5,7 @@ interface UsePageVisibilityOptions {
   onHidden?: () => void;
   checkInterval?: number; // em milissegundos
   minHiddenTime?: number; // tempo mínimo que a página deve ficar oculta para disparar onVisible
-  enableAutoRefresh?: boolean; // se deve habilitar refresh automático ao voltar
+  disableAutoRefresh?: boolean; // nova opção para desabilitar verificações automáticas
 }
 
 export function usePageVisibility(options: UsePageVisibilityOptions = {}) {
@@ -13,15 +13,14 @@ export function usePageVisibility(options: UsePageVisibilityOptions = {}) {
     onVisible,
     onHidden,
     checkInterval = 1000,
-    minHiddenTime = 30000, // Aumentado para 30 segundos por padrão
-    enableAutoRefresh = false // Desabilitado por padrão
+    minHiddenTime = 5000, // 5 segundos por padrão
+    disableAutoRefresh = true // por padrão, desabilitar verificações automáticas
   } = options;
 
   const [isVisible, setIsVisible] = useState(!document.hidden);
   const [hiddenStartTime, setHiddenStartTime] = useState<number | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastCheckRef = useRef<number>(0);
-  const lastVisibleTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -41,20 +40,12 @@ export function usePageVisibility(options: UsePageVisibilityOptions = {}) {
         // Página ficou visível
         const wasHidden = !isVisible;
         const hiddenDuration = hiddenStartTime ? now - hiddenStartTime : 0;
-        const timeSinceLastVisible = now - lastVisibleTimeRef.current;
         
         setIsVisible(true);
         setHiddenStartTime(null);
-        lastVisibleTimeRef.current = now;
         
-        // Só executar onVisible se:
-        // 1. A página ficou oculta por tempo suficiente E
-        // 2. O auto-refresh está habilitado E
-        // 3. Passou tempo suficiente desde a última vez que ficou visível
-        if (wasHidden && 
-            hiddenDuration >= minHiddenTime && 
-            enableAutoRefresh &&
-            timeSinceLastVisible > 60000) { // Pelo menos 1 minuto desde a última verificação
+        // Só executar onVisible se a página ficou oculta por tempo suficiente E se não estiver desabilitado
+        if (wasHidden && hiddenDuration >= minHiddenTime && !disableAutoRefresh) {
           
           if (onVisible) {
             // Limpar timeout anterior se existir
@@ -64,23 +55,19 @@ export function usePageVisibility(options: UsePageVisibilityOptions = {}) {
             
             // Executar callback com pequeno delay para evitar conflitos
             timeoutRef.current = setTimeout(() => {
-              console.log('👁️ usePageVisibility - Executando onVisible após', Math.round(hiddenDuration / 1000), 'segundos oculta');
               onVisible();
             }, 100);
           }
         } else if (wasHidden) {
-          console.log('👁️ usePageVisibility - Página visível, mas não executando onVisible:', {
-            hiddenDuration: Math.round(hiddenDuration / 1000) + 's',
-            minRequired: Math.round(minHiddenTime / 1000) + 's',
-            enableAutoRefresh,
-            timeSinceLastVisible: Math.round(timeSinceLastVisible / 1000) + 's'
-          });
+          console.log('👁️ usePageVisibility - Página visível, mas não executando verificações automáticas');
         }
       }
     };
 
-    // Verificar se já há mudanças pendentes
+    // Verificar se já há mudanças pendentes - apenas se não estiver desabilitado
     const checkForChanges = () => {
+      if (disableAutoRefresh) return;
+      
       const now = Date.now();
       if (now - lastCheckRef.current < checkInterval) {
         return;
@@ -98,18 +85,20 @@ export function usePageVisibility(options: UsePageVisibilityOptions = {}) {
     // Listener para mudanças de visibilidade
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // Verificação periódica para casos onde o evento não é disparado
-    const intervalId = setInterval(checkForChanges, checkInterval);
+    // Verificação periódica para casos onde o evento não é disparado - apenas se não estiver desabilitado
+    const intervalId = disableAutoRefresh ? null : setInterval(checkForChanges, checkInterval);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearInterval(intervalId);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
       
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [isVisible, onVisible, onHidden, checkInterval, minHiddenTime, enableAutoRefresh, hiddenStartTime]);
+  }, [isVisible, onVisible, onHidden, checkInterval, minHiddenTime, hiddenStartTime, disableAutoRefresh]);
 
   return {
     isVisible,
