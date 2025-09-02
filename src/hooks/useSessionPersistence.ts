@@ -183,7 +183,7 @@ export function useSessionPersistence(options: SessionPersistenceOptions = {}) {
         clearInterval(intervalRef.current);
       }
     };
-  }, []); // Sem dependências para executar apenas uma vez
+  }, [checkInterval, clearSessionData, generateSessionId, isSessionValid, loadSessionData, onSessionExpire, onSessionRestore, updateSessionActivity]); // Dependências necessárias
 
   // Atualizar atividade quando a página fica visível
   useEffect(() => {
