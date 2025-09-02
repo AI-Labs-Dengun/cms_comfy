@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import EnvironmentCheck from "@/components/EnvironmentCheck";
 import { AuthProvider } from "@/context/AuthContext";
+import SessionDebug from "@/components/SessionDebug";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,7 @@ export default function RootLayout({
         <EnvironmentCheck>
           <AuthProvider>
             {children}
+            <SessionDebug show={process.env.NODE_ENV === 'development'} />
           </AuthProvider>
         </EnvironmentCheck>
       </body>
