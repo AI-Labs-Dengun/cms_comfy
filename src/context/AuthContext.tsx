@@ -6,6 +6,8 @@ import { User } from '@supabase/supabase-js';
 import { AuthResponse } from '@/types/auth';
 import { AuthService } from '@/services/auth';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
+import { useSessionPersistence } from '@/hooks/useSessionPersistence';
+import { clearAllSessionData, hasValidSessionData, getSessionData, saveSessionData, updateSessionActivity, cleanupSessionData } from '@/lib/sessionUtils';
 
 interface UserProfile {
   id: string;
@@ -33,12 +35,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Cache keys - apenas essencial
-const CACHE_KEYS = {
-  AUTH_DATA: 'cms_auth_data',
-  LAST_CHECK: 'cms_last_auth_check'
-};
-
 interface CachedAuthData {
   user: User | null;
   profile: UserProfile | null;
@@ -58,14 +54,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const initializedRef = useRef(false);
   const lastAuthCheckRef = useRef<number>(0);
   const authStateChangeRef = useRef<boolean>(false);
+  const sessionPersistentRef = useRef<boolean>(false);
 
-  // Hook de visibilidade da página otimizado
+  // Hook de persistência de sessão
+  const {
+    saveSessionData: savePersistentData,
+    clearSessionData,
+    updateSessionActivity: updatePersistentActivity,
+    isSessionValid
+  } = useSessionPersistence({
+    onSessionRestore: (data: CachedAuthData) => {
+      console.log('🔄 AuthContext - Restaurando dados da sessão...');
+      if (data.user && data.profile) {
+        setUser(data.user);
+        setProfile(data.profile);
+        setAuthInfo(data.authInfo);
+        sessionPersistentRef.current = true;
+        console.log('✅ AuthContext - Dados da sessão restaurados com sucesso');
+      }
+    },
+    onSessionExpire: () => {
+      console.log('⏰ AuthContext - Sessão expirada, limpando estado...');
+      setUser(null);
+      setProfile(null);
+      setAuthInfo(null);
+      sessionPersistentRef.current = false;
+    },
+    maxSessionAge: 8 * 60 * 60 * 1000 // 8 horas
+  });
+
+  // Hook de visibilidade da página otimizado - reduzir verificações excessivas
   usePageVisibility({
     onVisible: () => {
       console.log('👁️ AuthContext - Página visível, verificando se precisa atualizar auth...');
+      // Atualizar atividade da sessão
+      updateSessionActivity();
+      updatePersistentActivity();
+      
       // Só verificar se houve mudanças significativas ou se passou muito tempo
       const timeSinceLastCheck = Date.now() - lastAuthCheckRef.current;
-      if (timeSinceLastCheck > 60000) { // 1 minuto
+      if (timeSinceLastCheck > 300000) { // 5 minutos em vez de 1 minuto
         console.log('⏰ AuthContext - Passou muito tempo, atualizando auth...');
         refreshAuth(false);
       }
@@ -73,27 +101,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onHidden: () => {
       console.log('👁️ AuthContext - Página oculta');
     },
-    minHiddenTime: 10000 // 10 segundos
+    minHiddenTime: 30000 // 30 segundos em vez de 10
   });
 
-  // Função para salvar no cache
+  // Função para salvar no sessionStorage
   const saveToCache = useCallback((data: CachedAuthData) => {
     try {
-      localStorage.setItem(CACHE_KEYS.AUTH_DATA, JSON.stringify(data));
-      localStorage.setItem(CACHE_KEYS.LAST_CHECK, Date.now().toString());
-      console.log('📦 AuthContext - Dados salvos no cache');
+      // Usar utilitários de sessão
+      saveSessionData(data);
+      
+      // Salvar também usando o hook de persistência
+      savePersistentData(data);
+      
+      console.log('📦 AuthContext - Dados salvos no sessionStorage');
     } catch (error) {
       console.error('❌ AuthContext - Erro ao salvar cache:', error);
     }
-  }, []);
+  }, [savePersistentData]);
 
   // Função para limpar cache
   const clearCache = useCallback(() => {
-    Object.values(CACHE_KEYS).forEach(key => {
-      localStorage.removeItem(key);
-    });
+    clearAllSessionData();
+    clearSessionData();
     console.log('🗑️ AuthContext - Cache limpo');
-  }, []);
+  }, [clearSessionData]);
 
   // Função para carregar perfil do usuário - SEM cache
   const loadUserProfile = useCallback(async (currentUser: User): Promise<UserProfile | null> => {
@@ -198,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       setAuthInfo(null);
       setError(null);
+      sessionPersistentRef.current = false;
       
       // Limpar cache de queries do Supabase se disponível
       try {
@@ -229,11 +261,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Verificar se já fizemos uma verificação recente (dentro de 10 segundos para login)
+    // Verificar se já fizemos uma verificação recente (dentro de 30 segundos para login)
     const now = Date.now();
     const timeSinceLastCheck = now - lastAuthCheckRef.current;
     
-    if (!forceRefresh && timeSinceLastCheck < 10000) {
+    if (!forceRefresh && timeSinceLastCheck < 30000) {
       console.log('⏭️ AuthContext - Verificação recente, pulando... (última verificação há', Math.round(timeSinceLastCheck / 1000), 'segundos)');
       return;
     }
@@ -298,7 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(userProfile);
       setAuthInfo(cmsAuthInfo);
       
-      // Salvar no cache apenas se tudo deu certo
+      // Salvar no sessionStorage apenas se tudo deu certo
       const cacheData: CachedAuthData = {
         user: currentUser,
         profile: userProfile,
@@ -306,6 +338,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         timestamp: Date.now()
       };
       saveToCache(cacheData);
+      
+      // Marcar sessão como persistente
+      sessionPersistentRef.current = true;
       
       console.log('✅ AuthContext - refreshAuth concluído com sucesso');
       
@@ -336,6 +371,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       console.log('🚀 AuthContext - Inicializando autenticação...');
       
+      // Limpar dados de sessão corrompidos
+      cleanupSessionData();
+      
+      // Verificar se há dados persistentes válidos
+      if (hasValidSessionData()) {
+        console.log('📦 AuthContext - Dados persistentes válidos encontrados');
+        sessionPersistentRef.current = true;
+        
+        // Tentar restaurar dados da sessão
+        const sessionData = getSessionData();
+        if (sessionData && sessionData.user && sessionData.profile) {
+          console.log('🔄 AuthContext - Restaurando dados da sessão...');
+          setUser(sessionData.user as User);
+          setProfile(sessionData.profile as UserProfile);
+          setAuthInfo(sessionData.authInfo as AuthResponse);
+          setLoading(false);
+          return;
+        }
+      }
+      
       // Verificação direta sem depender muito de cache
       await refreshAuth(true);
     };
@@ -359,6 +414,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthInfo(null);
         setError(null);
         setLoading(false);
+        sessionPersistentRef.current = false;
         
         // Redirecionar para login se não estiver já na página de login/signup/home
         const currentPath = window.location.pathname;
@@ -406,6 +462,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthorized,
         authInfoSuccess: authInfo?.success,
         canAccessCMS,
+        sessionPersistent: sessionPersistentRef.current,
+        sessionValid: isSessionValid(),
+        hasValidSessionData: hasValidSessionData(),
         detalhes: {
           userExists: !!user,
           userEmail: user?.email,
@@ -425,7 +484,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isCMSUser,
       canAccessCMS
     };
-  }, [user, profile, authInfo]);
+  }, [user, profile, authInfo, isSessionValid]);
 
   const contextValue: AuthContextType = {
     user,
