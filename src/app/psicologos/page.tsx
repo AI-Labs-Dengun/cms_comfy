@@ -111,7 +111,7 @@ export default function PsicologosPage() {
   const [activeFilters, setActiveFilters] = useState<ChatStatus[]>([]);
   const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>('all');
   const [recentlyUpdatedChats, setRecentlyUpdatedChats] = useState<Set<string>>(new Set());
-  const [pageIsVisible, setPageIsVisible] = useState(!document.hidden);
+  const [pageIsVisible] = useState(!document.hidden);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [selectedChatMessages, setSelectedChatMessages] = useState<Message[]>([]);
@@ -587,25 +587,16 @@ export default function PsicologosPage() {
     onChatDeleted: handleChatDeleted
   });
 
-  // Configurar detecção de visibilidade da página
+  // Hook de visibilidade da página
   usePageVisibility({
     onVisible: () => {
-      console.log('👁️ Página ficou visível - atualizando chats...');
-      setPageIsVisible(true);
-      // Atualizar todos os chats quando a página ficar visível (apenas se ficou oculta por mais de 30 segundos)
-      if (chats.length > 0) {
-        chats.forEach(chat => {
-          if (chat.id !== selectedChat?.id) {
-            updateChatInList(chat.id);
-          }
-        });
-      }
+      console.log('👁️ PsicologosPage - Página visível');
     },
     onHidden: () => {
-      setPageIsVisible(false);
+      console.log('👁️ PsicologosPage - Página oculta');
     },
     minHiddenTime: 30000, // 30 segundos
-    enableAutoRefresh: true // Habilitar apenas para esta página específica
+    disableAutoRefresh: false // Habilitar verificações para esta página específica
   });
 
   // Carregar chats disponíveis
