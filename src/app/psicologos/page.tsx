@@ -592,7 +592,7 @@ export default function PsicologosPage() {
     onVisible: () => {
       console.log('👁️ Página ficou visível - atualizando chats...');
       setPageIsVisible(true);
-      // Atualizar todos os chats quando a página ficar visível
+      // Atualizar todos os chats quando a página ficar visível (apenas se ficou oculta por mais de 30 segundos)
       if (chats.length > 0) {
         chats.forEach(chat => {
           if (chat.id !== selectedChat?.id) {
@@ -603,7 +603,9 @@ export default function PsicologosPage() {
     },
     onHidden: () => {
       setPageIsVisible(false);
-    }
+    },
+    minHiddenTime: 30000, // 30 segundos
+    enableAutoRefresh: true // Habilitar apenas para esta página específica
   });
 
   // Carregar chats disponíveis
