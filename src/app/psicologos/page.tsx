@@ -102,9 +102,16 @@ interface Chat extends ChatType {
 type AssignmentFilter = 'all' | 'available' | 'assigned_to_me';
 
 export default function PsicologosPage() {
-  const { profile } = useAuth();
+  const { profile, user, isAuthenticated } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  
+  // Cache persistente para chats
+  const CHATS_CACHE_KEY = 'psicologos_chats_cache';
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+  
+
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showChatList, setShowChatList] = useState(true);
@@ -240,16 +247,28 @@ export default function PsicologosPage() {
           
           setChats(prevChats => {
             const existingIndex = prevChats.findIndex(chat => chat.id === chatId);
+            let updatedChats;
             if (existingIndex >= 0) {
               // Atualizar chat existente
-              const updatedChats = [...prevChats];
+              updatedChats = [...prevChats];
               updatedChats[existingIndex] = sanitizedChat;
-              return updatedChats;
             } else {
               // Adicionar novo chat
               console.log('➕ Novo chat adicionado à lista:', chatId);
-              return [...prevChats, sanitizedChat];
+              updatedChats = [...prevChats, sanitizedChat];
             }
+            
+            // Atualizar cache
+            try {
+              sessionStorage.setItem(CHATS_CACHE_KEY, JSON.stringify({
+                data: updatedChats,
+                timestamp: Date.now()
+              }));
+            } catch (error) {
+              console.error('❌ Erro ao atualizar cache após modificação:', error);
+            }
+            
+            return updatedChats;
           });
         } else {
           console.log('❌ Chat não encontrado:', chatId);
@@ -599,14 +618,51 @@ export default function PsicologosPage() {
     disableAutoRefresh: false // Habilitar verificações para esta página específica
   });
 
-  // Carregar chats disponíveis
+  // Carregar chats disponíveis - OTIMIZADO para não recarregar desnecessariamente
   useEffect(() => {
+    // NÃO carregar se não tem usuário autenticado
+    if (!user || !profile || !isAuthenticated) {
+      console.log('⏭️ PsicologosPage - Usuário não autenticado, aguardando...');
+      return;
+    }
+
+    // Tentar carregar do cache primeiro
+    const cachedData = sessionStorage.getItem(CHATS_CACHE_KEY);
+    if (cachedData) {
+      try {
+        const { data, timestamp } = JSON.parse(cachedData);
+        const now = Date.now();
+        
+        // Se cache ainda é válido (5 minutos)
+        if (now - timestamp < CACHE_DURATION) {
+          console.log('📦 PsicologosPage - Carregando chats do cache');
+          setChats(data || []);
+          setHasLoadedOnce(true);
+          setLoading(false);
+          return;
+        } else {
+          console.log('⏰ PsicologosPage - Cache expirado, removendo...');
+          sessionStorage.removeItem(CHATS_CACHE_KEY);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao carregar cache:', error);
+        sessionStorage.removeItem(CHATS_CACHE_KEY);
+      }
+    }
+
+    // Se já carregou uma vez e temos dados, NÃO recarregar
+    if (hasLoadedOnce && chats.length > 0) {
+      console.log('✅ PsicologosPage - Chats já carregados, pulando recarga desnecessária');
+      setLoading(false);
+      return;
+    }
+
     const loadChats = async () => {
       try {
+        console.log('🔄 PsicologosPage - Carregando chats pela primeira vez...');
         setLoading(true);
         setError(null);
 
-        console.log('🔄 Carregando chats...');
         const result = await getChats();
         
         if (result.success) {
@@ -626,7 +682,22 @@ export default function PsicologosPage() {
           }
           
           // Garantir que sempre temos um array, mesmo que vazio
-          setChats(result.data || []);
+          const chatsData = result.data || [];
+          setChats(chatsData);
+          setHasLoadedOnce(true); // Marcar como carregado
+          
+          // Salvar no cache
+          try {
+            sessionStorage.setItem(CHATS_CACHE_KEY, JSON.stringify({
+              data: chatsData,
+              timestamp: Date.now()
+            }));
+            console.log('💾 PsicologosPage - Chats salvos no cache');
+          } catch (error) {
+            console.error('❌ Erro ao salvar cache:', error);
+          }
+          
+          console.log('✅ PsicologosPage - Chats carregados com sucesso');
         } else {
           console.error('❌ Erro ao carregar chats:', result.error);
           // Se o erro for sobre tabela não existir, mostrar mensagem específica
@@ -656,7 +727,7 @@ export default function PsicologosPage() {
     };
 
     loadChats();
-  }, []);
+  }, [user, profile, isAuthenticated, hasLoadedOnce, chats.length, CACHE_DURATION]);
 
   // Solicitar permissão de notificação
   useEffect(() => {
