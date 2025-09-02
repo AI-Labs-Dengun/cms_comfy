@@ -255,11 +255,9 @@ export default function LoginPage() {
         <LoadingSpinner 
           size="lg" 
           text="Acesso autorizado! Redirecionando..." 
+          secondaryText={`Bem-vindo, ${profile?.name || user?.email}`}
           color="green"
         />
-        <p className="text-sm text-gray-400 mt-4 text-center">
-          Bem-vindo, {profile?.name || user?.email}
-        </p>
       </div>
     );
   }

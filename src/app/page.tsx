@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import LoginPage from "./login/page";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -97,10 +98,11 @@ export default function Home() {
   if (!mounted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mb-4"></div>
-          <p className="text-gray-600">Inicializando...</p>
-        </div>
+        <LoadingSpinner 
+          size="lg" 
+          text="Inicializando..." 
+          color="black"
+        />
       </div>
     );
   }
@@ -109,10 +111,11 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mb-4"></div>
-          <p className="text-gray-600">Verificando acesso...</p>
-        </div>
+        <LoadingSpinner 
+          size="lg" 
+          text="Verificando acesso..." 
+          color="black"
+        />
       </div>
     );
   }
@@ -121,10 +124,11 @@ export default function Home() {
   if (isAuthenticated && canAccessCMS && hasRedirected.current) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mb-4"></div>
-          <p className="text-gray-600">Redirecionando para o dashboard...</p>
-        </div>
+        <LoadingSpinner 
+          size="lg" 
+          text="Redirecionando para o dashboard..." 
+          color="green"
+        />
       </div>
     );
   }
