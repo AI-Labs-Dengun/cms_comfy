@@ -7,6 +7,7 @@ import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
 import PsicologoAssignedTag from '@/components/PsicologoAssignedTag';
 import { getChats, updateChatStatus, Chat as ChatType, Message, getChatMessages } from '@/services/chat';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
+import { EncryptionService } from '@/services/encryption';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -131,6 +132,13 @@ export default function PsicologosPage() {
   const [isInitialChatLoad, setIsInitialChatLoad] = useState(false);
   const [isRefreshingChats, setIsRefreshingChats] = useState(false);
 
+  // Log para debug quando o chat selecionado muda
+  useEffect(() => {
+    if (selectedChat?.id) {
+      console.log('🔄 Chat selecionado mudou:', selectedChat.id);
+    }
+  }, [selectedChat?.id]);
+
   // Função para processar novas mensagens no chat selecionado
   const handleNewMessageInSelectedChat = useCallback((message: Message) => {
     console.log('💬 Nova mensagem no chat selecionado:', message);
@@ -142,21 +150,43 @@ export default function PsicologosPage() {
       timestamp: message.created_at
     });
     
+    // 🔓 PROCESSAR mensagem encriptada se necessário
+    let processedMessage = message;
+    if (selectedChat?.id && message.chat_id === selectedChat.id) {
+      try {
+        // Usar diretamente o serviço de encriptação
+        const decryptedContent = EncryptionService.processMessageForDisplay(message.content, selectedChat.id);
+        processedMessage = {
+          ...message,
+          content: decryptedContent
+        };
+        console.log('🔓 Mensagem processada na página pai:', {
+          originalContent: message.content,
+          processedContent: processedMessage.content
+        });
+      } catch (error) {
+        console.error('❌ Erro ao processar mensagem:', error);
+        processedMessage = message; // Manter mensagem original em caso de erro
+      }
+    } else {
+      console.log('⚠️ Mensagem não processada - chat não selecionado ou diferente');
+    }
+    
     setSelectedChatMessages(prevMessages => {
       // Verificar se a mensagem já existe para evitar duplicatas
       const messageExists = prevMessages.some(m => 
-        m.id === message.id && 
-        m.created_at === message.created_at &&
-        m.content === message.content
+        m.id === processedMessage.id && 
+        m.created_at === processedMessage.created_at &&
+        m.content === processedMessage.content
       );
       
       if (!messageExists) {
-        console.log('✅ Adicionando nova mensagem ao chat selecionado:', message.content);
+        console.log('✅ Adicionando nova mensagem ao chat selecionado:', processedMessage.content);
         
         // Criar uma nova mensagem com chave única
         const newMessage = {
-          ...message,
-          _uniqueKey: `${message.id}-${message.created_at}-${message.content?.substring(0, 10)}-${prevMessages.length}`
+          ...processedMessage,
+          _uniqueKey: `${processedMessage.id}-${processedMessage.created_at}-${processedMessage.content?.substring(0, 10)}-${prevMessages.length}`
         };
         
         // Ordenar mensagens por data de criação
@@ -167,21 +197,21 @@ export default function PsicologosPage() {
         // Mostrar indicador de nova mensagem APENAS se:
         // 1. A mensagem não é do psicólogo atual
         // 2. E a página não está visível (está em background/minimizada)
-        if (message.sender_type === 'app_user' && (!pageIsVisible || document.hidden)) {
+        if (processedMessage.sender_type === 'app_user' && (!pageIsVisible || document.hidden)) {
           console.log('🔔 Mostrando indicador de nova mensagem no chat (página não visível)');
           setShowNewMessageIndicator(true);
           // Esconder o indicador após 3 segundos
           setTimeout(() => setShowNewMessageIndicator(false), 3000);
-        } else if (message.sender_type === 'app_user') {
+        } else if (processedMessage.sender_type === 'app_user') {
           console.log('⚠️ Não mostrando indicador - chat está visível e ativo');
         }
         
         return updatedMessages;
       }
-      console.log('⚠️ Mensagem já existe no chat selecionado, ignorando duplicata:', message.id);
+      console.log('⚠️ Mensagem já existe no chat selecionado, ignorando duplicata:', processedMessage.id);
       return prevMessages;
-    });
-  }, [pageIsVisible]);
+          });
+  }, [pageIsVisible, selectedChat?.id]);
 
   // Função para atualizar um chat específico na lista
   const updateChatInList = useCallback(async (chatId: string) => {
