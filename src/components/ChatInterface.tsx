@@ -6,6 +6,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
 import { getChatInfo, sendMessage, updateChatStatus, markMessagesAsRead, ChatInfo, Message, Chat } from '@/services/chat';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
+import { useEncryptedChat } from '@/hooks/useEncryptedChat';
 import { supabase } from '@/lib/supabase';
 import SelfAssignButton from '@/components/SelfAssignButton';
 
@@ -34,6 +35,7 @@ interface GroupedMessages {
 export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, onNewMessageReceived, showNewMessageIndicator = true, messages: externalMessages, onLoadMoreMessages, hasMoreMessages = false, isLoadingMoreMessages = false, messagesContainerRef, isInitialLoad = false }: ChatInterfaceProps) {
   const { profile } = useAuth();
   const { isOnline } = useOnlineStatus();
+  const { processIncomingMessage } = useEncryptedChat(chatId);
   const [localIsOnline, setLocalIsOnline] = useState(false);
   const [assignedPsicologo, setAssignedPsicologo] = useState<{
     id: string;
@@ -558,12 +560,19 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     
     // Só processar a mensagem se ela pertence ao chat atual
     if (message.chat_id === chatId) {
+      // 🔓 PROCESSAR mensagem encriptada em tempo real
+      const processedMessage = processIncomingMessage(message);
+      console.log('🔓 Mensagem processada em tempo real:', {
+        originalContent: message.content,
+        processedContent: processedMessage.content
+      });
+      
       // NÃO adicionar mensagem ao estado local - apenas notificar a página pai
-      console.log('✅ Notificando página pai sobre nova mensagem:', message.content);
+      console.log('✅ Notificando página pai sobre nova mensagem:', processedMessage.content);
       
       // Usar a prop para processar a mensagem na página pai
       if (onNewMessageReceived) {
-        onNewMessageReceived(message);
+        onNewMessageReceived(processedMessage);
       }
       
       // Se a mensagem é do usuário e o chat está ativo, marcar como lida automaticamente
@@ -585,7 +594,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
         }, 1000); // Pequeno delay para garantir que a mensagem foi processada
       }
     }
-  }, [chatId, isChatActive, onChatUpdate, onNewMessageReceived]);
+  }, [chatId, isChatActive, onChatUpdate, onNewMessageReceived, processIncomingMessage]);
 
   // Atualizar as refs quando as funções mudam
   useEffect(() => {
