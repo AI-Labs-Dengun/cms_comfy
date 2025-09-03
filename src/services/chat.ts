@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { EncryptionService } from './encryption';
 
 // Função para gerar nome mascarado baseado no ID do usuário
 // GARANTIA DE SIGILO: Esta função sempre gera um nome mascarado único e consistente
@@ -343,9 +344,20 @@ export async function getChatMessages(chatId: string, limit: number = 20, offset
       };
     }
 
+    // 🔓 DESENCRIPTAR mensagens antes de retornar
+    const decryptedMessages = (data.messages || []).map((message: Message) => ({
+      ...message,
+      content: EncryptionService.processMessageForDisplay(message.content, chatId)
+    }));
+
+    console.log('🔓 Mensagens desencriptadas:', {
+      totalMessages: decryptedMessages.length,
+      chatId
+    });
+
     return {
       success: true,
-      data: data.messages || []
+      data: decryptedMessages
     };
 
   } catch (error) {
@@ -390,9 +402,20 @@ export async function getChatMessagesAll(chatId: string): Promise<ApiResponse<Me
       };
     }
 
+    // 🔓 DESENCRIPTAR mensagens antes de retornar
+    const decryptedMessages = (data.messages || []).map((message: Message) => ({
+      ...message,
+      content: EncryptionService.processMessageForDisplay(message.content, chatId)
+    }));
+
+    console.log('🔓 Mensagens desencriptadas (getChatMessagesAll):', {
+      totalMessages: decryptedMessages.length,
+      chatId
+    });
+
     return {
       success: true,
-      data: data.messages || []
+      data: decryptedMessages
     };
 
   } catch (error) {
@@ -418,10 +441,17 @@ export async function sendMessage(chatId: string, content: string): Promise<ApiR
       };
     }
 
-    // ✅ IMPLEMENTAÇÃO REAL: Enviar mensagem para o banco de dados
+    // 🔐 ENCRIPTAR mensagem antes de enviar
+    const encryptedContent = EncryptionService.processMessageForStorage(content, chatId);
+    console.log('🔐 Mensagem encriptada para envio:', { 
+      originalLength: content.length, 
+      encryptedLength: encryptedContent.length 
+    });
+
+    // ✅ IMPLEMENTAÇÃO REAL: Enviar mensagem encriptada para o banco de dados
     const { data, error } = await supabase.rpc('send_message', {
       chat_id_param: chatId,
-      content_param: content,
+      content_param: encryptedContent,
       sender_id_param: user.id
     });
 
@@ -950,10 +980,17 @@ export async function simulateNewMessage(chatId: string, content: string): Promi
       };
     }
 
-    // Enviar mensagem simulada
+    // 🔐 ENCRIPTAR mensagem simulada antes de enviar
+    const encryptedContent = EncryptionService.processMessageForStorage(content, chatId);
+    console.log('🔐 Mensagem simulada encriptada:', { 
+      originalLength: content.length, 
+      encryptedLength: encryptedContent.length 
+    });
+
+    // Enviar mensagem simulada encriptada
     const { data, error } = await supabase.rpc('send_message', {
       chat_id_param: chatId,
-      content_param: content,
+      content_param: encryptedContent,
       sender_id_param: appUser.id
     });
 
