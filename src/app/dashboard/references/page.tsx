@@ -16,7 +16,7 @@ export default function ReferencesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [filterSubject, setFilterSubject] = useState("");
+  const [filterTagId, setFilterTagId] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   
   // Estados dos modais
@@ -76,20 +76,24 @@ export default function ReferencesPage() {
     return references.filter((reference) => {
       const matchesSearch = search === "" || 
         reference.title.toLowerCase().includes(search.toLowerCase()) ||
-        reference.subject.toLowerCase().includes(search.toLowerCase()) ||
+        (reference.tag?.name.toLowerCase().includes(search.toLowerCase()) || false) ||
         reference.description.toLowerCase().includes(search.toLowerCase());
 
-      const matchesSubject = filterSubject === "" || 
-        reference.subject.toLowerCase().includes(filterSubject.toLowerCase());
+      const matchesTag = filterTagId === "" || 
+        reference.tag_id === filterTagId;
 
-      return matchesSearch && matchesSubject;
+      return matchesSearch && matchesTag;
     });
-  }, [references, search, filterSubject]);
+  }, [references, search, filterTagId]);
 
-  // Obter assuntos únicos para filtro
-  const uniqueSubjects = useMemo(() => {
-    const subjects = references.map(ref => ref.subject);
-    return [...new Set(subjects)].sort();
+  // Obter tags únicas para filtro
+  const uniqueTags = useMemo(() => {
+    const tags = references
+      .map(ref => ref.tag)
+      .filter((tag): tag is NonNullable<typeof tag> => tag !== undefined);
+    return [...new Set(tags.map(tag => tag.id))].map(tagId => 
+      tags.find(tag => tag.id === tagId)!
+    ).sort((a, b) => a.name.localeCompare(b.name));
   }, [references]);
 
   // Função para mostrar notificação
@@ -150,12 +154,12 @@ export default function ReferencesPage() {
   // Função para limpar filtros
   const clearFilters = () => {
     setSearch("");
-    setFilterSubject("");
+    setFilterTagId("");
   };
 
   // Verificar se há filtros ativos
   const hasActiveFilters = () => {
-    return search !== "" || filterSubject !== "";
+    return search !== "" || filterTagId !== "";
   };
 
   // Formatação de data
@@ -251,19 +255,19 @@ export default function ReferencesPage() {
               {showFilters && (
                 <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 shadow-sm">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                    {/* Filtro por assunto */}
+                    {/* Filtro por tag */}
                     <div>
                       <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-2">
-                        Assunto
+                        Tag
                       </label>
                       <select
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs sm:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
-                        value={filterSubject}
-                        onChange={e => setFilterSubject(e.target.value)}
+                        value={filterTagId}
+                        onChange={e => setFilterTagId(e.target.value)}
                       >
-                        <option value="">Todos os assuntos</option>
-                        {uniqueSubjects.map(subject => (
-                          <option key={subject} value={subject}>{subject}</option>
+                        <option value="">Todas as tags</option>
+                        {uniqueTags.map(tag => (
+                          <option key={tag.id} value={tag.id}>{tag.name}</option>
                         ))}
                       </select>
                     </div>
@@ -352,9 +356,17 @@ export default function ReferencesPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <h3 className="text-lg font-semibold text-gray-900">{reference.title}</h3>
-                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
-                                {reference.subject}
-                              </span>
+                              {reference.tag && (
+                                <span 
+                                  className="px-2 py-1 rounded text-xs font-medium"
+                                  style={{ 
+                                    backgroundColor: `${reference.tag.color}20`,
+                                    color: reference.tag.color 
+                                  }}
+                                >
+                                  {reference.tag.name}
+                                </span>
+                              )}
                             </div>
                             <p className="text-gray-600 text-sm mb-3 line-clamp-2">{reference.description}</p>
                             <div className="flex items-center gap-4 text-xs text-gray-500">
