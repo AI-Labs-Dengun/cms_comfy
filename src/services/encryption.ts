@@ -264,25 +264,29 @@ export class EncryptionService {
       chatId
     });
     
-    // Se a mensagem precisa ser desencriptada, tentar desencriptar
-    if (this.needsDecryption(message)) {
-      try {
-        console.log('🔓 Tentando desencriptar mensagem...');
-        const decryptedMessage = this.decryptMessage(message, chatId);
-        console.log('✅ Mensagem desencriptada com sucesso:', {
-          originalLength: message.length,
-          decryptedLength: decryptedMessage.length
-        });
-        return decryptedMessage;
-      } catch (error) {
-        console.warn('⚠️ Falha ao desencriptar mensagem, retornando como está:', error);
+    // ✅ SEMPRE tentar desencriptar primeiro (abordagem mais robusta)
+    try {
+      console.log('🔓 Tentando desencriptar mensagem...');
+      const decryptedMessage = this.decryptMessage(message, chatId);
+      console.log('✅ Mensagem desencriptada com sucesso:', {
+        originalLength: message.length,
+        decryptedLength: decryptedMessage.length,
+        originalContent: message,
+        decryptedContent: decryptedMessage
+      });
+      return decryptedMessage;
+    } catch (error) {
+      console.log('⚠️ Falha ao desencriptar mensagem, verificando se precisa ser desencriptada:', error);
+      
+      // Se falhou, verificar se realmente precisa ser desencriptada
+      if (this.needsDecryption(message)) {
+        console.warn('⚠️ Mensagem parece precisar de desencriptação mas falhou, retornando como está');
+        return message;
+      } else {
+        console.log('ℹ️ Mensagem não precisa ser desencriptada, retornando como está');
         return message;
       }
     }
-    
-    // Se não precisa ser desencriptada, retornar como está
-    console.log('ℹ️ Mensagem não precisa ser desencriptada, retornando como está');
-    return message;
   }
   
   /**
