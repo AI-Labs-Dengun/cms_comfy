@@ -189,9 +189,9 @@ export function useChatRealtime({
                   } catch (error) {
                     console.error('❌ Erro ao processar mensagem na tentativa', attempt, ':', error);
                     
-                    // Retry até 3 vezes com delay crescente
+                    // Retry até 3 vezes com delay mínimo
                     if (attempt < 3) {
-                      const delay = attempt * 100; // 100ms, 200ms, 300ms
+                      const delay = attempt * 10; // 10ms, 20ms, 30ms (reduzido drasticamente)
                       console.log(`🔄 Tentando novamente em ${delay}ms...`);
                       setTimeout(() => processMessage(attempt + 1), delay);
                     } else {
