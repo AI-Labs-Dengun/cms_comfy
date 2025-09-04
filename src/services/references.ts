@@ -1,5 +1,8 @@
 import { supabase } from '@/lib/supabase';
-import { Reference, CreateReferenceData, UpdateReferenceData, ReferenceResponse } from '@/types/references';
+import { Reference, CreateReferenceData, UpdateReferenceData, ReferenceResponse, ReferenceTag, CreateTagData, UpdateTagData, TagResponse } from '@/types/references';
+
+// Re-exportar tipos para uso em componentes
+export type { ReferenceTag } from '@/types/references';
 
 export class ReferenceService {
   /**
@@ -9,7 +12,10 @@ export class ReferenceService {
     try {
       const { data, error } = await supabase
         .from('cms_references')
-        .select('*')
+        .select(`
+          *,
+          tag:cms_reference_tags(*)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -40,7 +46,10 @@ export class ReferenceService {
     try {
       const { data, error } = await supabase
         .from('cms_references')
-        .select('*')
+        .select(`
+          *,
+          tag:cms_reference_tags(*)
+        `)
         .eq('id', id)
         .single();
 
@@ -218,7 +227,10 @@ export class ReferenceService {
     try {
       const { data, error } = await supabase
         .from('cms_references')
-        .select('*')
+        .select(`
+          *,
+          tag:cms_reference_tags(*)
+        `)
         .ilike('title', `%${title}%`)
         .order('created_at', { ascending: false });
 
@@ -242,6 +254,220 @@ export class ReferenceService {
       };
     }
   }
+
+  // ===== MÉTODOS PARA GERENCIAR TAGS =====
+
+  /**
+   * Busca todas as tags
+   */
+  static async getAllTags(): Promise<TagResponse> {
+    try {
+      const { data, error } = await supabase
+        .from('cms_reference_tags')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Erro ao buscar tags:', error);
+        return {
+          success: false,
+          error: 'Erro ao buscar tags: ' + error.message
+        };
+      }
+
+      return {
+        success: true,
+        data: data as ReferenceTag[]
+      };
+    } catch (error) {
+      console.error('Erro inesperado ao buscar tags:', error);
+      return {
+        success: false,
+        error: 'Erro inesperado ao buscar tags'
+      };
+    }
+  }
+
+  /**
+   * Busca uma tag específica por ID
+   */
+  static async getTagById(id: string): Promise<TagResponse> {
+    try {
+      const { data, error } = await supabase
+        .from('cms_reference_tags')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        console.error('Erro ao buscar tag:', error);
+        return {
+          success: false,
+          error: 'Erro ao buscar tag: ' + error.message
+        };
+      }
+
+      return {
+        success: true,
+        data: data as ReferenceTag
+      };
+    } catch (error) {
+      console.error('Erro inesperado ao buscar tag:', error);
+      return {
+        success: false,
+        error: 'Erro inesperado ao buscar tag'
+      };
+    }
+  }
+
+  /**
+   * Cria uma nova tag
+   */
+  static async createTag(tagData: CreateTagData): Promise<TagResponse> {
+    try {
+      // Obter usuário atual
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        return {
+          success: false,
+          error: 'Usuário não autenticado'
+        };
+      }
+
+      const { data, error } = await supabase
+        .from('cms_reference_tags')
+        .insert({
+          ...tagData,
+          created_by: user.id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao criar tag:', error);
+        return {
+          success: false,
+          error: 'Erro ao criar tag: ' + error.message
+        };
+      }
+
+      return {
+        success: true,
+        data: data as ReferenceTag,
+        message: 'Tag criada com sucesso!'
+      };
+    } catch (error) {
+      console.error('Erro inesperado ao criar tag:', error);
+      return {
+        success: false,
+        error: 'Erro inesperado ao criar tag'
+      };
+    }
+  }
+
+  /**
+   * Atualiza uma tag existente
+   */
+  static async updateTag(id: string, updateData: UpdateTagData): Promise<TagResponse> {
+    try {
+      const { data, error } = await supabase
+        .from('cms_reference_tags')
+        .update({
+          ...updateData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao atualizar tag:', error);
+        return {
+          success: false,
+          error: 'Erro ao atualizar tag: ' + error.message
+        };
+      }
+
+      return {
+        success: true,
+        data: data as ReferenceTag,
+        message: 'Tag atualizada com sucesso!'
+      };
+    } catch (error) {
+      console.error('Erro inesperado ao atualizar tag:', error);
+      return {
+        success: false,
+        error: 'Erro inesperado ao atualizar tag'
+      };
+    }
+  }
+
+  /**
+   * Verifica se uma tag tem referências associadas
+   */
+  static async checkTagUsage(tagId: string): Promise<{ hasReferences: boolean; count: number }> {
+    try {
+      const { data, error } = await supabase
+        .from('cms_references')
+        .select('id', { count: 'exact' })
+        .eq('tag_id', tagId);
+
+      if (error) {
+        console.error('Erro ao verificar uso da tag:', error);
+        return { hasReferences: false, count: 0 };
+      }
+
+      return {
+        hasReferences: (data && data.length > 0),
+        count: data ? data.length : 0
+      };
+    } catch (error) {
+      console.error('Erro inesperado ao verificar uso da tag:', error);
+      return { hasReferences: false, count: 0 };
+    }
+  }
+
+  /**
+   * Remove uma tag (apenas se não tiver referências associadas)
+   */
+  static async deleteTag(id: string): Promise<TagResponse> {
+    try {
+      // Verificar se a tag tem referências associadas
+      const usage = await this.checkTagUsage(id);
+      
+      if (usage.hasReferences) {
+        return {
+          success: false,
+          error: `Não é possível remover esta tag. Ela está sendo usada em ${usage.count} referência(s).`
+        };
+      }
+
+      const { error } = await supabase
+        .from('cms_reference_tags')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Erro ao remover tag:', error);
+        return {
+          success: false,
+          error: 'Erro ao remover tag: ' + error.message
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Tag removida com sucesso!'
+      };
+    } catch (error) {
+      console.error('Erro inesperado ao remover tag:', error);
+      return {
+        success: false,
+        error: 'Erro inesperado ao remover tag'
+      };
+    }
+  }
 }
 
 // Funções de conveniência para uso direto
@@ -250,5 +476,12 @@ export const getReferenceById = (id: string) => ReferenceService.getReferenceByI
 export const createReference = (data: CreateReferenceData) => ReferenceService.createReference(data);
 export const updateReference = (id: string, data: UpdateReferenceData) => ReferenceService.updateReference(id, data);
 export const deleteReference = (id: string) => ReferenceService.deleteReference(id);
-export const getReferencesBySubject = (subject: string) => ReferenceService.getReferencesBySubject(subject);
 export const getReferencesByTitle = (title: string) => ReferenceService.getReferencesByTitle(title);
+
+// Funções de conveniência para tags
+export const getAllTags = () => ReferenceService.getAllTags();
+export const getTagById = (id: string) => ReferenceService.getTagById(id);
+export const createTag = (data: CreateTagData) => ReferenceService.createTag(data);
+export const updateTag = (id: string, data: UpdateTagData) => ReferenceService.updateTag(id, data);
+export const deleteTag = (id: string) => ReferenceService.deleteTag(id);
+export const checkTagUsage = (id: string) => ReferenceService.checkTagUsage(id);
