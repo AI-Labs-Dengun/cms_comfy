@@ -765,6 +765,98 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     return () => clearInterval(interval);
   }, [chatId, loadAssignedPsicologo]);
 
+  // ✅ NOVO: Estado para controlar polling de fallback
+  const [lastMessageTimestamp, setLastMessageTimestamp] = useState<string>('');
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isPollingRef = useRef(false);
+  
+
+
+  // ✅ NOVA FUNÇÃO: Polling de fallback para mensagens
+  const startFallbackPolling = useCallback(() => {
+    if (isPollingRef.current) return;
+    
+    console.log('🔄 Iniciando polling de fallback para mensagens...');
+    isPollingRef.current = true;
+    
+    const pollForNewMessages = async () => {
+      try {
+        // Buscar mensagens mais recentes que a última conhecida
+        const { data: newMessages, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('chat_id', chatId)
+          .eq('is_deleted', false)
+          .gt('created_at', lastMessageTimestamp || new Date(0).toISOString())
+          .order('created_at', { ascending: true });
+        
+        if (!error && newMessages && newMessages.length > 0) {
+          console.log('📡 Polling: Encontradas', newMessages.length, 'novas mensagens');
+          
+          // Processar cada nova mensagem
+          for (const message of newMessages) {
+            try {
+              // Desencriptar mensagem
+              const decryptedContent = EncryptionService.processMessageForDisplay(message.content, chatId);
+              const processedMessage = {
+                ...message,
+                content: decryptedContent
+              };
+              
+              // Notificar sobre a nova mensagem
+              if (onNewMessageReceived) {
+                onNewMessageReceived(processedMessage);
+              }
+              
+              // Atualizar timestamp da última mensagem
+              setLastMessageTimestamp(message.created_at);
+            } catch (error) {
+              console.error('❌ Erro ao processar mensagem do polling:', error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erro no polling de fallback:', error);
+      }
+    };
+    
+    // Executar polling a cada 5 segundos
+    pollingIntervalRef.current = setInterval(pollForNewMessages, 5000);
+    
+    // Executar imediatamente na primeira vez
+    pollForNewMessages();
+  }, [chatId, lastMessageTimestamp, onNewMessageReceived]);
+
+  // ✅ NOVA FUNÇÃO: Parar polling de fallback
+  const stopFallbackPolling = useCallback(() => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    isPollingRef.current = false;
+    console.log('🛑 Polling de fallback parado');
+  }, []);
+
+  // ✅ NOVO: Iniciar polling quando o chat é carregado
+  useEffect(() => {
+    if (externalMessages && externalMessages.length > 0) {
+      // Definir timestamp da última mensagem conhecida
+      const lastMessage = externalMessages[externalMessages.length - 1];
+      setLastMessageTimestamp(lastMessage.created_at);
+      
+      // Iniciar polling de fallback após 10 segundos se não houver mensagens do Realtime
+      const timeoutId = setTimeout(() => {
+        console.log('🔄 Iniciando polling de fallback após timeout...');
+        startFallbackPolling();
+      }, 10000);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        stopFallbackPolling();
+      };
+    }
+  }, [externalMessages, startFallbackPolling, stopFallbackPolling]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-full">
