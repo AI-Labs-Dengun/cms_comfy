@@ -5,13 +5,14 @@ import { useRouter, useParams } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import { useAuth } from "@/context/AuthContext";
 import { getReferenceById, updateReference } from "@/services/references";
+import TagSelector from "@/components/TagSelector";
 import { ArrowLeft, Save, Link, ExternalLink } from "lucide-react";
 
 export default function EditReferencePage() {
   const router = useRouter();
   const params = useParams();
   const { isAuthenticated, canAccessCMS, loading: authLoading } = useAuth();
-  const [subject, setSubject] = useState("");
+  const [tagId, setTagId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [url, setUrl] = useState("");
@@ -31,7 +32,7 @@ export default function EditReferencePage() {
       
       if (response.success && response.data && !Array.isArray(response.data)) {
         const reference = response.data;
-        setSubject(reference.subject);
+        setTagId(reference.tag_id);
         setTitle(reference.title);
         setDescription(reference.description);
         setUrl(reference.url);
@@ -61,8 +62,8 @@ export default function EditReferencePage() {
 
     try {
       // Validações
-      if (!subject.trim()) {
-        setError("Assunto é obrigatório");
+      if (!tagId) {
+        setError("Tag é obrigatória");
         return;
       }
 
@@ -90,7 +91,7 @@ export default function EditReferencePage() {
       }
 
       const response = await updateReference(referenceId, {
-        subject: subject.trim(),
+        tag_id: tagId,
         title: title.trim(),
         description: description.trim(),
         url: url.trim()
@@ -190,24 +191,25 @@ export default function EditReferencePage() {
           {/* Formulário */}
           {!loading && !error && (
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Assunto */}
+              {/* Tag */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-900">
-                  Assunto
+                  Tag
                   <span className="text-red-500 ml-1">*</span>
                 </label>
                 <p className="text-xs text-gray-500 mb-2">
-                  Categoria ou tema da referência (ex: Psicologia, Tecnologia, Saúde Mental, etc.)
+                  Selecione uma tag existente ou crie uma nova para categorizar a referência
                 </p>
-                <input
-                  type="text"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
-                  placeholder="Ex: Psicologia, Tecnologia, Saúde Mental..."
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  required
-                  disabled={saving}
-                />
+                <div className="space-y-2">
+                  <TagSelector
+                    selectedTagId={tagId}
+                    onTagSelect={setTagId}
+                    disabled={saving}
+                    placeholder="Selecione uma tag..."
+                  />
+                  <div className="text-xs text-gray-500 flex items-center gap-1">
+                  </div>
+                </div>
               </div>
 
               {/* Título */}
@@ -301,7 +303,7 @@ export default function EditReferencePage() {
                   className="bg-black text-white px-6 py-2 rounded-md font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   disabled={
                     saving || 
-                    !subject.trim() || 
+                    !tagId || 
                     !title.trim() || 
                     !description.trim() || 
                     !url.trim()
