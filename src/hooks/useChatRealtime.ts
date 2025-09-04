@@ -274,7 +274,7 @@ export function useChatRealtime({
         retryTimeoutRef.current = null;
       }
     };
-  }, [chatId]); // Remover dependências das funções de callback para evitar recriação desnecessária
+  }, [chatId, createSubscriptions, retryConnection]); // Adicionar dependências das funções de callback
 
   // ✅ NOVA FUNÇÃO: Limpar manualmente as subscriptions
   const cleanup = () => {
