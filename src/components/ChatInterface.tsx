@@ -7,6 +7,7 @@ import ChatStatusTag, { ChatStatus } from '@/components/ChatStatusTag';
 import { getChatInfo, sendMessage, updateChatStatus, markMessagesAsRead, ChatInfo, Message, Chat } from '@/services/chat';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
 import { useEncryptedChat } from '@/hooks/useEncryptedChat';
+import { EncryptionService } from '@/services/encryption';
 import { supabase } from '@/lib/supabase';
 import SelfAssignButton from '@/components/SelfAssignButton';
 
@@ -560,15 +561,51 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     
     // Só processar a mensagem se ela pertence ao chat atual
     if (message.chat_id === chatId) {
-      // 🔓 PROCESSAR mensagem encriptada em tempo real
-      const processedMessage = processIncomingMessage(message);
-      console.log('🔓 Mensagem processada em tempo real:', {
+      // ✅ OBRIGATÓRIO: Forçar desencriptação de TODAS as mensagens do Realtime
+      console.log('🔓 OBRIGANDO desencriptação de mensagem do Realtime:', {
+        messageId: message.id,
         originalContent: message.content,
-        processedContent: processedMessage.content
+        contentLength: message.content?.length || 0
       });
       
+      let processedMessage: Message;
+      
+      try {
+        // 🔓 DESENCRIPTAR OBRIGATORIAMENTE usando o serviço de encriptação
+        const decryptedContent = EncryptionService.processMessageForDisplay(message.content, chatId);
+        
+        processedMessage = {
+          ...message,
+          content: decryptedContent
+        };
+        
+        console.log('✅ Mensagem OBRIGATORIAMENTE desencriptada:', {
+          messageId: message.id,
+          originalContent: message.content,
+          decryptedContent: processedMessage.content,
+          wasEncrypted: message.content !== decryptedContent
+        });
+        
+      } catch (error) {
+        console.error('❌ ERRO CRÍTICO: Falha na desencriptação obrigatória:', error);
+        
+        // Em caso de erro, tentar usar o hook como fallback
+        try {
+          processedMessage = processIncomingMessage(message);
+          console.log('⚠️ Usando fallback de desencriptação:', processedMessage.content);
+        } catch (fallbackError) {
+          console.error('❌ ERRO CRÍTICO: Fallback também falhou:', fallbackError);
+          
+          // Último recurso: mostrar mensagem original com aviso
+          processedMessage = {
+            ...message,
+            content: `[ERRO DE DESENCRIPTAÇÃO] ${message.content}`
+          };
+        }
+      }
+      
       // NÃO adicionar mensagem ao estado local - apenas notificar a página pai
-      console.log('✅ Notificando página pai sobre nova mensagem:', processedMessage.content);
+      console.log('✅ Notificando página pai sobre nova mensagem desencriptada:', processedMessage.content);
       
       // Usar a prop para processar a mensagem na página pai
       if (onNewMessageReceived) {
