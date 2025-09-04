@@ -2,14 +2,14 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, ArrowRight, LogOut, User, Users, PlusCircle, Menu, X, Tags } from 'lucide-react';
+import { Plus, ArrowRight, LogOut, User, Users, PlusCircle, Menu, X, Tags, BookOpen } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
 import Image from 'next/image';
 
 interface CMSLayoutProps {
   children: React.ReactNode;
-  currentPage?: 'create' | 'management' | 'psicologos-create' | 'psicologos' | 'tags-leitura';
+  currentPage?: 'create' | 'management' | 'psicologos-create' | 'psicologos' | 'tags-leitura' | 'references';
 }
 
 export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
@@ -148,6 +148,18 @@ export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
             >
               <Tags className="w-4 h-4" />
               <span className="text-sm lg:text-base">Categorias de Leitura</span>
+            </button>
+            {/* Referências */}
+            <button
+              className={`flex items-center gap-2 px-3 py-3 rounded-lg font-medium cursor-pointer transition-colors ${
+                currentPage === 'references' 
+                  ? 'bg-black text-white' 
+                  : 'text-gray-900 hover:bg-gray-100'
+              }`}
+              onClick={() => handleNavigation('/dashboard/references')}
+            >
+              <BookOpen className="w-4 h-4" />
+              <span className="text-sm lg:text-base">Referências</span>
             </button>
             {/* Novo Psicólogo */}
             <button
