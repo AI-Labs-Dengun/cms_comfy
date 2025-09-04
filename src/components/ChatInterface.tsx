@@ -328,14 +328,14 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
     if (isInitialLoad && externalMessages && externalMessages.length > 0) {
       console.log('📜 ChatInterface - Garantindo scroll para última mensagem ao entrar no chat');
       
-      // Usar setTimeout para garantir que o DOM foi renderizado
+      // Usar setTimeout para garantir que o DOM foi renderizado (delay reduzido)
       setTimeout(() => {
         if (containerRef.current) {
           const container = containerRef.current;
           container.scrollTop = container.scrollHeight;
           console.log('✅ Scroll aplicado para última mensagem');
         }
-      }, 100);
+      }, 50); // Reduzido de 100ms para 50ms
     }
   }, [isInitialLoad, externalMessages, containerRef]);
 
@@ -517,10 +517,10 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
         console.log('✅ Mensagem enviada com sucesso:', result.data);
         
         // A mensagem será adicionada automaticamente via tempo real
-        // Scroll suave para a nova mensagem enviada
+        // Scroll suave para a nova mensagem enviada (delay reduzido)
         setTimeout(() => {
           scrollToBottom();
-        }, 100);
+        }, 50); // Reduzido de 100ms para 50ms
         
         // Notificar a página pai para atualizar a lista de chats
         if (onChatUpdate) {
@@ -615,7 +615,8 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
       // Se a mensagem é do usuário e o chat está ativo, marcar como lida automaticamente
       if (message.sender_type === 'app_user' && isChatActive) {
         console.log('📖 Marcando nova mensagem como lida automaticamente (chat ativo)');
-        setTimeout(async () => {
+        // ✅ REMOVIDO: Delay desnecessário - marcar como lida imediatamente
+        (async () => {
           try {
             await markMessagesAsRead(chatId);
             setHasMarkedAsRead(true);
@@ -628,7 +629,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
           } catch (error) {
             console.error('❌ Erro ao marcar nova mensagem como lida:', error);
           }
-        }, 1000); // Pequeno delay para garantir que a mensagem foi processada
+        })();
       }
     }
   }, [chatId, isChatActive, onChatUpdate, onNewMessageReceived, processIncomingMessage]);
@@ -820,8 +821,8 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
       }
     };
     
-    // Executar polling a cada 5 segundos
-    pollingIntervalRef.current = setInterval(pollForNewMessages, 5000);
+    // Executar polling a cada 3 segundos (reduzido para maior responsividade)
+    pollingIntervalRef.current = setInterval(pollForNewMessages, 3000);
     
     // Executar imediatamente na primeira vez
     pollForNewMessages();
@@ -844,11 +845,11 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
       const lastMessage = externalMessages[externalMessages.length - 1];
       setLastMessageTimestamp(lastMessage.created_at);
       
-      // Iniciar polling de fallback após 10 segundos se não houver mensagens do Realtime
+      // Iniciar polling de fallback após 5 segundos se não houver mensagens do Realtime (reduzido)
       const timeoutId = setTimeout(() => {
         console.log('🔄 Iniciando polling de fallback após timeout...');
         startFallbackPolling();
-      }, 10000);
+      }, 5000); // Reduzido de 10 segundos para 5 segundos
       
       return () => {
         clearTimeout(timeoutId);
