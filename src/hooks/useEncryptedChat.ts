@@ -10,19 +10,20 @@ import { EncryptionService } from '@/services/encryption';
 export function useEncryptedChat(chatId: string) {
   
   /**
-   * Processa uma mensagem recebida em tempo real
+   * Processa uma mensagem recebida em tempo real (versão FORÇADA)
    * @param message - Mensagem do banco de dados (pode estar encriptada)
    * @returns Mensagem processada (desencriptada se necessário)
    */
   const processIncomingMessage = useCallback((message: Message): Message => {
     try {
-      console.log('🔓 Processando mensagem recebida em tempo real:', {
+      console.log('🔓 Processando mensagem recebida em tempo real (FORÇADO):', {
         messageId: message.id,
         chatId: message.chat_id,
-        contentLength: message.content?.length || 0
+        contentLength: message.content?.length || 0,
+        originalContent: message.content
       });
 
-      // Desencriptar mensagem se necessário
+      // 🔓 OBRIGATÓRIO: Sempre tentar desencriptar
       const decryptedContent = EncryptionService.processMessageForDisplay(message.content, chatId);
       
       const processedMessage = {
@@ -30,17 +31,23 @@ export function useEncryptedChat(chatId: string) {
         content: decryptedContent
       };
 
-      console.log('✅ Mensagem processada com sucesso:', {
+      console.log('✅ Mensagem processada com sucesso (FORÇADO):', {
         messageId: message.id,
         originalLength: message.content?.length || 0,
-        decryptedLength: decryptedContent.length
+        decryptedLength: decryptedContent.length,
+        wasEncrypted: message.content !== decryptedContent,
+        finalContent: decryptedContent
       });
 
       return processedMessage;
     } catch (error) {
-      console.error('❌ Erro ao processar mensagem recebida:', error);
-      // Retornar mensagem original em caso de erro
-      return message;
+      console.error('❌ Erro ao processar mensagem recebida (FORÇADO):', error);
+      
+      // Em caso de erro, retornar mensagem com aviso
+      return {
+        ...message,
+        content: `[ERRO DE DESENCRIPTAÇÃO] ${message.content}`
+      };
     }
   }, [chatId]);
 
