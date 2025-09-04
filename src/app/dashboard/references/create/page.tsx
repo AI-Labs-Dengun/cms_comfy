@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import { useAuth } from "@/context/AuthContext";
 import { createReference } from "@/services/references";
+import TagSelector from "@/components/TagSelector";
 import { ArrowLeft, Save, Link } from "lucide-react";
 
 export default function CreateReferencePage() {
   const router = useRouter();
   const { isAuthenticated, canAccessCMS, loading: authLoading } = useAuth();
-  const [subject, setSubject] = useState("");
+  const [tagId, setTagId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [url, setUrl] = useState("");
@@ -26,8 +27,8 @@ export default function CreateReferencePage() {
 
     try {
       // Validações
-      if (!subject.trim()) {
-        setError("Assunto é obrigatório");
+      if (!tagId) {
+        setError("Tag é obrigatória");
         return;
       }
 
@@ -55,7 +56,7 @@ export default function CreateReferencePage() {
       }
 
       const response = await createReference({
-        subject: subject.trim(),
+        tag_id: tagId,
         title: title.trim(),
         description: description.trim(),
         url: url.trim()
@@ -65,7 +66,7 @@ export default function CreateReferencePage() {
         setSuccess("Referência criada com sucesso!");
         
         // Limpar formulário
-        setSubject("");
+        setTagId("");
         setTitle("");
         setDescription("");
         setUrl("");
@@ -86,7 +87,7 @@ export default function CreateReferencePage() {
   };
 
   const handleCancel = () => {
-    const hasChanges = subject.trim() || title.trim() || description.trim() || url.trim();
+    const hasChanges = tagId || title.trim() || description.trim() || url.trim();
     
     if (hasChanges) {
       const confirmLeave = window.confirm(
@@ -150,24 +151,25 @@ export default function CreateReferencePage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Assunto */}
+            {/* Tag */}
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-900">
-                Assunto
+                Tag
                 <span className="text-red-500 ml-1">*</span>
               </label>
               <p className="text-xs text-gray-500 mb-2">
-                Categoria ou tema da referência (ex: Psicologia, Tecnologia, Saúde Mental, etc.)
+                Selecione uma tag existente ou crie uma nova para categorizar a referência
               </p>
-              <input
-                type="text"
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
-                placeholder="Ex: Psicologia, Tecnologia, Saúde Mental..."
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                required
-                disabled={loading}
-              />
+              <div className="space-y-2">
+                <TagSelector
+                  selectedTagId={tagId}
+                  onTagSelect={setTagId}
+                  disabled={loading}
+                  placeholder="Selecione uma tag..."
+                />
+                <div className="text-xs text-gray-500 flex items-center gap-1">
+                </div>
+              </div>
             </div>
 
             {/* Título */}
@@ -248,7 +250,7 @@ export default function CreateReferencePage() {
                 className="bg-black text-white px-6 py-2 rounded-md font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 disabled={
                   loading || 
-                  !subject.trim() || 
+                  !tagId || 
                   !title.trim() || 
                   !description.trim() || 
                   !url.trim()
