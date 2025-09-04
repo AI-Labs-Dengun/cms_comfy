@@ -150,22 +150,32 @@ export default function PsicologosPage() {
       timestamp: message.created_at
     });
     
-    // 🔓 PROCESSAR mensagem encriptada se necessário
+    // ✅ VERIFICAÇÃO ADICIONAL: Garantir que a mensagem não está encriptada
     let processedMessage = message;
     if (selectedChat?.id && message.chat_id === selectedChat.id) {
       try {
-        // Usar diretamente o serviço de encriptação
-        const decryptedContent = EncryptionService.processMessageForDisplay(message.content, selectedChat.id);
-        processedMessage = {
-          ...message,
-          content: decryptedContent
-        };
-        console.log('🔓 Mensagem processada na página pai:', {
-          originalContent: message.content,
-          processedContent: processedMessage.content
-        });
+        // Verificar se a mensagem ainda parece estar encriptada
+        const isStillEncrypted = EncryptionService.isDefinitelyEncrypted(message.content);
+        
+        if (isStillEncrypted) {
+          console.log('⚠️ Mensagem ainda parece encriptada, forçando desencriptação adicional:', message.content);
+          
+          // Forçar desencriptação adicional
+          const decryptedContent = EncryptionService.processMessageForDisplay(message.content, selectedChat.id);
+          processedMessage = {
+            ...message,
+            content: decryptedContent
+          };
+          
+          console.log('✅ Desencriptação adicional realizada:', {
+            originalContent: message.content,
+            processedContent: processedMessage.content
+          });
+        } else {
+          console.log('✅ Mensagem já está desencriptada corretamente');
+        }
       } catch (error) {
-        console.error('❌ Erro ao processar mensagem:', error);
+        console.error('❌ Erro ao verificar/processar mensagem:', error);
         processedMessage = message; // Manter mensagem original em caso de erro
       }
     } else {
