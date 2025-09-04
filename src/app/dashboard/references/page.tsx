@@ -7,7 +7,8 @@ import { useAuth } from "@/context/AuthContext";
 import { getAllReferences, deleteReference } from "@/services/references";
 import { Reference } from "@/types/references";
 import { DeleteConfirmationModal, NotificationModal } from "@/components/modals";
-import { Plus, Search, Edit, Trash2, ExternalLink, Filter } from "lucide-react";
+import { Plus, Search, Edit, Trash2, ExternalLink } from "lucide-react";
+import TagFilterSelector from "@/components/TagFilterSelector";
 
 export default function ReferencesPage() {
   const router = useRouter();
@@ -16,8 +17,7 @@ export default function ReferencesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [filterTagId, setFilterTagId] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
+  const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   
   // Estados dos modais
   const [deleteModal, setDeleteModal] = useState<{
@@ -79,21 +79,36 @@ export default function ReferencesPage() {
         (reference.tag?.name.toLowerCase().includes(search.toLowerCase()) || false) ||
         reference.description.toLowerCase().includes(search.toLowerCase());
 
-      const matchesTag = filterTagId === "" || 
-        reference.tag_id === filterTagId;
+      const matchesTag = filterTagIds.length === 0 || 
+        filterTagIds.includes(reference.tag_id);
 
       return matchesSearch && matchesTag;
     });
-  }, [references, search, filterTagId]);
+  }, [references, search, filterTagIds]);
 
-  // Obter tags únicas para filtro
-  const uniqueTags = useMemo(() => {
-    const tags = references
-      .map(ref => ref.tag)
-      .filter((tag): tag is NonNullable<typeof tag> => tag !== undefined);
-    return [...new Set(tags.map(tag => tag.id))].map(tagId => 
-      tags.find(tag => tag.id === tagId)!
-    ).sort((a, b) => a.name.localeCompare(b.name));
+  // Obter tags que têm referências
+  const tagsWithReferences = useMemo(() => {
+    // Criar um Map para contar referências por tag
+    const tagCounts = new Map<string, { tag: NonNullable<typeof references[0]['tag']>; count: number }>();
+    
+    references.forEach(ref => {
+      if (ref.tag) {
+        const existing = tagCounts.get(ref.tag.id);
+        if (existing) {
+          existing.count++;
+        } else {
+          tagCounts.set(ref.tag.id, { tag: ref.tag, count: 1 });
+        }
+      }
+    });
+    
+    // Converter para array e ordenar
+    const tagsWithCounts = Array.from(tagCounts.values())
+      .filter(item => item.count > 0) // Apenas tags com pelo menos 1 referência
+      .map(item => item.tag)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    
+    return tagsWithCounts;
   }, [references]);
 
   // Função para mostrar notificação
@@ -154,12 +169,17 @@ export default function ReferencesPage() {
   // Função para limpar filtros
   const clearFilters = () => {
     setSearch("");
-    setFilterTagId("");
+    setFilterTagIds([]);
   };
 
   // Verificar se há filtros ativos
   const hasActiveFilters = () => {
-    return search !== "" || filterTagId !== "";
+    return search !== "" || filterTagIds.length > 0;
+  };
+
+  // Função para processar busca (sem filtros de tag no texto)
+  const processSearch = (searchTerm: string) => {
+    setSearch(searchTerm);
   };
 
   // Formatação de data
@@ -207,17 +227,25 @@ export default function ReferencesPage() {
             {/* Barra de busca e filtros */}
             <div className="w-full mb-4 sm:mb-6 space-y-3 sm:space-y-4">
               {/* Barra de busca principal */}
-              <div className="flex items-center w-full justify-center">
-                <span className="pl-3 pr-2 text-gray-600">
-                  <Search className="w-5 h-5" />
-                </span>
-                <input
-                  type="text"
-                  className="w-full max-w-2xl sm:max-w-3xl border border-gray-300 rounded-lg px-3 py-2 sm:py-3 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium text-sm sm:text-base"
-                  placeholder="Pesquise por título, assunto ou descrição..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  style={{ fontFamily: 'Inter, Quicksand, sans-serif' }}
+              <div className="flex items-center w-full justify-center gap-2">
+                <div className="flex items-center flex-1 max-w-2xl sm:max-w-3xl">
+                  <span className="pl-3 pr-2 text-gray-600">
+                    <Search className="w-5 h-5" />
+                  </span>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-l-lg px-3 py-2 sm:py-3 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium text-sm sm:text-base"
+                    placeholder="Pesquise por título ou descrição..."
+                    value={search}
+                    onChange={e => processSearch(e.target.value)}
+                    style={{ fontFamily: 'Inter, Quicksand, sans-serif' }}
+                  />
+                </div>
+                <TagFilterSelector
+                  selectedTagIds={filterTagIds}
+                  onTagSelect={setFilterTagIds}
+                  disabled={loading}
+                  availableTags={tagsWithReferences}
                 />
               </div>
 
@@ -232,15 +260,6 @@ export default function ReferencesPage() {
                   <span className="sm:hidden">Nova</span>
                 </button>
                 
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black transition-colors"
-                >
-                  <Filter className="w-4 h-4" />
-                  <span className="hidden sm:inline">{showFilters ? 'Ocultar Filtros' : 'Mostrar Filtros'}</span>
-                  <span className="sm:hidden">{showFilters ? 'Ocultar' : 'Filtros'}</span>
-                </button>
-                
                 {hasActiveFilters() && (
                   <button
                     onClick={clearFilters}
@@ -251,29 +270,7 @@ export default function ReferencesPage() {
                 )}
               </div>
 
-              {/* Painel de filtros */}
-              {showFilters && (
-                <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 shadow-sm">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                    {/* Filtro por tag */}
-                    <div>
-                      <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-2">
-                        Tag
-                      </label>
-                      <select
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs sm:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
-                        value={filterTagId}
-                        onChange={e => setFilterTagId(e.target.value)}
-                      >
-                        <option value="">Todas as tags</option>
-                        {uniqueTags.map(tag => (
-                          <option key={tag.id} value={tag.id}>{tag.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
+
             </div>
 
             {/* Contador de resultados */}
@@ -284,9 +281,16 @@ export default function ReferencesPage() {
                     {filteredReferences.length} de {references.length} referências encontradas
                   </span>
                   {hasActiveFilters() && (
-                    <span className="text-blue-600 font-semibold">
-                      Filtros ativos
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">
+                        Filtros ativos
+                      </span>
+                      {filterTagIds.length > 0 && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          {filterTagIds.length} tag(s) selecionada(s)
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
