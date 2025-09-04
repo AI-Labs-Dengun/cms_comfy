@@ -113,14 +113,102 @@ export class EncryptionService {
   }
   
   /**
-   * Verifica se uma mensagem está encriptada
+   * Verifica se uma mensagem está encriptada de forma mais robusta
    * @param message - Mensagem para verificar
-   * @returns true se parece estar encriptada em Base64
+   * @returns true se a mensagem está definitivamente encriptada
    */
-  static isEncrypted(message: string): boolean {
+  static isDefinitelyEncrypted(message: string): boolean {
+    // Verificar se a mensagem está vazia
+    if (!message || message.length === 0) {
+      return false;
+    }
+    
     // Verificar se a mensagem parece ser Base64 válido
     const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-    return base64Regex.test(message) && message.length > 0;
+    const isBase64 = base64Regex.test(message);
+    
+    // Verificações para determinar se está definitivamente encriptada
+    const hasSpecialChars = /[^A-Za-z0-9+/=]/.test(message);
+    const hasSpaces = /\s/.test(message);
+    const hasAccents = /[áéíóúâêîôûãõçñ]/.test(message);
+    const isLongEnough = message.length >= 16; // Base64 encriptado geralmente é longo
+    
+    // Log para debug
+    console.log('🔍 Verificando se mensagem está definitivamente encriptada:', {
+      message: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
+      length: message.length,
+      isBase64,
+      hasSpecialChars,
+      hasSpaces,
+      hasAccents,
+      isLongEnough
+    });
+    
+    // Se tem caracteres especiais, espaços ou acentos, definitivamente não está encriptada
+    if (hasSpecialChars || hasSpaces || hasAccents) {
+      console.log('🔍 Mensagem tem caracteres especiais/espaços/acentos - não encriptada');
+      return false;
+    }
+    
+    // Para ser considerado definitivamente encriptado, deve ser Base64 E ter comprimento adequado
+    const definitelyEncrypted = isBase64 && isLongEnough;
+    
+    console.log('🔍 Resultado da verificação:', definitelyEncrypted ? 'DEFINITIVAMENTE ENCRIPTADA' : 'NÃO ENCRIPTADA OU INCERTA');
+    
+    return definitelyEncrypted;
+  }
+
+  /**
+   * Verifica se uma mensagem está encriptada (versão original mantida para compatibilidade)
+   * @param message - Mensagem para verificar
+   * @returns true se a mensagem parece estar encriptada em Base64
+   */
+  static isEncrypted(message: string): boolean {
+    return this.isDefinitelyEncrypted(message);
+  }
+
+  /**
+   * Verifica se uma mensagem precisa ser desencriptada
+   * @param message - Mensagem para verificar
+   * @returns true se a mensagem parece estar encriptada e precisa ser desencriptada
+   */
+  static needsDecryption(message: string): boolean {
+    // Verificar se a mensagem está vazia
+    if (!message || message.length === 0) {
+      return false;
+    }
+    
+    // Verificar se a mensagem parece ser Base64 válido
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    const isBase64 = base64Regex.test(message);
+    
+    // Verificações para determinar se precisa ser desencriptada
+    const hasSpecialChars = /[^A-Za-z0-9+/=]/.test(message);
+    const hasSpaces = /\s/.test(message);
+    const hasAccents = /[áéíóúâêîôûãõçñ]/.test(message);
+    
+    // Log para debug
+    console.log('🔍 Verificando se mensagem precisa ser desencriptada:', {
+      message: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
+      length: message.length,
+      isBase64,
+      hasSpecialChars,
+      hasSpaces,
+      hasAccents
+    });
+    
+    // Se tem caracteres especiais, espaços ou acentos, definitivamente não está encriptada
+    if (hasSpecialChars || hasSpaces || hasAccents) {
+      console.log('🔍 Mensagem tem caracteres especiais/espaços/acentos - não precisa desencriptar');
+      return false;
+    }
+    
+    // Se parece Base64, precisa tentar desencriptar
+    const needsDecrypt = isBase64;
+    
+    console.log('🔍 Resultado da verificação:', needsDecrypt ? 'PRECISA DESENCRIPTAR' : 'NÃO PRECISA DESENCRIPTAR');
+    
+    return needsDecrypt;
   }
   
   /**
@@ -130,14 +218,37 @@ export class EncryptionService {
    * @returns Mensagem encriptada
    */
   static processMessageForStorage(message: string, chatId: string): string {
-    // Se a mensagem já parece estar encriptada, retornar como está
-    if (this.isEncrypted(message)) {
-      console.log('⚠️ Mensagem já parece estar encriptada, mantendo como está');
+    console.log('🔐 Processando mensagem para armazenamento:', {
+      message: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
+      length: message.length,
+      chatId
+    });
+    
+    // Se a mensagem está vazia, retornar como está
+    if (!message || message.trim().length === 0) {
+      console.log('⚠️ Mensagem vazia, retornando como está');
       return message;
     }
     
-    // Encriptar mensagem
-    return this.encryptMessage(message, chatId);
+    // Verificar se a mensagem está definitivamente encriptada
+    const isDefinitelyEncrypted = this.isDefinitelyEncrypted(message);
+    
+    if (isDefinitelyEncrypted) {
+      console.log('⚠️ Mensagem está definitivamente encriptada, mantendo como está');
+      return message;
+    }
+    
+    // Se não está definitivamente encriptada, encriptar
+    console.log('🔐 Encriptando mensagem (não está definitivamente encriptada)...');
+    const encryptedMessage = this.encryptMessage(message, chatId);
+    
+    console.log('✅ Mensagem processada para armazenamento:', {
+      originalLength: message.length,
+      encryptedLength: encryptedMessage.length,
+      wasEncrypted: !isDefinitelyEncrypted
+    });
+    
+    return encryptedMessage;
   }
   
   /**
@@ -147,18 +258,30 @@ export class EncryptionService {
    * @returns Mensagem desencriptada
    */
   static processMessageForDisplay(message: string, chatId: string): string {
-    // Se a mensagem parece estar encriptada, tentar desencriptar
-    if (this.isEncrypted(message)) {
+    console.log('🔓 Processando mensagem para exibição:', {
+      message: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
+      length: message.length,
+      chatId
+    });
+    
+    // Se a mensagem precisa ser desencriptada, tentar desencriptar
+    if (this.needsDecryption(message)) {
       try {
-        return this.decryptMessage(message, chatId);
+        console.log('🔓 Tentando desencriptar mensagem...');
+        const decryptedMessage = this.decryptMessage(message, chatId);
+        console.log('✅ Mensagem desencriptada com sucesso:', {
+          originalLength: message.length,
+          decryptedLength: decryptedMessage.length
+        });
+        return decryptedMessage;
       } catch (error) {
         console.warn('⚠️ Falha ao desencriptar mensagem, retornando como está:', error);
         return message;
       }
     }
     
-    // Se não parece estar encriptada, retornar como está
-    console.log('ℹ️ Mensagem não parece estar encriptada, retornando como está');
+    // Se não precisa ser desencriptada, retornar como está
+    console.log('ℹ️ Mensagem não precisa ser desencriptada, retornando como está');
     return message;
   }
   
