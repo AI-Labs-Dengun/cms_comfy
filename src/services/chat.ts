@@ -223,11 +223,32 @@ export async function getChats(): Promise<ApiResponse<Chat[]>> {
 
           if (lastMessage) {
             
-            // Atualizar o chat com a última mensagem real
+            // ✅ DESENCRIPTAR a última mensagem antes de usar
+            let decryptedContent = lastMessage.content;
+            try {
+              console.log('🔓 Desencriptando última mensagem do chat:', {
+                chatId: chat.id,
+                originalContent: lastMessage.content
+              });
+              
+              decryptedContent = EncryptionService.processMessageForDisplay(lastMessage.content, chat.id);
+              
+              console.log('✅ Última mensagem desencriptada:', {
+                chatId: chat.id,
+                originalContent: lastMessage.content,
+                decryptedContent: decryptedContent
+              });
+            } catch (error) {
+              console.error('❌ Erro ao desencriptar última mensagem do chat', chat.id, ':', error);
+              // Manter conteúdo original em caso de erro
+              decryptedContent = lastMessage.content;
+            }
+            
+            // Atualizar o chat com a última mensagem real e desencriptada
             return {
               ...chat,
               last_message_at: lastMessage.created_at,
-              last_message_content: lastMessage.content,
+              last_message_content: decryptedContent, // ✅ Conteúdo desencriptado
               last_message_sender_type: lastMessage.sender_type,
               last_message_sender_name: lastMessage.sender_type === 'psicologo' ? 'Você' : chat.masked_user_name
             };
