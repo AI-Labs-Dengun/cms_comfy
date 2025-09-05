@@ -124,42 +124,71 @@ export default function TagSelector({
     }
   };
 
-  // Criar nova tag
-  const handleCreateTag = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  // Criar nova tag (sem usar <form> interno)
+  const handleCreateTagClick = async () => {
     if (!newTagName.trim()) {
+      console.warn('TagSelector: Nome da tag está vazio');
       return;
     }
 
+    console.log('🏷️ TagSelector: Iniciando criação de tag', {
+      name: newTagName.trim(),
+      color: newTagColor
+    });
+
     setCreatingTag(true);
+    setError(null); // Limpar erros anteriores
 
     try {
-      const response = await createTag({
+      const tagData = {
         name: newTagName.trim(),
         color: newTagColor
-      });
+      };
+
+      console.log('📤 TagSelector: Enviando dados para createTag:', tagData);
+
+      const response = await createTag(tagData);
+
+      console.log('📥 TagSelector: Resposta recebida:', response);
 
       if (response.success && response.data) {
+        console.log('✅ TagSelector: Tag criada com sucesso:', response.data);
+        
         // Adicionar nova tag à lista
-        setTags(prev => [...prev, response.data as ReferenceTag]);
+        setTags(prev => {
+          const newTags = [...prev, response.data as ReferenceTag];
+          console.log('📋 TagSelector: Lista de tags atualizada:', newTags);
+          return newTags;
+        });
         
         // Selecionar a nova tag
-        onTagSelect((response.data as ReferenceTag).id);
+        const newTagId = (response.data as ReferenceTag).id;
+        console.log('🎯 TagSelector: Selecionando nova tag:', newTagId);
+        onTagSelect(newTagId);
         
         // Limpar formulário
         setNewTagName("");
         setNewTagColor("#3B82F6");
         setShowCreateForm(false);
         setIsOpen(false);
+        
+        console.log('🧹 TagSelector: Formulário limpo e fechado');
       } else {
+        console.error('❌ TagSelector: Falha na criação da tag:', response.error);
         setError(response.error || 'Erro ao criar tag');
+        
+        // Exibir alerta para debug
+        alert(`Erro ao criar tag: ${response.error || 'Erro desconhecido'}`);
       }
     } catch (err) {
-      console.error('Erro ao criar tag:', err);
+      console.error('💥 TagSelector: Erro inesperado ao criar tag:', err);
       setError('Erro inesperado ao criar tag');
+      
+      // Exibir alerta para debug
+      alert(`Erro inesperado: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
     } finally {
       setCreatingTag(false);
+      console.log('🏁 TagSelector: Processo de criação finalizado');
     }
   };
 
@@ -296,7 +325,7 @@ export default function TagSelector({
                 </button>
               ) : (
                 <div className="p-3 border-t border-gray-200">
-                  <form onSubmit={handleCreateTag} className="space-y-3">
+                  <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Nome da Tag
@@ -305,6 +334,15 @@ export default function TagSelector({
                         type="text"
                         value={newTagName}
                         onChange={(e) => setNewTagName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!creatingTag && newTagName.trim()) {
+                              handleCreateTagClick();
+                            }
+                          }
+                        }}
                         placeholder="Digite o nome da tag..."
                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900"
                         disabled={creatingTag}
@@ -359,7 +397,8 @@ export default function TagSelector({
 
                     <div className="flex gap-2">
                       <button
-                        type="submit"
+                        type="button"
+                        onClick={handleCreateTagClick}
                         disabled={creatingTag || !newTagName.trim()}
                         className="flex-1 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -378,7 +417,7 @@ export default function TagSelector({
                         <X className="w-3 h-3" />
                       </button>
                     </div>
-                  </form>
+                  </div>
                 </div>
               )}
             </>
