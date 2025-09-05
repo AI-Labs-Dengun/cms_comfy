@@ -10,25 +10,58 @@ export class ReferenceService {
    */
   static async getAllReferences(): Promise<ReferenceResponse> {
     try {
-      const { data, error } = await supabase
+      // Primeiro, buscar as referências
+      const { data: referencesData, error: referencesError } = await supabase
         .from('cms_references')
-        .select(`
-          *,
-          tag:cms_reference_tags(*)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Erro ao buscar referências:', error);
+      if (referencesError) {
+        console.error('Erro ao buscar referências:', referencesError);
         return {
           success: false,
-          error: 'Erro ao buscar referências: ' + error.message
+          error: 'Erro ao buscar referências: ' + referencesError.message
         };
       }
 
+      if (!referencesData || referencesData.length === 0) {
+        return {
+          success: true,
+          data: []
+        };
+      }
+
+      // Buscar todas as tags
+      const { data: tagsData, error: tagsError } = await supabase
+        .from('cms_reference_tags')
+        .select('*');
+
+      if (tagsError) {
+        console.error('Erro ao buscar tags:', tagsError);
+        // Retornar referências sem tags se houver erro
+        return {
+          success: true,
+          data: referencesData as Reference[]
+        };
+      }
+
+      // Criar um mapa de tags para lookup rápido
+      const tagsMap = new Map();
+      if (tagsData) {
+        tagsData.forEach(tag => {
+          tagsMap.set(tag.id, tag);
+        });
+      }
+
+      // Combinar referências com suas tags
+      const referencesWithTags = referencesData.map(reference => ({
+        ...reference,
+        tag: tagsMap.get(reference.tag_id) || null
+      }));
+
       return {
         success: true,
-        data: data as Reference[]
+        data: referencesWithTags as Reference[]
       };
     } catch (error) {
       console.error('Erro inesperado ao buscar referências:', error);
@@ -44,26 +77,51 @@ export class ReferenceService {
    */
   static async getReferenceById(id: string): Promise<ReferenceResponse> {
     try {
-      const { data, error } = await supabase
+      // Buscar a referência
+      const { data: referenceData, error: referenceError } = await supabase
         .from('cms_references')
-        .select(`
-          *,
-          tag:cms_reference_tags(*)
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
-      if (error) {
-        console.error('Erro ao buscar referência:', error);
+      if (referenceError) {
+        console.error('Erro ao buscar referência:', referenceError);
         return {
           success: false,
-          error: 'Erro ao buscar referência: ' + error.message
+          error: 'Erro ao buscar referência: ' + referenceError.message
         };
       }
 
+      if (!referenceData) {
+        return {
+          success: false,
+          error: 'Referência não encontrada'
+        };
+      }
+
+      // Buscar a tag associada se existir
+      let tagData = null;
+      if (referenceData.tag_id) {
+        const { data: tag, error: tagError } = await supabase
+          .from('cms_reference_tags')
+          .select('*')
+          .eq('id', referenceData.tag_id)
+          .single();
+
+        if (!tagError && tag) {
+          tagData = tag;
+        }
+      }
+
+      // Combinar referência com sua tag
+      const referenceWithTag = {
+        ...referenceData,
+        tag: tagData
+      };
+
       return {
         success: true,
-        data: data as Reference
+        data: referenceWithTag as Reference
       };
     } catch (error) {
       console.error('Erro inesperado ao buscar referência:', error);
@@ -225,26 +283,59 @@ export class ReferenceService {
    */
   static async getReferencesByTitle(title: string): Promise<ReferenceResponse> {
     try {
-      const { data, error } = await supabase
+      // Buscar referências por título
+      const { data: referencesData, error: referencesError } = await supabase
         .from('cms_references')
-        .select(`
-          *,
-          tag:cms_reference_tags(*)
-        `)
+        .select('*')
         .ilike('title', `%${title}%`)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Erro ao buscar referências por título:', error);
+      if (referencesError) {
+        console.error('Erro ao buscar referências por título:', referencesError);
         return {
           success: false,
-          error: 'Erro ao buscar referências por título: ' + error.message
+          error: 'Erro ao buscar referências por título: ' + referencesError.message
         };
       }
 
+      if (!referencesData || referencesData.length === 0) {
+        return {
+          success: true,
+          data: []
+        };
+      }
+
+      // Buscar todas as tags
+      const { data: tagsData, error: tagsError } = await supabase
+        .from('cms_reference_tags')
+        .select('*');
+
+      if (tagsError) {
+        console.error('Erro ao buscar tags:', tagsError);
+        // Retornar referências sem tags se houver erro
+        return {
+          success: true,
+          data: referencesData as Reference[]
+        };
+      }
+
+      // Criar um mapa de tags para lookup rápido
+      const tagsMap = new Map();
+      if (tagsData) {
+        tagsData.forEach(tag => {
+          tagsMap.set(tag.id, tag);
+        });
+      }
+
+      // Combinar referências com suas tags
+      const referencesWithTags = referencesData.map(reference => ({
+        ...reference,
+        tag: tagsMap.get(reference.tag_id) || null
+      }));
+
       return {
         success: true,
-        data: data as Reference[]
+        data: referencesWithTags as Reference[]
       };
     } catch (error) {
       console.error('Erro inesperado ao buscar referências por título:', error);
@@ -324,33 +415,73 @@ export class ReferenceService {
    * Cria uma nova tag
    */
   static async createTag(tagData: CreateTagData): Promise<TagResponse> {
+    console.log('🚀 ReferenceService.createTag: Iniciando criação de tag');
+    console.log('📝 Dados recebidos:', tagData);
+    
     try {
       // Obter usuário atual
+      console.log('🔐 Verificando autenticação do usuário...');
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (userError || !user) {
+      if (userError) {
+        console.error('❌ Erro de autenticação:', userError);
+        return {
+          success: false,
+          error: 'Erro de autenticação: ' + userError.message
+        };
+      }
+      
+      if (!user) {
+        console.error('❌ Usuário não encontrado');
         return {
           success: false,
           error: 'Usuário não autenticado'
         };
       }
 
+      console.log('✅ Usuário autenticado:', { id: user.id, email: user.email });
+
+      // Preparar dados para inserção
+      const insertData = {
+        ...tagData,
+        created_by: user.id
+      };
+
+      console.log('📤 Dados para inserção na tabela cms_reference_tags:', insertData);
+
+      // Tentar inserir na tabela
       const { data, error } = await supabase
         .from('cms_reference_tags')
-        .insert({
-          ...tagData,
-          created_by: user.id
-        })
+        .insert(insertData)
         .select()
         .single();
 
+      console.log('📥 Resposta do Supabase:');
+      console.log('  - Data:', data);
+      console.log('  - Error:', error);
+
       if (error) {
-        console.error('Erro ao criar tag:', error);
+        console.error('❌ Erro do Supabase ao criar tag:', error);
+        console.error('  - Code:', error.code);
+        console.error('  - Message:', error.message);
+        console.error('  - Details:', error.details);
+        console.error('  - Hint:', error.hint);
+        
         return {
           success: false,
-          error: 'Erro ao criar tag: ' + error.message
+          error: `Erro ao criar tag: ${error.message} (Código: ${error.code})`
         };
       }
+
+      if (!data) {
+        console.error('❌ Nenhum dado retornado após inserção');
+        return {
+          success: false,
+          error: 'Nenhum dado retornado após criar tag'
+        };
+      }
+
+      console.log('✅ Tag criada com sucesso:', data);
 
       return {
         success: true,
@@ -358,10 +489,12 @@ export class ReferenceService {
         message: 'Tag criada com sucesso!'
       };
     } catch (error) {
-      console.error('Erro inesperado ao criar tag:', error);
+      console.error('💥 Erro inesperado ao criar tag:', error);
+      console.error('  - Stack:', error instanceof Error ? error.stack : 'N/A');
+      
       return {
         success: false,
-        error: 'Erro inesperado ao criar tag'
+        error: `Erro inesperado ao criar tag: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
       };
     }
   }
