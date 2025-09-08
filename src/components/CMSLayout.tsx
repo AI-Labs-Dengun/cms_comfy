@@ -2,14 +2,14 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, ArrowRight, LogOut, User, Users, PlusCircle, Menu, X, Tags, BookOpen } from 'lucide-react';
+import { Plus, ArrowRight, LogOut, User, Users, PlusCircle, Menu, X, Tags, BookOpen, Phone } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
 import Image from 'next/image';
 
 interface CMSLayoutProps {
   children: React.ReactNode;
-  currentPage?: 'create' | 'management' | 'psicologos-create' | 'psicologos' | 'tags-leitura' | 'references';
+  currentPage?: 'create' | 'management' | 'psicologos-create' | 'psicologos' | 'tags-leitura' | 'references' | 'contacts';
 }
 
 export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
@@ -160,6 +160,18 @@ export default function CMSLayout({ children, currentPage }: CMSLayoutProps) {
             >
               <BookOpen className="w-4 h-4" />
               <span className="text-sm lg:text-base">Referências</span>
+            </button>
+            {/* Contactos */}
+            <button
+              className={`flex items-center gap-2 px-3 py-3 rounded-lg font-medium cursor-pointer transition-colors ${
+                currentPage === 'contacts' 
+                  ? 'bg-black text-white' 
+                  : 'text-gray-900 hover:bg-gray-100'
+              }`}
+              onClick={() => handleNavigation('/dashboard/contacts')}
+            >
+              <Phone className="w-4 h-4" />
+              <span className="text-sm lg:text-base">Contactos</span>
             </button>
             {/* Novo Psicólogo */}
             <button
