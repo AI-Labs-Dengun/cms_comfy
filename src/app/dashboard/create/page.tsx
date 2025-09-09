@@ -10,13 +10,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 
-const emotionTags = [
-  "Raiva",
-  "Alegria",
-  "Inveja",
-  "Medo",
-  "Tristeza",
-];
+import { EMOTIONS } from '@/lib/emotions';
 
 // Componente do Editor Markdown
 const MarkdownEditor = ({ value, onChange, placeholder, showToolbar = true }: { 
@@ -1228,7 +1222,7 @@ export default function CreateContent() {
 
               </label>
               <div className="grid grid-cols-2 gap-2 mt-2">
-                {emotionTags.map((emotion) => (
+                {EMOTIONS.map((emotion) => (
                   <label key={emotion} className="flex items-center gap-2 text-sm text-gray-900 font-medium">
                     <input
                       type="checkbox"

@@ -6,6 +6,7 @@ import CMSLayout from "@/components/CMSLayout";
 import { getUserPosts, togglePostPublication, deletePost, Post, getTagsForPost } from "@/services/posts";
 import { useAuth } from "@/context/AuthContext";
 import { DeleteConfirmationModal, PublishToggleModal, NotificationModal } from "@/components/modals";
+import { EMOTIONS } from '@/lib/emotions';
 
 // Tipos para os filtros
 interface FilterState {
@@ -706,7 +707,7 @@ export default function Management() {
                           {uniqueTags.map(tag => (
                             <option key={tag} value={tag}>{tag}</option>
                           ))}
-                          {["Medo", "Alegria", "Raiva", "Inveja", "Tristeza"].map(tag => (
+                          {EMOTIONS.map(tag => (
                             <option key={`emotion-${tag}`} value={tag}>{tag} (emoção)</option>
                           ))}
                         </select>

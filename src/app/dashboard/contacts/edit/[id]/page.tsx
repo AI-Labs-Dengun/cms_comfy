@@ -6,8 +6,7 @@ import CMSLayout from '@/components/CMSLayout';
 import { useAuth } from '@/context/AuthContext';
 import { getContactById, updateContact } from '@/services/contacts';
 import { Save, ArrowLeft } from 'lucide-react';
-
-const predefinedEmotions = ['Ansiedade','Tristeza','Raiva','Medo','Alegria','Desconforto'];
+import { EMOTIONS } from '@/lib/emotions';
 
 export default function EditContactPage() {
   const router = useRouter();
@@ -394,7 +393,7 @@ export default function EditContactPage() {
                     <label className="block text-sm font-medium text-gray-900 mb-2">Emoções associadas</label>
                     <p className="text-xs text-gray-500 mb-3">Selecione as emoções que este contacto pode ajudar</p>
                     <div className="flex flex-wrap gap-2">
-                      {predefinedEmotions.map(e => (
+                      {EMOTIONS.map(e => (
                         <button
                           key={e}
                           type="button"

@@ -11,13 +11,7 @@ import { DeleteConfirmationModal, PublishToggleModal, NotificationModal } from "
 import { supabase } from "@/lib/supabase";
 import Image from 'next/image';
 
-const emotionTags = [
-  "Raiva",
-  "Alegria", 
-  "Inveja",
-  "Medo",
-  "Tristeza",
-];
+import { EMOTIONS } from '@/lib/emotions';
 
 // Componente para embed do TikTok
 const TikTokEmbed = ({ url, videoId }: { url: string; videoId: string }) => {
@@ -1738,7 +1732,7 @@ export default function DetalhesConteudo() {
                   <div className="mb-4">
                     <label className="block text-xs text-gray-500 font-bold mb-1">Tags de Emoção</label>
                     <div className="grid grid-cols-2 gap-2 mt-2">
-                      {emotionTags.map((emotion) => (
+                      {EMOTIONS.map((emotion) => (
                         <label key={emotion} className="flex items-center gap-2 text-sm text-gray-900 font-medium">
                           <input
                             type="checkbox"
