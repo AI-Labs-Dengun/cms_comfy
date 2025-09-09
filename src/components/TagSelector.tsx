@@ -52,7 +52,7 @@ export default function TagSelector({
     if (tags.length > 0) {
       checkTagsUsage();
     }
-  }, [tags]);
+  }, [tags, checkTagsUsage]);
 
   const checkTagsUsage = async () => {
     const usageInfo: {[key: string]: { hasReferences: boolean; count: number }} = {};
