@@ -222,8 +222,8 @@ export default function ContactsPage() {
                                 📍 {contact.location}{contact.address ? ` - ${contact.address}` : ''}
                               </p>
                             )}
-                            {contact.phone && (
-                              <p className="text-gray-600 text-sm">📞 {contact.phone}</p>
+                            {contact.phone1 && (
+                              <p className="text-gray-600 text-sm">📞 {contact.phone1}</p>
                             )}
                             {contact.when_to_use && (
                               <p className="text-gray-600 text-sm line-clamp-2">{contact.when_to_use}</p>
