@@ -17,30 +17,81 @@ export default function EditContactPage() {
   const [title, setTitle] = useState('');
   const [whenToUse, setWhenToUse] = useState('');
   const [whoAttends, setWhoAttends] = useState('');
-  const [recommendedAge, setRecommendedAge] = useState('');
-  const [contacts, setContacts] = useState<string[]>([]);
-  const [newContactInput, setNewContactInput] = useState('');
-  const [openingDays, setOpeningDays] = useState('');
-  const [openingStartTime, setOpeningStartTime] = useState('09:00');
-  const [openingEndTime, setOpeningEndTime] = useState('17:00');
-  const [moreInfoUrl, setMoreInfoUrl] = useState('');
+  const [phone1, setPhone1] = useState('');
+  const [phone2, setPhone2] = useState('');
+  const [phone3, setPhone3] = useState('');
   const [emotions, setEmotions] = useState<string[]>([]);
   const [location, setLocation] = useState('');
   const [address, setAddress] = useState('');
-  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [whenToSeek, setWhenToSeek] = useState('');
   const [site, setSite] = useState('');
+  const [moreInfoUrl, setMoreInfoUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Novos estados para idade
+  const [minAge, setMinAge] = useState<number | null>(null);
+  const [maxAge, setMaxAge] = useState<number | null>(null);
+  const [allAges, setAllAges] = useState(false);
+
+  // Novos estados para horários
+  const [hoursAvailable, setHoursAvailable] = useState<'available' | 'unavailable' | '24h'>('available');
+  const [openingDays, setOpeningDays] = useState('');
+  const [openingStartTime, setOpeningStartTime] = useState('09:00');
+  const [openingEndTime, setOpeningEndTime] = useState('17:00');
+
+  // Opções de idade (5 aos 25 anos)
+  const ageOptions = Array.from({ length: 21 }, (_, i) => i + 5);
 
   const toggleEmotion = (emo: string) => {
     setEmotions(prev => prev.includes(emo) ? prev.filter(e=>e!==emo) : [...prev, emo]);
   };
 
-  const toggleRecommendedAge = (age: string) => {
-    setRecommendedAge(prev => prev === age ? '' : age);
+  const handleAgeChange = (type: 'min' | 'max', value: string) => {
+    if (allAges) return; // ignore changes when 'all ages' is selected
+    const age = value ? parseInt(value) : null;
+    if (type === 'min') {
+      setMinAge(age);
+      // Se idade máxima for menor que a mínima, resetar a máxima
+      if (maxAge && age && age > maxAge) {
+        setMaxAge(null);
+      }
+    } else {
+      setMaxAge(age);
+    }
+  };
+
+  const getAvailableMaxAges = () => {
+    if (!minAge) return ageOptions;
+    return ageOptions.filter(age => age >= minAge);
+  };
+
+  const generateRecommendedAge = () => {
+    if (allAges || !minAge) return undefined;
+    if (maxAge) return `${minAge}-${maxAge}`;
+    return `${minAge}+`;
+  };
+
+  // Normaliza URL: se sem esquema, adiciona https://
+  const normalizeUrl = (raw?: string) => {
+    if (!raw) return undefined;
+    const v = raw.trim();
+    if (!v) return undefined;
+    try {
+      // If has scheme, URL constructor will work
+      new URL(v);
+      return v;
+    } catch {
+      // try with https://
+      try {
+        new URL(`https://${v}`);
+        return `https://${v}`;
+      } catch {
+        return v; // return original, backend can validate
+      }
+    }
   };
 
   const loadContact = useCallback(async () => {
@@ -52,17 +103,37 @@ export default function EditContactPage() {
         setTitle(contact.title || '');
         setWhenToUse(contact.when_to_use || '');
         setWhoAttends(contact.who_attends || '');
-        setRecommendedAge(contact.recommended_age || '');
-        // Convert ContactEntry[] to string[] for contacts
-        setContacts(contact.contacts?.map(c => c.value) || []);
-        setOpeningDays(contact.opening_hours?.raw || '');
-        setOpeningStartTime(contact.opening_hours?.periods?.[0]?.from || '09:00');
-        setOpeningEndTime(contact.opening_hours?.periods?.[0]?.to || '17:00');
+        
+        // Carregar idades
+        setMinAge(contact.min_age || null);
+        setMaxAge(contact.max_age || null);
+        if (contact.min_age === null && contact.max_age === null) {
+          setAllAges(true);
+        }
+        
+        // Carregar telefones
+        setPhone1(contact.phone1 || '');
+        setPhone2(contact.phone2 || '');
+        setPhone3(contact.phone3 || '');
+        
+        // Carregar horários
+        const openingHours = contact.opening_hours;
+        if (openingHours?.is_unavailable) {
+          setHoursAvailable('unavailable');
+        } else if (openingHours?.is_24h) {
+          setHoursAvailable('24h');
+        } else {
+          setHoursAvailable('available');
+        }
+        
+        setOpeningDays(openingHours?.days_text || '');
+        setOpeningStartTime(openingHours?.start_time || '09:00');
+        setOpeningEndTime(openingHours?.end_time || '17:00');
+        
         setMoreInfoUrl(contact.more_info_url || '');
         setEmotions(contact.emotions || []);
         setLocation(contact.location || '');
         setAddress(contact.address || '');
-        setPhone(contact.phone || '');
         setEmail(contact.email || '');
         setWhenToSeek(contact.when_to_seek || '');
         setSite(contact.site || '');
@@ -94,27 +165,46 @@ export default function EditContactPage() {
         return; 
       }
 
+      // Construir opening_hours baseado na seleção
+      let openingHoursData = {};
+      if (hoursAvailable === 'unavailable') {
+        openingHoursData = {
+          is_unavailable: true,
+          raw: 'Indisponível'
+        };
+      } else if (hoursAvailable === '24h') {
+        openingHoursData = {
+          is_24h: true,
+          raw: '24 horas por dia',
+          days_text: openingDays || 'Todos os dias'
+        };
+      } else {
+        openingHoursData = {
+          days_text: openingDays || undefined,
+          start_time: openingStartTime || undefined,
+          end_time: openingEndTime || undefined,
+          raw: openingDays ? `${openingDays} das ${openingStartTime} às ${openingEndTime}` : `Das ${openingStartTime} às ${openingEndTime}`
+        };
+      }
+
       const payload = {
         title: title.trim(),
         when_to_use: whenToUse.trim(),
         who_attends: whoAttends.trim(),
-        recommended_age: recommendedAge ? recommendedAge : undefined,
-        // map multiple contacts into expected shape
-        contacts: contacts.length ? contacts.map(c => ({ type: 'primary', value: c })) : [],
-        opening_hours: {
-          raw: openingDays,
-          days_text: openingDays ? openingDays : undefined,
-          start_time: openingStartTime || undefined,
-          end_time: openingEndTime || undefined,
-        },
-        more_info_url: moreInfoUrl ? moreInfoUrl : undefined,
+        recommended_age: generateRecommendedAge(),
+        min_age: allAges ? undefined : (minAge || undefined),
+        max_age: allAges ? undefined : (maxAge || undefined),
+        phone1: phone1 || undefined,
+        phone2: phone2 || undefined,
+        phone3: phone3 || undefined,
+        opening_hours: openingHoursData,
+        more_info_url: normalizeUrl(moreInfoUrl),
         emotions,
         location: location ? location : undefined,
         address: address ? address : undefined,
-        phone: phone ? phone : undefined,
         email: email ? email.trim() : undefined,
         when_to_seek: whenToSeek ? whenToSeek : undefined,
-        site: site ? site : undefined
+        site: normalizeUrl(site)
       };
 
       const res = await updateContact(id, payload);
@@ -224,21 +314,46 @@ export default function EditContactPage() {
                     </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-2">Idade recomendada</label>
-                    <p className="text-xs text-gray-500 mb-3">Selecione a idade mínima recomendada para visualizar este conteúdo</p>
-                    <div className="flex flex-wrap gap-2">
-                      {['12+','16+'].map(a => (
-                        <button
-                          key={a}
-                          type="button"
-                          onClick={() => toggleRecommendedAge(a)}
-                          className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${recommendedAge === a ? 'bg-black text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                          disabled={loading}
-                          aria-pressed={recommendedAge === a}
+                    <p className="text-xs text-gray-500 mb-3">Selecione a faixa etária para este contacto</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Idade mínima</label>
+                        <select
+                          value={minAge || ''}
+                          onChange={e => handleAgeChange('min', e.target.value)}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900"
+                          disabled={loading || allAges}
                         >
-                          {a}
-                        </button>
-                      ))}
+                          <option value="">Selecionar idade mínima</option>
+                          {ageOptions.map(age => (
+                            <option key={age} value={age}>{age} anos</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Idade máxima (opcional)</label>
+                        <select
+                          value={maxAge || ''}
+                          onChange={e => handleAgeChange('max', e.target.value)}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900"
+                          disabled={loading || allAges || !minAge}
+                        >
+                          <option value="">Sem limite máximo</option>
+                          {getAvailableMaxAges().map(age => (
+                            <option key={age} value={age}>{age} anos</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
+                    <div className="flex items-center gap-3 mt-3">
+                      <input id="any-age-edit" type="checkbox" checked={allAges} onChange={() => { setAllAges(prev => { const next = !prev; if (next) { setMinAge(null); setMaxAge(null); } return next; }); }} />
+                      <label htmlFor="any-age-edit" className="text-sm text-gray-700">Qualquer idade</label>
+                    </div>
+                    {!allAges && minAge && (
+                      <p className="text-xs text-gray-600 mt-2">
+                        Idade recomendada: {generateRecommendedAge()}
+                      </p>
+                    )}
                   </div>
                   </div>
                 </div>
@@ -248,62 +363,43 @@ export default function EditContactPage() {
               <div className="bg-white p-6 rounded-lg shadow border">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações de Contacto</h3>
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Contacto(s) principal(is)</label>
-                    <p className="text-xs text-gray-500 mb-2">Adicione um contacto e pressione Enter para adicionar outro</p>
-                    <div className="flex flex-col gap-2">
-                      <input
-                        type="text"
-                        value={newContactInput}
-                        onChange={e => setNewContactInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const v = newContactInput.trim();
-                            if (v && !contacts.includes(v)) {
-                              setContacts(prev => [...prev, v]);
-                              setNewContactInput('');
-                            } else {
-                              setNewContactInput('');
-                            }
-                          }
-                        }}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
-                        placeholder="Ex: 213 456 789 ou email@exemplo.com"
-                        disabled={loading}
-                      />
-
-                      {/* chips for added contacts */}
-                      <div className="flex flex-wrap gap-2">
-                        {contacts.map((c, idx) => (
-                          <div key={c + idx} className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-sm">
-                            <span className="text-gray-800">{c}</span>
-                            <button
-                              type="button"
-                              onClick={() => setContacts(prev => prev.filter((_, i) => i !== idx))}
-                              className="text-gray-500 hover:text-gray-800"
-                              aria-label={`Remover contacto ${c}`}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-2">Telefone 1</label>
+                        <input
+                          type="tel"
+                          value={phone1}
+                          onChange={e => setPhone1(e.target.value)}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                          placeholder="213 456 789"
+                          disabled={loading}
+                        />
                       </div>
-                    </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-2">Telefone 2</label>
+                        <input
+                          type="tel"
+                          value={phone2}
+                          onChange={e => setPhone2(e.target.value)}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                          placeholder="Opcional"
+                          disabled={loading}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-2">Telefone 3</label>
+                        <input
+                          type="tel"
+                          value={phone3}
+                          onChange={e => setPhone3(e.target.value)}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                          placeholder="Opcional"
+                          disabled={loading}
+                        />
+                      </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">Telefone</label>
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={e => setPhone(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
-                        placeholder="213 456 789"
-                        disabled={loading}
-                      />
-                    </div>
+                  <div className="grid grid-cols-1">
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-2">Email</label>
                       <input
@@ -315,43 +411,113 @@ export default function EditContactPage() {
                         disabled={loading}
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">Período de funcionamento</label>
-                      <p className="text-xs text-gray-500 mb-3">Selecione o período em que este contacto está disponível</p>
-                      
-                      <input
-                        type="text"
-                        value={openingDays}
-                        onChange={e => setOpeningDays(e.target.value)}
-                        className="mb-3 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
-                        placeholder="Ex: segunda a sexta, fins de semana fechado"
-                        disabled={loading}
-                      />
-
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Horário de início</label>
-                          <input
-                            type="time"
-                            value={openingStartTime}
-                            onChange={e => setOpeningStartTime(e.target.value)}
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Horário de fim</label>
-                          <input
-                            type="time"
-                            value={openingEndTime}
-                            onChange={e => setOpeningEndTime(e.target.value)}
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900"
-                            disabled={loading}
-                          />
-                        </div>
-                      </div>
-                      </div>
                   </div>
+                  
+                  <div className="md:col-span-3">
+                      <label className="block text-sm font-medium text-gray-900 mb-2">Horário de funcionamento</label>
+                      <p className="text-xs text-gray-500 mb-3">Selecione a disponibilidade deste contacto</p>
+                      
+                      {/* Toggle para tipo de horário */}
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        <button
+                          type="button"
+                          onClick={() => setHoursAvailable('available')}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            hoursAvailable === 'available'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                          disabled={loading}
+                        >
+                          Horário específico
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHoursAvailable('24h')}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            hoursAvailable === '24h'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                          disabled={loading}
+                        >
+                          24 horas
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHoursAvailable('unavailable')}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            hoursAvailable === 'unavailable'
+                              ? 'bg-red-600 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                          disabled={loading}
+                        >
+                          Indisponível
+                        </button>
+                      </div>
+
+                      {/* Campos condicionais baseados na seleção */}
+                      {hoursAvailable === 'available' && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Dias de funcionamento</label>
+                            <input
+                              type="text"
+                              value={openingDays}
+                              onChange={e => setOpeningDays(e.target.value)}
+                              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                              placeholder="Ex: Segunda a sexta-feira"
+                              disabled={loading}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Horário de início</label>
+                              <input
+                                type="time"
+                                value={openingStartTime}
+                                onChange={e => setOpeningStartTime(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900"
+                                disabled={loading}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Horário de fim</label>
+                              <input
+                                type="time"
+                                value={openingEndTime}
+                                onChange={e => setOpeningEndTime(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900"
+                                disabled={loading}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {hoursAvailable === '24h' && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Dias de funcionamento (opcional)</label>
+                          <input
+                            type="text"
+                            value={openingDays}
+                            onChange={e => setOpeningDays(e.target.value)}
+                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
+                            placeholder="Ex: Todos os dias da semana"
+                            disabled={loading}
+                          />
+                          <p className="text-xs text-green-600 mt-1">Este contacto está disponível 24 horas por dia</p>
+                        </div>
+                      )}
+
+                      {hoursAvailable === 'unavailable' && (
+                        <div className="text-center py-4">
+                          <p className="text-sm text-red-600 font-medium">Este contacto está marcado como indisponível</p>
+                          <p className="text-xs text-gray-500 mt-1">Os horários não serão exibidos na aplicação</p>
+                        </div>
+                      )}
+                    </div>
                 </div>
               </div>
 
@@ -427,9 +593,10 @@ export default function EditContactPage() {
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-2">Mais info (URL)</label>
                       <input
-                        type="url"
+                        type="text"
                         value={moreInfoUrl}
                         onChange={e => setMoreInfoUrl(e.target.value)}
+                        onBlur={() => setMoreInfoUrl(normalizeUrl(moreInfoUrl) || '')}
                         className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
                         placeholder="https://exemplo.com/mais-info"
                         disabled={loading}
@@ -438,9 +605,10 @@ export default function EditContactPage() {
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-2">Site (URL)</label>
                       <input
-                        type="url"
+                        type="text"
                         value={site}
                         onChange={e => setSite(e.target.value)}
+                        onBlur={() => setSite(normalizeUrl(site) || '')}
                         className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
                         placeholder="https://exemplo.com"
                         disabled={loading}
