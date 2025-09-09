@@ -17,7 +17,8 @@ export default function ContactsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
+  // allow selecting multiple emotion tags
+  const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
 
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; contactId: string | null; contactTitle: string; isLoading: boolean }>({ isOpen:false, contactId:null, contactTitle:'', isLoading:false });
   const [notification, setNotification] = useState<{ isOpen: boolean; type: 'success'|'error'|'info'; title: string; message: string }>({ isOpen:false, type:'info', title:'', message:'' });
@@ -41,16 +42,18 @@ export default function ContactsPage() {
 
   const filtered = useMemo(() => {
     return contacts.filter(c => {
-      // Emotion filter: if an emotion is selected, contact must include it
-      if (selectedEmotion) {
-        if (!c.emotions || !c.emotions.includes(selectedEmotion)) return false;
+      // Emotion filter: if any emotions are selected, contact must match at least one (OR)
+      if (selectedEmotions && selectedEmotions.length > 0) {
+        if (!c.emotions || !Array.isArray(c.emotions)) return false;
+        const matches = selectedEmotions.some(se => c.emotions!.includes(se));
+        if (!matches) return false;
       }
 
       if (!search) return true;
       const s = search.toLowerCase();
       return c.title.toLowerCase().includes(s) || (c.location || '').toLowerCase().includes(s) || (c.when_to_use || '').toLowerCase().includes(s);
     });
-  }, [contacts, search, selectedEmotion]);
+  }, [contacts, search, selectedEmotions]);
 
   const openDelete = (id: string, title: string) => setDeleteModal({ isOpen:true, contactId:id, contactTitle:title, isLoading:false });
   const closeDelete = () => setDeleteModal(prev => ({ ...prev, isOpen:false }));
@@ -109,12 +112,12 @@ export default function ContactsPage() {
             <div className="w-full flex justify-center">
               <div className="max-w-3xl w-full flex items-center gap-2 flex-wrap">
                 {EMOTIONS.map((emo) => {
-                  const isActive = selectedEmotion === emo;
+                  const isActive = selectedEmotions.includes(emo);
                   return (
                     <button
                       key={emo}
                       type="button"
-                      onClick={() => setSelectedEmotion(prev => prev === emo ? null : emo)}
+                      onClick={() => setSelectedEmotions(prev => prev.includes(emo) ? prev.filter(p => p !== emo) : [...prev, emo])}
                       className={`px-3 py-1 rounded-full text-sm font-medium transition-colors border ${isActive ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
                     >
                       {emo}
@@ -122,10 +125,10 @@ export default function ContactsPage() {
                   );
                 })}
 
-                {selectedEmotion && (
+                {selectedEmotions.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setSelectedEmotion(null)}
+                    onClick={() => setSelectedEmotions([])}
                     className="ml-auto px-2 py-1 text-xs text-red-600 hover:text-red-800"
                   >
                     Limpar
