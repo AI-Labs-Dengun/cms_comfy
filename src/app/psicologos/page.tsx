@@ -1244,28 +1244,35 @@ export default function PsicologosPage() {
 
   // Função para atualizar o status de um chat
   const handleStatusChange = async (chatId: string, newStatus: ChatStatus) => {
+    // OTIMIZAÇÃO: Atualização otimista para refletir o novo status instantaneamente
+    const prevStatus = chats.find(c => c.id === chatId)?.status;
+
+    // Se já está no mesmo status, nada a fazer
+    if (prevStatus === newStatus) return;
+
+    // Aplicar atualização otimista na lista e no chat selecionado
+    setChats(prevChats => prevChats.map(chat => chat.id === chatId ? { ...chat, status: newStatus } : chat));
+    if (selectedChat?.id === chatId) {
+      setSelectedChat(prev => prev ? { ...prev, status: newStatus } : null);
+    }
+
     try {
       const result = await updateChatStatus(chatId, newStatus);
-      
-      if (result.success) {
-        // Atualizar o chat na lista local
-        setChats(prevChats => 
-          prevChats.map(chat => 
-            chat.id === chatId 
-              ? { ...chat, status: newStatus }
-              : chat
-          )
-        );
-        
-        // Se o chat selecionado foi atualizado, atualizar também
+      if (!result.success) {
+        console.error('Erro ao atualizar status no servidor:', result.error);
+        // Reverter alteração otimista
+        setChats(prevChats => prevChats.map(chat => chat.id === chatId ? { ...chat, status: prevStatus || 'novo_chat' } : chat));
         if (selectedChat?.id === chatId) {
-          setSelectedChat(prev => prev ? { ...prev, status: newStatus } : null);
+          setSelectedChat(prev => prev ? { ...prev, status: prevStatus || 'novo_chat' } : null);
         }
-      } else {
-        console.error('Erro ao atualizar status:', result.error);
       }
     } catch (error) {
       console.error('Erro ao atualizar status do chat:', error);
+      // Reverter alteração otimista em caso de falha de rede
+      setChats(prevChats => prevChats.map(chat => chat.id === chatId ? { ...chat, status: prevStatus || 'novo_chat' } : chat));
+      if (selectedChat?.id === chatId) {
+        setSelectedChat(prev => prev ? { ...prev, status: prevStatus || 'novo_chat' } : null);
+      }
     }
   };
 
@@ -1663,6 +1670,7 @@ export default function PsicologosPage() {
             onClose={handleCloseChat}
             onChatUpdate={updateChatInList}
             onNewMessageReceived={handleNewMessageInSelectedChat}
+            onChatStatusChange={handleStatusChange}
             showNewMessageIndicator={showNewMessageIndicator}
             messages={selectedChatMessages}
             onLoadMoreMessages={() => loadMoreMessages(selectedChat.id, messagesOffset)}
