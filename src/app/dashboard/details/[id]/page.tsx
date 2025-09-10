@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { getPost, deletePost, togglePostPublication, updatePost, Post, getTagsForPost, getAllReadingTags, associateTagWithPost, removeTagFromPost } from "@/services/posts";
+import { getPost, deletePost, togglePostPublication, updatePost, Post, getTagsForPost, getAllReadingTags, associateTagWithPost, removeTagFromPost, uploadFileForPost, CreatePostData } from "@/services/posts";
 import { getFileUrl, getSignedUrl } from "@/services/storage";
 import { useAuth } from "@/context/AuthContext";
 import { DeleteConfirmationModal, PublishToggleModal, NotificationModal } from "@/components/modals";
@@ -427,6 +427,9 @@ export default function DetalhesConteudo() {
   const [editContent, setEditContent] = useState(""); // ✅ ADICIONANDO ESTADO PARA CONTENT
   const [editContentUrl, setEditContentUrl] = useState("");
   const [editThumbnailUrl, setEditThumbnailUrl] = useState(""); // ✅ ADICIONANDO ESTADO PARA THUMBNAIL
+  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
+  const [uploadThumbnailError, setUploadThumbnailError] = useState<string | null>(null);
+  const [requestRemoveThumbnail, setRequestRemoveThumbnail] = useState(false);
   const [editTags, setEditTags] = useState<string[]>([]);
   const [editEmotionTags, setEditEmotionTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -603,12 +606,18 @@ export default function DetalhesConteudo() {
   const initializeEditValues = (postData: Post) => {
     setEditTitle(postData.title);
     setEditDescription(postData.description);
-    setEditContent(postData.content || ""); // Inicializar o novo estado
+    setEditContent(postData.content || ""); 
     setEditContentUrl(postData.content_url || "");
-    setEditThumbnailUrl(postData.thumbnail_url || ""); // ✅ INICIALIZAR THUMBNAIL_URL
+    setEditThumbnailUrl(postData.thumbnail_url || ""); 
     setEditTags(postData.tags);
     setEditEmotionTags(postData.emotion_tags);
-    setEditMinAge(postData.min_age || 12); // ✅ INICIALIZAR IDADE MÍNIMA
+    setEditMinAge(postData.min_age || 12); 
+    
+    // Reset thumbnail states
+    setRequestRemoveThumbnail(false);
+    setUploadThumbnailError(null);
+    setIsUploadingThumbnail(false);
+    
     // ✅ INICIALIZAR TAG DE LEITURA SELECIONADA (apenas a primeira)
     if (postData.category === 'Leitura') {
       getTagsForPost(postData.id)
@@ -636,7 +645,6 @@ export default function DetalhesConteudo() {
     }
     setIsEditing(false);
     setTagInput("");
-    // ✅ RESETAR TAG DE LEITURA (apenas a primeira)
     if (post && post.category === 'Leitura') {
       getTagsForPost(post.id)
         .then((tags) => {
@@ -648,7 +656,6 @@ export default function DetalhesConteudo() {
     }
   };
 
-  // ✅ FUNÇÃO PARA SELECIONAR UMA ÚNICA TAG DE LEITURA
   const handleReadingTagSelect = (tagId: string) => {
     setSelectedReadingTagIds([tagId]); // Apenas uma tag selecionada
   };
@@ -674,23 +681,20 @@ export default function DetalhesConteudo() {
         return;
       }
 
-      const updateData = {
+    const updateData: Partial<CreatePostData> = {
         title: editTitle.trim(),
         description: editDescription.trim(),
-        content: editContent.trim(), // Adicionar o novo campo ao updateData
+        content: editContent.trim(), 
         content_url: editContentUrl.trim() || undefined,
-        thumbnail_url: editThumbnailUrl.trim() || undefined, // ✅ ADICIONAR THUMBNAIL_URL
+        thumbnail_url: requestRemoveThumbnail ? null : (editThumbnailUrl.trim() || undefined), 
         tags: editTags,
         emotion_tags: editEmotionTags,
-        min_age: editMinAge, // ✅ ADICIONAR IDADE MÍNIMA
-        category: post.category as 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura', // Preservar a categoria atual do post
-        // categoria_leitura será preenchida automaticamente pelo trigger quando as tags forem associadas
+        min_age: editMinAge, 
+        category: post.category as 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura', 
       };
-
-      const response = await updatePost(post.id, updateData);
+  const response = await updatePost(post.id, updateData);
 
       if (response.success) {
-        // ✅ ATUALIZAR TAG DE LEITURA SE FOR POST DE LEITURA
         if (post.category === 'Leitura') {
           try {
             // Obter tags atuais do post
@@ -723,18 +727,18 @@ export default function DetalhesConteudo() {
           }
         }
 
-        // Atualizar o estado local
+        // Atualizar o estado local (usar valores anteriores como fallback quando undefined)
         setPost((prev: Post | null) => prev ? {
           ...prev,
-          title: updateData.title,
-          description: updateData.description,
-          content: updateData.content, // Atualizar o novo campo
-          content_url: updateData.content_url,
-          thumbnail_url: updateData.thumbnail_url, // ✅ ATUALIZAR THUMBNAIL_URL
-          tags: updateData.tags,
-          emotion_tags: updateData.emotion_tags,
-          min_age: updateData.min_age, // ✅ ATUALIZAR IDADE MÍNIMA
-          category: updateData.category, // Preservar a categoria
+          title: updateData.title ?? prev.title,
+          description: updateData.description ?? prev.description,
+          content: updateData.content ?? prev.content, 
+          content_url: updateData.content_url ?? prev.content_url,
+          thumbnail_url: updateData.thumbnail_url === null ? undefined : (updateData.thumbnail_url ?? prev.thumbnail_url),
+          tags: updateData.tags ?? prev.tags,
+          emotion_tags: updateData.emotion_tags ?? prev.emotion_tags,
+          min_age: updateData.min_age ?? prev.min_age, 
+          category: updateData.category ?? prev.category, 
           updated_at: new Date().toISOString()
         } : null);
         
@@ -760,6 +764,60 @@ export default function DetalhesConteudo() {
       }
       setTagInput("");
     }
+  };
+
+  // Handlers para upload/remover thumbnail
+  const handleThumbnailFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar se é uma imagem
+    if (!file.type.startsWith('image/')) {
+      setUploadThumbnailError('Por favor, selecione apenas arquivos de imagem para a thumbnail');
+      toast.error('Por favor, selecione apenas arquivos de imagem');
+      return;
+    }
+    
+    // Validar tamanho (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadThumbnailError('A thumbnail deve ter no máximo 5MB');
+      toast.error('A thumbnail deve ter no máximo 5MB');
+      return;
+    }
+
+    setUploadThumbnailError(null);
+    setIsUploadingThumbnail(true);
+
+    try {
+      const res = await uploadFileForPost(file);
+      if (!res.success || !res.data) {
+        setUploadThumbnailError(res.error || 'Erro no upload da thumbnail');
+        toast.error(res.error || 'Erro no upload da thumbnail');
+        return;
+      }
+
+      // Atualizar URL no campo de edição
+      setEditThumbnailUrl(res.data.url);
+      setRequestRemoveThumbnail(false); // cancelar remoção se estiver marcada
+      toast.success('Thumbnail carregada com sucesso!');
+    } catch (err) {
+      console.error('Erro ao fazer upload da thumbnail:', err);
+      const errorMsg = 'Erro inesperado ao fazer upload da thumbnail';
+      setUploadThumbnailError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setIsUploadingThumbnail(false);
+      // reset input value to allow re-upload same file
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleRemoveThumbnail = () => {
+    // Mark for removal and clear preview URL
+    setRequestRemoveThumbnail(true);
+    setEditThumbnailUrl('');
+    setUploadThumbnailError(null); // Limpar erros anteriores
+    toast.success('Thumbnail será removida ao salvar as alterações');
   };
 
   // Função para remover tag
@@ -1169,8 +1227,7 @@ export default function DetalhesConteudo() {
               <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
-              <div>
-                      src={post.thumbnail_url} 
+              <div className="text-sm text-gray-500 break-all">
                 <div className="text-sm text-gray-500 break-all">{url}</div>
               </div>
             </div>
@@ -1224,10 +1281,10 @@ export default function DetalhesConteudo() {
                   const hasChanges = 
                     editTitle !== post?.title ||
                     editDescription !== post?.description ||
-                    editContent !== post?.content || // Adicionar a nova comparação
+                    editContent !== post?.content || 
                     editContentUrl !== (post?.content_url || "") ||
-                    editThumbnailUrl !== (post?.thumbnail_url || "") || // ✅ ADICIONAR COMPARAÇÃO DO THUMBNAIL
-                    editMinAge !== (post?.min_age || 12) || // ✅ ADICIONAR COMPARAÇÃO DA IDADE MÍNIMA
+                    editThumbnailUrl !== (post?.thumbnail_url || "") || 
+                    editMinAge !== (post?.min_age || 12) || 
                     JSON.stringify(editTags) !== JSON.stringify(post?.tags) ||
                     JSON.stringify(editEmotionTags) !== JSON.stringify(post?.emotion_tags);
                   
@@ -1486,56 +1543,160 @@ export default function DetalhesConteudo() {
 
                   {/* ✅ CAMPO PARA EDITAR THUMBNAIL URL (especialmente para Podcasts) */}
                   {post.category === "Podcast" && post.content_url && !post.file_path && (
-                    <div className="mb-4">
-                      <label className="block text-xs text-gray-500 font-bold mb-1">URL da Thumbnail (opcional)</label>
-                      <div className="relative">
-                        <input
-                          type="url"
-                          value={editThumbnailUrl}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditThumbnailUrl(e.target.value)}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium"
-                          placeholder="https://exemplo.com/thumbnail.jpg"
-                        />
-                        <div className="mt-1 text-xs text-gray-500">
-                          💡 URL da imagem que será exibida como thumbnail do podcast
+                    <div className="mb-6">
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <label className="text-sm font-semibold text-gray-900">Thumbnail do Podcast</label>
                         </div>
-                        {editThumbnailUrl.trim() && (
-                          <div className="mt-2">
-                            <div className="text-xs text-gray-500 font-bold mb-1">Prévia da Thumbnail:</div>
-                            <div className="border rounded-lg overflow-hidden max-w-xs">
-                              {isValidUrl(editThumbnailUrl) ? (
-                                <Image 
-                                  src={editThumbnailUrl} 
-                                  alt="Prévia da thumbnail"
-                                  className="w-full h-auto object-cover"
-                                  width={200}
-                                  height={150}
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = 'none';
-                                    const parent = target.parentElement;
-                                    if (parent) {
-                                      parent.innerHTML = `
-                                        <div class="p-4 text-center text-gray-500">
-                                          <div class="text-xs">❌ Erro ao carregar thumbnail</div>
-                                        </div>
-                                      `;
-                                    }
-                                  }}
-                                />
-                              ) : (
-                                <div className="p-4 text-center text-gray-500">
-                                  <div className="text-xs">⚠️ URL inválida</div>
-                                </div>
-                              )}
+                        
+                        {/* Preview atual da thumbnail */}
+                        {(editThumbnailUrl.trim() || (!requestRemoveThumbnail && post.thumbnail_url)) && (
+                          <div className="mb-4">
+                            <div className="text-xs text-gray-600 font-medium mb-2">📷 Thumbnail atual:</div>
+                            <div className="relative inline-block">
+                              <div className="border rounded-lg overflow-hidden bg-white shadow-sm" style={{ maxWidth: '200px' }}>
+                                {isValidUrl(editThumbnailUrl || post.thumbnail_url || '') ? (
+                                  <Image 
+                                    src={editThumbnailUrl || post.thumbnail_url || ''} 
+                                    alt="Thumbnail atual"
+                                    className="w-full h-auto object-cover"
+                                    width={200}
+                                    height={150}
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = 'none';
+                                      const parent = target.parentElement;
+                                      if (parent) {
+                                        parent.innerHTML = `
+                                          <div class="p-4 text-center text-gray-500">
+                                            <div class="text-xs">❌ Erro ao carregar</div>
+                                          </div>
+                                        `;
+                                      }
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="p-4 text-center text-gray-500">
+                                    <div className="text-xs">⚠️ URL inválida</div>
+                                  </div>
+                                )}
+                              </div>
+                              {/* Botão remover sobreposto */}
+                              <button
+                                type="button"
+                                onClick={handleRemoveThumbnail}
+                                className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg transition-colors"
+                                title="Remover thumbnail"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
                             </div>
                           </div>
                         )}
+
+                        {/* Aviso de remoção */}
+                        {requestRemoveThumbnail && (
+                          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                              </svg>
+                              <span className="text-sm font-medium text-red-800">Thumbnail será removida ao salvar</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRequestRemoveThumbnail(false);
+                                setEditThumbnailUrl(post.thumbnail_url || '');
+                                toast('Remoção cancelada');
+                              }}
+                              className="mt-2 text-xs text-red-700 hover:text-red-900 underline"
+                            >
+                              Cancelar remoção
+                            </button>
+                          </div>
+                        )}
+                        
+                        <div className="space-y-4">
+                          {/* Opção 1: URL */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              🔗 Opção 1: Inserir URL da imagem
+                            </label>
+                            <input
+                              type="url"
+                              value={editThumbnailUrl}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                setEditThumbnailUrl(e.target.value);
+                                setRequestRemoveThumbnail(false);
+                              }}
+                              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 text-sm"
+                              placeholder="https://exemplo.com/thumbnail.jpg"
+                            />
+                            <div className="mt-1 text-xs text-gray-500">
+                              Cole aqui o link direto para uma imagem
+                            </div>
+                          </div>
+
+                          <div className="flex items-center">
+                            <div className="flex-1 border-t border-gray-300"></div>
+                            <span className="px-3 text-xs text-gray-500 bg-gray-50">OU</span>
+                            <div className="flex-1 border-t border-gray-300"></div>
+                          </div>
+
+                          {/* Opção 2: Upload */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              📤 Opção 2: Fazer upload de imagem
+                            </label>
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleThumbnailFileChange}
+                                className="hidden"
+                                id="thumbnail-upload"
+                                disabled={isUploadingThumbnail}
+                              />
+                              <label 
+                                htmlFor="thumbnail-upload" 
+                                className={`cursor-pointer ${isUploadingThumbnail ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              >
+                                <div className="flex flex-col items-center">
+                                  {isUploadingThumbnail ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                                      <span className="text-sm text-gray-600">Carregando...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                      </svg>
+                                      <span className="text-sm text-gray-600">
+                                        <span className="font-medium text-blue-600">Clique para selecionar</span> ou arraste uma imagem
+                                      </span>
+                                      <span className="text-xs text-gray-500 mt-1">PNG, JPG, GIF até 5MB</span>
+                                    </>
+                                  )}
+                                </div>
+                              </label>
+                            </div>
+                            {uploadThumbnailError && (
+                              <div className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                                ❌ {uploadThumbnailError}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  )}
-
-                  {/* Idade Mínima */}
+                  )}                  {/* Idade Mínima */}
                   <div className="mb-4">
                     <label className="block text-xs text-gray-500 font-bold mb-1">
                       Idade Mínima
@@ -1653,6 +1814,27 @@ export default function DetalhesConteudo() {
                   <div className="mt-2 text-xs text-gray-500">
                     Imagem representativa do podcast
                   </div>
+                                {/* Thumbnail Info - apenas para podcasts criados via link (não mostrar a URL bruta) */}
+              {post.category === "Podcast" && post.thumbnail_url && post.content_url && !post.file_path && (
+                <div className="mb-4">
+                  <div className="text-xs text-gray-500 font-bold">Thumbnail do Podcast</div>
+                  <div className="mt-1">
+                    {isValidUrl(post.thumbnail_url) ? (
+                      <a
+                        href={post.thumbnail_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 underline text-xs"
+                      >
+                        Ver thumbnail em nova aba
+                      </a>
+                    ) : (
+                      <div className="text-xs text-gray-500 italic">Thumbnail fornecida (não pública)</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
                 </div>
               )}
 
@@ -1761,34 +1943,6 @@ export default function DetalhesConteudo() {
                 </>
               )}
 
-              {/* Thumbnail Info - apenas para podcasts criados via link (não mostrar a URL bruta) */}
-              {post.category === "Podcast" && post.thumbnail_url && post.content_url && !post.file_path && (
-                <div className="mb-4">
-                  <div className="text-xs text-gray-500 font-bold">Thumbnail do Podcast</div>
-                  <div className="mt-1">
-                    {isValidUrl(post.thumbnail_url) ? (
-                      <a
-                        href={post.thumbnail_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 underline text-xs"
-                      >
-                        Ver thumbnail em nova aba
-                      </a>
-                    ) : (
-                      <div className="text-xs text-gray-500 italic">Thumbnail fornecida (não pública)</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* URL externa - apenas para referência */}
-              {post.content_url && !post.file_name && (
-                <div className="mb-4">
-                  <div className="text-xs text-gray-500 font-bold">URL do Conteúdo</div>
-                  <div className="text-gray-600 text-sm break-all">{post.content_url}</div>
-                </div>
-              )}
 
               <div className="my-6 border-b border-gray-200" />
 
