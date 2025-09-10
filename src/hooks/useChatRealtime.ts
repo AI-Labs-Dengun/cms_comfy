@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Chat, Message } from '@/services/chat';
 import { RealtimeChannel } from '@supabase/supabase-js';
@@ -62,7 +62,7 @@ export function useChatRealtime({
   };
 
   // ✅ NOVA FUNÇÃO: Criar subscriptions com retry mechanism
-  const createSubscriptions = () => {
+  const createSubscriptions = useCallback(() => {
     console.log('🚀 useChatRealtime - Configurando subscriptions...');
     console.log('🔍 Verificando configuração do Supabase Realtime...');
     console.log('🔍 ChatId fornecido:', chatId);
@@ -232,10 +232,10 @@ export function useChatRealtime({
       console.error('❌ Erro ao criar subscriptions:', error);
       return false;
     }
-  };
+  }, [chatId]);
 
   // ✅ NOVA FUNÇÃO: Retry mechanism para reconexão
-  const retryConnection = () => {
+  const retryConnection = useCallback(() => {
     if (connectionAttemptsRef.current >= maxRetryAttempts) {
       console.error('❌ Máximo de tentativas de reconexão atingido');
       return;
@@ -254,7 +254,7 @@ export function useChatRealtime({
         retryConnection();
       }
     }, delay);
-  };
+  }, [createSubscriptions]);
 
   useEffect(() => {
     // Tentar criar subscriptions
