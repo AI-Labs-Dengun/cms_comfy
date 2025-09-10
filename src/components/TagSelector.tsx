@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ChevronDown, Plus, X, Trash2 } from "lucide-react";
 import { getAllTags, createTag, deleteTag, checkTagUsage, ReferenceTag } from "@/services/references";
 
@@ -47,14 +47,7 @@ export default function TagSelector({
     loadTags();
   }, []);
 
-  // Verificar uso das tags
-  useEffect(() => {
-    if (tags.length > 0) {
-      checkTagsUsage();
-    }
-  }, [tags, checkTagsUsage]);
-
-  const checkTagsUsage = async () => {
+  const checkTagsUsage = useCallback(async () => {
     const usageInfo: {[key: string]: { hasReferences: boolean; count: number }} = {};
     
     for (const tag of tags) {
@@ -68,7 +61,14 @@ export default function TagSelector({
     }
     
     setTagUsageInfo(usageInfo);
-  };
+  }, [tags]);
+
+  // Verificar uso das tags
+  useEffect(() => {
+    if (tags.length > 0) {
+      checkTagsUsage();
+    }
+  }, [checkTagsUsage]);
 
   const handleDeleteTag = async (tagId: string, tagName: string) => {
     if (!confirm(`Tem certeza que deseja remover a tag "${tagName}"?`)) {
