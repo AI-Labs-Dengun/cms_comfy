@@ -426,6 +426,7 @@ export default function DetalhesConteudo() {
   const [editDescription, setEditDescription] = useState("");
   const [editContent, setEditContent] = useState(""); // ✅ ADICIONANDO ESTADO PARA CONTENT
   const [editContentUrl, setEditContentUrl] = useState("");
+  const [editThumbnailUrl, setEditThumbnailUrl] = useState(""); // ✅ ADICIONANDO ESTADO PARA THUMBNAIL
   const [editTags, setEditTags] = useState<string[]>([]);
   const [editEmotionTags, setEditEmotionTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -604,6 +605,7 @@ export default function DetalhesConteudo() {
     setEditDescription(postData.description);
     setEditContent(postData.content || ""); // Inicializar o novo estado
     setEditContentUrl(postData.content_url || "");
+    setEditThumbnailUrl(postData.thumbnail_url || ""); // ✅ INICIALIZAR THUMBNAIL_URL
     setEditTags(postData.tags);
     setEditEmotionTags(postData.emotion_tags);
     setEditMinAge(postData.min_age || 12); // ✅ INICIALIZAR IDADE MÍNIMA
@@ -677,6 +679,7 @@ export default function DetalhesConteudo() {
         description: editDescription.trim(),
         content: editContent.trim(), // Adicionar o novo campo ao updateData
         content_url: editContentUrl.trim() || undefined,
+        thumbnail_url: editThumbnailUrl.trim() || undefined, // ✅ ADICIONAR THUMBNAIL_URL
         tags: editTags,
         emotion_tags: editEmotionTags,
         min_age: editMinAge, // ✅ ADICIONAR IDADE MÍNIMA
@@ -727,6 +730,7 @@ export default function DetalhesConteudo() {
           description: updateData.description,
           content: updateData.content, // Atualizar o novo campo
           content_url: updateData.content_url,
+          thumbnail_url: updateData.thumbnail_url, // ✅ ATUALIZAR THUMBNAIL_URL
           tags: updateData.tags,
           emotion_tags: updateData.emotion_tags,
           min_age: updateData.min_age, // ✅ ATUALIZAR IDADE MÍNIMA
@@ -1222,6 +1226,7 @@ export default function DetalhesConteudo() {
                     editDescription !== post?.description ||
                     editContent !== post?.content || // Adicionar a nova comparação
                     editContentUrl !== (post?.content_url || "") ||
+                    editThumbnailUrl !== (post?.thumbnail_url || "") || // ✅ ADICIONAR COMPARAÇÃO DO THUMBNAIL
                     editMinAge !== (post?.min_age || 12) || // ✅ ADICIONAR COMPARAÇÃO DA IDADE MÍNIMA
                     JSON.stringify(editTags) !== JSON.stringify(post?.tags) ||
                     JSON.stringify(editEmotionTags) !== JSON.stringify(post?.emotion_tags);
@@ -1478,6 +1483,57 @@ export default function DetalhesConteudo() {
                       )}
                     </div>
                   </div>
+
+                  {/* ✅ CAMPO PARA EDITAR THUMBNAIL URL (especialmente para Podcasts) */}
+                  {post.category === "Podcast" && post.content_url && !post.file_path && (
+                    <div className="mb-4">
+                      <label className="block text-xs text-gray-500 font-bold mb-1">URL da Thumbnail (opcional)</label>
+                      <div className="relative">
+                        <input
+                          type="url"
+                          value={editThumbnailUrl}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditThumbnailUrl(e.target.value)}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium"
+                          placeholder="https://exemplo.com/thumbnail.jpg"
+                        />
+                        <div className="mt-1 text-xs text-gray-500">
+                          💡 URL da imagem que será exibida como thumbnail do podcast
+                        </div>
+                        {editThumbnailUrl.trim() && (
+                          <div className="mt-2">
+                            <div className="text-xs text-gray-500 font-bold mb-1">Prévia da Thumbnail:</div>
+                            <div className="border rounded-lg overflow-hidden max-w-xs">
+                              {isValidUrl(editThumbnailUrl) ? (
+                                <Image 
+                                  src={editThumbnailUrl} 
+                                  alt="Prévia da thumbnail"
+                                  className="w-full h-auto object-cover"
+                                  width={200}
+                                  height={150}
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                      parent.innerHTML = `
+                                        <div class="p-4 text-center text-gray-500">
+                                          <div class="text-xs">❌ Erro ao carregar thumbnail</div>
+                                        </div>
+                                      `;
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <div className="p-4 text-center text-gray-500">
+                                  <div className="text-xs">⚠️ URL inválida</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Idade Mínima */}
                   <div className="mb-4">
