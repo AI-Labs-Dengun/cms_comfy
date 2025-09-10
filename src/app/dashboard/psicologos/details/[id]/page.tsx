@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Pencil, Save, X, Key, Trash2 } from "lucide-react";
+import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 interface Psicologo {
@@ -91,13 +92,17 @@ export default function PsicologoDetailsPage() {
       if (error) {
         console.error('❌ Erro ao buscar psicólogo:', error);
         console.error('❌ Detalhes do erro:', error.message, error.details, error.hint);
-        setError('Erro ao carregar dados do psicólogo: ' + error.message);
+  const msg = 'Erro ao carregar dados do psicólogo: ' + (error.message || 'Erro desconhecido');
+  setError(msg);
+  toast.error(msg);
         return;
       }
 
       if (!data) {
         console.error('❌ Psicólogo não encontrado com ID:', id);
-        setError('Psicólogo não encontrado');
+  const msg = 'Psicólogo não encontrado';
+  setError(msg);
+  toast.error(msg);
         return;
       }
 
@@ -108,7 +113,9 @@ export default function PsicologoDetailsPage() {
       setGuardianEmail(data.guardian_email || "");
     } catch (err) {
       console.error('Erro ao buscar psicólogo:', err);
-      setError('Erro ao carregar dados do psicólogo');
+  const msg = 'Erro ao carregar dados do psicólogo';
+  setError(msg);
+  toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -137,16 +144,21 @@ export default function PsicologoDetailsPage() {
 
       if (error) {
         console.error('Erro ao atualizar psicólogo:', error);
-        setError('Erro ao salvar alterações');
+  const msg = 'Erro ao salvar alterações';
+  setError(msg);
+  toast.error(msg);
         return;
       }
 
       setPsicologo(prev => prev ? { ...prev, name, username, guardian_email: guardianEmail } : null);
       setEditing(false);
-      setError("");
+  setError("");
+  toast.success('Alterações guardadas com sucesso');
     } catch (err) {
       console.error('Erro ao atualizar psicólogo:', err);
-      setError('Erro ao salvar alterações');
+  const msg = 'Erro ao salvar alterações';
+  setError(msg);
+  toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -175,21 +187,28 @@ export default function PsicologoDetailsPage() {
 
       if (error) {
         console.error('Erro RPC ao eliminar psicólogo:', error);
-        setError(`Erro ao eliminar psicólogo: ${error.message}`);
+  const msg = `Erro ao eliminar psicólogo: ${error.message}`;
+  setError(msg);
+  toast.error(msg);
         return;
       }
 
       if (!data.success) {
         console.error('Erro na função de deleção:', data.error);
-        setError(data.error);
+  const msg = data.error || 'Erro ao eliminar psicólogo';
+  setError(msg);
+  toast.error(msg);
         return;
       }
 
       console.log('Psicólogo eliminado:', data);
-      router.push('/dashboard/psicologos');
+  toast.success('Psicólogo eliminado com sucesso');
+  router.push('/dashboard/psicologos');
     } catch (err) {
       console.error('Erro ao eliminar psicólogo:', err);
-      setError('Erro inesperado ao eliminar psicólogo');
+  const msg = 'Erro inesperado ao eliminar psicólogo';
+  setError(msg);
+  toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -200,22 +219,30 @@ export default function PsicologoDetailsPage() {
 
     // Validações de senha mais rigorosas
     if (!newPassword || !confirmPassword) {
-      setError('❌ Preencha todos os campos de senha');
+  const msg = '❌ Preencha todos os campos de senha';
+  setError(msg);
+  toast.error(msg);
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError('❌ As senhas não coincidem');
+  const msg = '❌ As senhas não coincidem';
+  setError(msg);
+  toast.error(msg);
       return;
     }
 
     if (newPassword.length < 6) {
-      setError('❌ A senha deve ter pelo menos 6 caracteres');
+  const msg = '❌ A senha deve ter pelo menos 6 caracteres';
+  setError(msg);
+  toast.error(msg);
       return;
     }
 
     if (newPassword.length > 72) {
-      setError('❌ A senha deve ter no máximo 72 caracteres');
+  const msg = '❌ A senha deve ter no máximo 72 caracteres';
+  setError(msg);
+  toast.error(msg);
       return;
     }
 
@@ -224,7 +251,9 @@ export default function PsicologoDetailsPage() {
     // Verificar se não é muito simples
     const simplePasswords = ['123456', 'password', 'qwerty', '123456789', '12345678', '12345', '1234567', 'admin', 'test'];
     if (simplePasswords.includes(newPassword.toLowerCase())) {
-      setError('❌ Esta senha é muito simples. Escolha uma senha mais segura');
+  const msg = '❌ Esta senha é muito simples. Escolha uma senha mais segura';
+  setError(msg);
+  toast.error(msg);
       return;
     }
 
@@ -234,7 +263,9 @@ export default function PsicologoDetailsPage() {
       // Obter usuário atual para validação
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setError('Usuário não autenticado');
+  const msg = 'Usuário não autenticado';
+  setError(msg);
+  toast.error(msg);
         return;
       }
 
@@ -247,20 +278,26 @@ export default function PsicologoDetailsPage() {
 
       if (validationError) {
         console.error('Erro na validação de senha:', validationError);
-        setError(`Erro na validação: ${validationError.message}`);
+  const msg = `Erro na validação: ${validationError.message}`;
+  setError(msg);
+  toast.error(msg);
         return;
       }
 
       if (!validationData.success) {
         console.error('Erro na validação:', validationData.error);
-        setError(validationData.error);
+  const msg = validationData.error || 'Erro na validação da alteração de senha';
+  setError(msg);
+  toast.error(msg);
         return;
       }
 
       // Obter token do usuário atual para autenticação
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        setError('Erro de autenticação. Faça login novamente.');
+  const msg = 'Erro de autenticação. Faça login novamente.';
+  setError(msg);
+  toast.error(msg);
         return;
       }
 
@@ -281,7 +318,9 @@ export default function PsicologoDetailsPage() {
 
       if (!response.ok || !result.success) {
         console.error('Erro ao alterar senha via API:', result.error);
-        setError(result.error || 'Erro ao alterar senha');
+        const msg = result.error || 'Erro ao alterar senha';
+        setError(msg);
+        toast.error(msg);
         return;
       }
 
@@ -289,12 +328,11 @@ export default function PsicologoDetailsPage() {
       setNewPassword("");
       setConfirmPassword("");
       setError("");
-      
       // Mostrar mensagem diferente se o usuário foi corrigido automaticamente
       if (result.corrected) {
-        alert(`✅ Senha alterada com sucesso para ${psicologo.name}!\n\n🔧 Nota: Os dados do psicólogo foram corrigidos automaticamente durante o processo.`);
+        toast.success(`Senha alterada com sucesso para ${psicologo.name}! Dados corrigidos automaticamente.`);
       } else {
-        alert(`✅ Senha alterada com sucesso para ${psicologo.name}!`);
+        toast.success(`Senha alterada com sucesso para ${psicologo.name}!`);
       }
 
     } catch (err) {
