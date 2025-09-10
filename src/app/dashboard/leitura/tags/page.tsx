@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import CMSLayout from "@/components/CMSLayout";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { supabase } from "@/lib/supabase";
+import { toast } from 'react-hot-toast';
 
 interface ReadingTag {
   id: string;
@@ -21,7 +22,6 @@ export default function TagsLeituraPage() {
   const [tags, setTags] = useState<ReadingTag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#3B82F6");
@@ -61,10 +61,10 @@ export default function TagsLeituraPage() {
   // Criar ou editar tag
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(null);
+  setError(null);
           if (!name.trim()) {
-        setError("O nome da categoria é obrigatório.");
+        // mostrar erro via toast para boa UX
+        toast.error("O nome da categoria é obrigatório.");
         return;
       }
     if (editingTag) {
@@ -76,9 +76,11 @@ export default function TagsLeituraPage() {
         tag_color: color,
       });
       if (error) {
-        setError("Erro ao editar categoria: " + error.message);
+        // mostrar via toast e manter estado local para depuração
+        toast.error("Erro ao editar categoria: " + error.message);
+        setError(error.message);
       } else {
-        setSuccess("Categoria editada com sucesso!");
+        toast.success("Categoria editada com sucesso!");
         setEditingTag(null);
         setName("");
         setDescription("");
@@ -93,9 +95,10 @@ export default function TagsLeituraPage() {
         tag_color: color,
       });
       if (error) {
-        setError("Erro ao criar categoria: " + error.message);
+        toast.error("Erro ao criar categoria: " + error.message);
+        setError(error.message);
       } else {
-        setSuccess("Categoria criada com sucesso!");
+        toast.success("Categoria criada com sucesso!");
         setName("");
         setDescription("");
         setColor("#3B82F6");
@@ -125,14 +128,14 @@ export default function TagsLeituraPage() {
     if (!showDelete) return;
     setDeleting(true);
     setError(null);
-    setSuccess(null);
     const { error } = await supabase.rpc("delete_reading_tag", {
       tag_id_param: showDelete.id,
     });
     if (error) {
-      setError("Erro ao deletar categoria: " + error.message);
+      toast.error("Erro ao deletar categoria: " + error.message);
+      setError(error.message);
     } else {
-      setSuccess("Categoria deletada com sucesso!");
+      toast.success("Categoria deletada com sucesso!");
       fetchTags();
     }
     setShowDelete(null);
@@ -185,7 +188,6 @@ export default function TagsLeituraPage() {
             )}
           </div>
           {error && <div className="text-red-700 text-sm mt-2 font-medium">{error}</div>}
-          {success && <div className="text-green-700 text-sm mt-2 font-medium">{success}</div>}
         </form>
         {/* Listagem de tags */}
         <div className="bg-white p-4 rounded shadow">

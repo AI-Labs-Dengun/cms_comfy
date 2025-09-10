@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { toast } from 'react-hot-toast';
 import { useRouter } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import { useAuth } from "@/context/AuthContext";
@@ -17,13 +18,12 @@ export default function CreateReferencePage() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  // notifications via HotToaster
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
+  setLoading(true);
+  setError(null);
 
     try {
       // Validações
@@ -63,8 +63,7 @@ export default function CreateReferencePage() {
       });
 
       if (response.success) {
-        setSuccess("Referência criada com sucesso!");
-        
+        toast.success('Referência criada com sucesso!');
         // Limpar formulário
         setTagId("");
         setTitle("");
@@ -77,6 +76,7 @@ export default function CreateReferencePage() {
         }, 2000);
       } else {
         setError(response.error || "Erro ao criar referência");
+        toast.error(response.error || "Erro ao criar referência");
       }
     } catch (err) {
       console.error("Erro inesperado:", err);
@@ -143,12 +143,7 @@ export default function CreateReferencePage() {
             </div>
           )}
           
-          {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md mb-6">
-              <p className="text-sm font-medium">{success}</p>
-              <p className="text-xs mt-1">Redirecionando para lista de referências...</p>
-            </div>
-          )}
+          {/* success handled via global toasts (HotToaster) */}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Tag */}

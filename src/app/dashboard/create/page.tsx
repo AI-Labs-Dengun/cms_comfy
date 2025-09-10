@@ -9,6 +9,7 @@ import { getMediaDuration } from "@/services/storage";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { toast } from 'react-hot-toast';
 
 import { EMOTIONS } from '@/lib/emotions';
 
@@ -247,11 +248,11 @@ const CreateReadingTagModal = ({
   const [color, setColor] = useState("#3B82F6");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
+      toast.error("O nome da categoria é obrigatório");
       setError("O nome da categoria é obrigatório");
       return;
     }
@@ -271,9 +272,8 @@ const CreateReadingTagModal = ({
       setDescription("");
       setColor("#3B82F6");
       
-      // Mostrar mensagem de sucesso
-      setSuccess("Categoria criada com sucesso!");
-      
+      // Mostrar mensagem de sucesso via toast e depois fechar modal
+      toast.success("Categoria criada com sucesso!");
       // Aguardar um pouco e depois fechar modal e atualizar lista
       setTimeout(() => {
         onClose();
@@ -293,7 +293,6 @@ const CreateReadingTagModal = ({
       setDescription("");
       setColor("#3B82F6");
       setError(null);
-      setSuccess(null);
       onClose();
     }
   };
@@ -365,12 +364,6 @@ const CreateReadingTagModal = ({
               <p className="text-sm font-medium">{error}</p>
             </div>
           )}
-          
-          {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
-              <p className="text-sm font-medium">{success}</p>
-            </div>
-          )}
 
           <div className="flex gap-3 pt-4">
             <button
@@ -412,7 +405,6 @@ export default function CreateContent() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [readingTags, setReadingTags] = useState<{id: string, name: string, color?: string}[]>([]);
   const [selectedReadingTags, setSelectedReadingTags] = useState<string[]>([]);
   const [showCreateTagModal, setShowCreateTagModal] = useState(false);
@@ -475,55 +467,62 @@ export default function CreateContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUploading(true);
-    setError(null);
-    setSuccess(null);
+  setError(null);
 
     try {
       // Validar dados obrigatórios
       if (!title.trim()) {
         setError("Título é obrigatório");
+        toast.error("Título é obrigatório");
         return;
       }
 
       if (!description.trim()) {
-        setError("Descrição é obrigatória");
+          setError("Descrição é obrigatória");
+          toast.error("Descrição é obrigatória");
         return;
       }
 
       // Validar conteúdo textual (exceto para Shorts)
       if (category !== "Shorts" && !content.trim()) {
         setError("Conteúdo textual é obrigatório");
+        toast.error("Conteúdo textual é obrigatório");
         return;
       }
 
       // Validar tags
       if (tags.length === 0) {
         setError("É obrigatório adicionar pelo menos uma tag");
+        toast.error("É obrigatório adicionar pelo menos uma tag");
         return;
       }
 
       // Validar tags de emoção
       if (emotions.length === 0) {
         setError("É obrigatório selecionar pelo menos uma tag de emoção");
+        toast.error("É obrigatório selecionar pelo menos uma tag de emoção");
         return;
       }
 
       // Validar conteúdo (URL ou arquivo) - obrigatório para todas as categorias
       if (!contentUrl.trim() && !file) {
         setError("Conteúdo é obrigatório. Forneça uma URL ou faça upload de um arquivo");
+        toast.error("Conteúdo é obrigatório. Forneça uma URL ou faça upload de um arquivo");
         return;
       }
 
       if (contentUrl.trim() && file) {
         setError("Escolha apenas uma opção: URL ou arquivo, não ambos");
+        toast.error("Escolha apenas uma opção: URL ou arquivo, não ambos");
         return;
       }
 
       // Validar URL para Shorts (deve ser de plataformas suportadas)
       if (category === "Shorts" && contentUrl.trim()) {
         const contentType = detectContentType(contentUrl);
-        if (!contentType || contentType === 'external') {
+          if (!contentType || contentType === 'external') {
           setError("Para Shorts, use URLs do YouTube, Instagram Reels ou TikTok");
+          toast.error("Para Shorts, use URLs do YouTube, Instagram Reels ou TikTok");
           return;
         }
       }
@@ -531,18 +530,21 @@ export default function CreateContent() {
       // Validar que Shorts não pode ter conteúdo textual
       if (category === "Shorts" && content.trim()) {
         setError("Posts da categoria Shorts não podem ter conteúdo textual");
+        toast.error("Posts da categoria Shorts não podem ter conteúdo textual");
         return;
       }
 
       // Validar que posts de Leitura devem ter pelo menos uma categoria selecionada
       if (category === "Leitura" && selectedReadingTags.length === 0) {
         setError("É obrigatório selecionar pelo menos uma categoria de leitura");
+        toast.error("É obrigatório selecionar pelo menos uma categoria de leitura");
         return;
       }
 
       // Validar idade mínima
       if (minAge !== 12 && minAge !== 16) {
         setError("Idade mínima deve ser 12 ou 16");
+        toast.error("Idade mínima deve ser 12 ou 16");
         return;
       }
 
@@ -601,7 +603,7 @@ export default function CreateContent() {
         try {
           const uploadResult = await uploadFileForPost(file);
           
-          if (uploadResult.success && uploadResult.data) {
+            if (uploadResult.success && uploadResult.data) {
             postData.file_path = uploadResult.data.path;
             postData.file_name = uploadResult.data.file_name;
             postData.file_type = uploadResult.data.file_type;
@@ -613,13 +615,15 @@ export default function CreateContent() {
             }
             
             setUploadProgress(100);
-          } else {
+            } else {
             setError(uploadResult.error || "Erro no upload do arquivo");
+            toast.error(uploadResult.error || "Erro no upload do arquivo");
             return;
           }
-        } catch (uploadError) {
+          } catch (uploadError) {
           console.error("Erro no upload:", uploadError);
           setError("Erro inesperado no upload do arquivo");
+          toast.error("Erro inesperado no upload do arquivo");
           return;
         } finally {
           clearInterval(progressInterval);
@@ -635,11 +639,13 @@ export default function CreateContent() {
             postData.thumbnail_url = thumbnailUploadResult.data.url;
           } else {
             setError(thumbnailUploadResult.error || "Erro no upload da thumbnail");
+            toast.error(thumbnailUploadResult.error || "Erro no upload da thumbnail");
             return;
           }
         } catch (thumbnailError) {
           console.error("Erro no upload da thumbnail:", thumbnailError);
           setError("Erro inesperado no upload da thumbnail");
+          toast.error("Erro inesperado no upload da thumbnail");
           return;
         }
       }
@@ -668,7 +674,7 @@ export default function CreateContent() {
       }
 
       if (result.success) {
-        setSuccess(result.message || "Post criado com sucesso!");
+        toast.success(result.message || "Post criado com sucesso!");
         
         // Limpar formulário
         setTitle("");
@@ -699,10 +705,12 @@ export default function CreateContent() {
         }
       } else {
         setError(result.error || "Erro desconhecido ao criar post");
+        toast.error(result.error || "Erro desconhecido ao criar post");
       }
     } catch (error) {
       console.error("Erro inesperado:", error);
       setError("Erro inesperado ao criar post");
+      toast.error("Erro inesperado ao criar post");
     } finally {
       setIsUploading(false);
     }
@@ -862,12 +870,7 @@ export default function CreateContent() {
             </div>
           )}
           
-          {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md mb-4">
-              <p className="text-sm font-medium">{success}</p>
-              <p className="text-xs mt-1">Redirecionando para gestão de posts...</p>
-            </div>
-          )}
+          {/* success handled via global toasts (HotToaster) */}
 
           {/* Aviso para categoria de leitura sem categorias selecionadas */}
           {category === 'Leitura' && selectedReadingTags.length === 0 && readingTags.length > 0 && (
@@ -1283,7 +1286,6 @@ export default function CreateContent() {
                 className="bg-black text-white px-6 py-2 rounded-md font-semibold hover:bg-gray-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 disabled={
                   isUploading || 
-                  success !== null || 
                   !title.trim() ||
                   !description.trim() ||
                   (!contentUrl.trim() && !file) ||
@@ -1298,9 +1300,7 @@ export default function CreateContent() {
                     ? uploadProgress > 0 
                       ? `A fazer upload... ${uploadProgress}%` 
                       : "A enviar..." 
-                    : success 
-                      ? "Enviado!" 
-                      : !title.trim()
+                    : !title.trim()
                         ? "Adicione um título"
                         : !description.trim()
                           ? "Adicione uma descrição"

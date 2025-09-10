@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { toast } from 'react-hot-toast';
 import { useRouter, useParams } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import { useAuth } from "@/context/AuthContext";
@@ -19,7 +20,7 @@ export default function EditReferencePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  // notifications via HotToaster
 
   const referenceId = params.id as string;
 
@@ -56,9 +57,8 @@ export default function EditReferencePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
-    setError(null);
-    setSuccess(null);
+  setSaving(true);
+  setError(null);
 
     try {
       // Validações
@@ -98,14 +98,14 @@ export default function EditReferencePage() {
       });
 
       if (response.success) {
-        setSuccess("Referência atualizada com sucesso!");
-        
+        toast.success('Referência atualizada com sucesso!');
         // Redirecionar após 2 segundos
         setTimeout(() => {
           router.push("/dashboard/references");
         }, 2000);
       } else {
         setError(response.error || "Erro ao atualizar referência");
+        toast.error(response.error || "Erro ao atualizar referência");
       }
     } catch (err) {
       console.error("Erro inesperado:", err);
@@ -181,12 +181,7 @@ export default function EditReferencePage() {
             </div>
           )}
           
-          {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md mb-6">
-              <p className="text-sm font-medium">{success}</p>
-              <p className="text-xs mt-1">Redirecionando para lista de referências...</p>
-            </div>
-          )}
+          {/* success handled via global toasts (HotToaster) */}
 
           {/* Formulário */}
           {!loading && !error && (

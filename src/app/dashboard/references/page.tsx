@@ -6,7 +6,8 @@ import CMSLayout from "@/components/CMSLayout";
 import { useAuth } from "@/context/AuthContext";
 import { getAllReferences, deleteReference } from "@/services/references";
 import { Reference } from "@/types/references";
-import { DeleteConfirmationModal, NotificationModal } from "@/components/modals";
+import { DeleteConfirmationModal } from "@/components/modals";
+import { toast } from 'react-hot-toast';
 import { Plus, Search, Edit, Trash2, ExternalLink } from "lucide-react";
 import TagFilterSelector from "@/components/TagFilterSelector";
 
@@ -32,17 +33,7 @@ export default function ReferencesPage() {
     isLoading: false
   });
 
-  const [notification, setNotification] = useState<{
-    isOpen: boolean;
-    type: "success" | "error" | "info";
-    title: string;
-    message: string;
-  }>({
-    isOpen: false,
-    type: "info",
-    title: "",
-    message: ""
-  });
+  // Notifications handled via global HotToaster (react-hot-toast)
 
   // Buscar referências ao carregar o componente
   useEffect(() => {
@@ -111,20 +102,7 @@ export default function ReferencesPage() {
     return tagsWithCounts;
   }, [references]);
 
-  // Função para mostrar notificação
-  const showNotification = (type: "success" | "error" | "info", title: string, message: string) => {
-    setNotification({
-      isOpen: true,
-      type,
-      title,
-      message
-    });
-  };
-
-  // Função para fechar notificação
-  const closeNotification = () => {
-    setNotification(prev => ({ ...prev, isOpen: false }));
-  };
+  // helper: use toast.success / toast.error for notifications
 
   // Função para abrir modal de exclusão
   const openDeleteModal = (referenceId: string, referenceTitle: string) => {
@@ -154,13 +132,13 @@ export default function ReferencesPage() {
         // Remover do estado local
         setReferences(prev => prev.filter(ref => ref.id !== deleteModal.referenceId));
         closeDeleteModal();
-        showNotification("success", "Sucesso!", "Referência removida com sucesso!");
+        toast.success('Referência removida com sucesso!');
       } else {
-        showNotification("error", "Erro", response.error || 'Erro ao remover referência');
+        toast.error(response.error || 'Erro ao remover referência');
       }
     } catch (err) {
       console.error('Erro ao remover referência:', err);
-      showNotification("error", "Erro", 'Erro inesperado ao remover referência');
+      toast.error('Erro inesperado ao remover referência');
     } finally {
       setDeleteModal(prev => ({ ...prev, isLoading: false }));
     }
@@ -439,13 +417,7 @@ export default function ReferencesPage() {
         isLoading={deleteModal.isLoading}
       />
       
-      <NotificationModal
-        isOpen={notification.isOpen}
-        onClose={closeNotification}
-        type={notification.type}
-        title={notification.title}
-        message={notification.message}
-      />
+  {/* notifications shown via HotToaster (react-hot-toast) */}
     </>
   );
 }

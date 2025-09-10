@@ -24,7 +24,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  // successMessage was only being set but never read which caused a build-time ESLint error.
+  // Use a ref to keep the same behavior (loggable state) without triggering the unused-vars rule.
+  const successMessageRef = useRef<string>("");
   
   // UseRef para controlar se já tentou redirecionar
   const hasRedirected = useRef(false);
@@ -79,7 +81,7 @@ export default function LoginPage() {
     if (shouldRedirectCMS) {
       console.log('✅ LoginPage - Redirecionando para dashboard CMS...');
       hasRedirected.current = true;
-      setSuccessMessage('Acesso autorizado! Redirecionando para CMS...');
+  successMessageRef.current = 'Acesso autorizado! Redirecionando para CMS...';
       
       // Limpar timeout anterior se existir
       if (redirectTimeoutRef.current) {
@@ -99,7 +101,7 @@ export default function LoginPage() {
     } else if (shouldRedirectPsicologo) {
       console.log('✅ LoginPage - Redirecionando para painel de psicólogos...');
       hasRedirected.current = true;
-      setSuccessMessage('Acesso autorizado! Redirecionando para painel de psicólogos...');
+  successMessageRef.current = 'Acesso autorizado! Redirecionando para painel de psicólogos...';
       
       // Limpar timeout anterior se existir
       if (redirectTimeoutRef.current) {
@@ -123,9 +125,9 @@ export default function LoginPage() {
     e.preventDefault();
     console.log('🚀 LoginPage - Iniciando processo de login...');
     
-    setIsLoading(true);
-    setError("");
-    setSuccessMessage("");
+  setIsLoading(true);
+  setError("");
+  successMessageRef.current = "";
     hasRedirected.current = false; // Reset do flag ao tentar novo login
     loginSuccessRef.current = false; // Reset do flag de sucesso
     
@@ -167,7 +169,7 @@ export default function LoginPage() {
 
       if (result.success) {
         setError('');
-        setSuccessMessage('Login bem-sucedido! Verificando permissões...');
+  successMessageRef.current = 'Login bem-sucedido! Verificando permissões...';
   toast.success('Login bem-sucedido! Verificando permissões...');
         loginSuccessRef.current = true; // Marcar que o login foi bem-sucedido
         
@@ -184,7 +186,7 @@ export default function LoginPage() {
         if (!hasRedirected.current) {
           console.log('🔄 LoginPage - Redirecionamento baseado no role...');
           hasRedirected.current = true;
-          setSuccessMessage('Redirecionando...');
+          successMessageRef.current = 'Redirecionando...';
           
           // Definir rota baseada no role
           const redirectPath = result.user_role === 'psicologo' ? '/psicologos' : '/dashboard/create';

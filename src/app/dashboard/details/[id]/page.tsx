@@ -8,6 +8,7 @@ import { getPost, deletePost, togglePostPublication, updatePost, Post, getTagsFo
 import { getFileUrl, getSignedUrl } from "@/services/storage";
 import { useAuth } from "@/context/AuthContext";
 import { DeleteConfirmationModal, PublishToggleModal, NotificationModal } from "@/components/modals";
+import { toast } from 'react-hot-toast';
 import { supabase } from "@/lib/supabase";
 import Image from 'next/image';
 
@@ -535,7 +536,7 @@ export default function DetalhesConteudo() {
 
     // Verificar se o post está publicado
     if (post.is_published) {
-      alert('Este post está publicado. Despublique-o primeiro antes de eliminá-lo.');
+      toast.error('Este post está publicado. Despublique-o primeiro antes de eliminá-lo.');
       setShowDeleteModal(false);
       return;
     }
@@ -547,9 +548,10 @@ export default function DetalhesConteudo() {
       
       if (response.success) {
         setShowDeleteModal(false);
+        toast.success('Conteúdo eliminado com sucesso');
         router.push('/dashboard/management');
       } else {
-        alert(response.error || 'Erro ao eliminar post');
+        toast.error(response.error || 'Erro ao eliminar post');
       }
     } catch (err) {
       console.error('Erro ao eliminar post:', err);
@@ -572,8 +574,9 @@ export default function DetalhesConteudo() {
         // Atualizar o estado local
         setPost((prev: Post | null) => prev ? { ...prev, is_published: !prev.is_published } : null);
         setShowPublishModal(false);
+        toast.success(response.message || 'Status de publicação alterado com sucesso');
       } else {
-        alert(response.error || 'Erro ao alterar status de publicação');
+        toast.error(response.error || 'Erro ao alterar status de publicação');
       }
     } catch (err) {
       console.error('Erro ao alterar publicação:', err);
