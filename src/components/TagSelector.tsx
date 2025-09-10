@@ -68,7 +68,7 @@ export default function TagSelector({
     if (tags.length > 0) {
       checkTagsUsage();
     }
-  }, [checkTagsUsage]);
+  }, [checkTagsUsage, tags.length]);
 
   const handleDeleteTag = async (tagId: string, tagName: string) => {
     if (!confirm(`Tem certeza que deseja remover a tag "${tagName}"?`)) {
