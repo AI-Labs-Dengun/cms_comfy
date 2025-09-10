@@ -17,6 +17,7 @@ interface ChatInterfaceProps {
   onClose?: () => void;
   onChatUpdate?: (chatId: string) => void; // Callback para atualizar a lista de chats
   onNewMessageReceived?: (message: Message) => void; // Callback para quando uma nova mensagem é recebida
+  onChatStatusChange?: (chatId: string, newStatus: ChatStatus) => void; // Notificar pai sobre mudança de status
   showNewMessageIndicator?: boolean; // Prop para controlar o indicador de nova mensagem
   messages?: Message[]; // Prop para receber mensagens da página pai
   onLoadMoreMessages?: () => void; // Callback para carregar mais mensagens
@@ -33,7 +34,7 @@ interface GroupedMessages {
   messages: Message[];
 }
 
-export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, onNewMessageReceived, showNewMessageIndicator = true, messages: externalMessages, onLoadMoreMessages, hasMoreMessages = false, isLoadingMoreMessages = false, messagesContainerRef, isInitialLoad = false }: ChatInterfaceProps) {
+export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, onNewMessageReceived, onChatStatusChange, showNewMessageIndicator = true, messages: externalMessages, onLoadMoreMessages, hasMoreMessages = false, isLoadingMoreMessages = false, messagesContainerRef, isInitialLoad = false }: ChatInterfaceProps) {
   const { profile } = useAuth();
   const { isOnline } = useOnlineStatus();
   const { processIncomingMessage } = useEncryptedChat(chatId);
@@ -477,6 +478,14 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
         setChatInfo(prev => prev ? { ...prev, status: newStatus } : null);
         // Marcar mensagens como lidas quando o usuário interage com o chat
         handleUserInteraction();
+        // Notificar o componente pai (lista) para refletir mudança imediatamente
+        if (onChatStatusChange) {
+          try {
+            onChatStatusChange(chatId, newStatus);
+          } catch (err) {
+            console.error('Erro ao notificar pai sobre mudança de status:', err);
+          }
+        }
       } else {
         console.error('Erro ao atualizar status:', result.error);
       }
