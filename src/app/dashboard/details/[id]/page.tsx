@@ -14,6 +14,18 @@ import Image from 'next/image';
 
 import { EMOTIONS } from '@/lib/emotions';
 
+// Valida se uma string é uma URL absoluta válida
+const isValidUrl = (src?: string | null) => {
+  if (!src) return false;
+  try {
+    // new URL() lança se não for uma URL válida
+    new URL(src);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 // Componente para embed do TikTok
 const TikTokEmbed = ({ url, videoId }: { url: string; videoId: string }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -837,37 +849,44 @@ export default function DetalhesConteudo() {
           <div className="mb-6">
             <div className="text-xs text-gray-500 font-bold mb-2">Pré-visualização</div>
             <div className="border rounded-lg overflow-hidden">
-              <Image 
-                src={fileUrl} 
-                alt={post.title}
-                className="max-w-full h-auto max-h-96 object-contain mx-auto"
-                width={600}
-                height={400}
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  // Mostrar informações de erro
-                  const parent = target.parentElement;
-                  if (parent) {
-                    parent.innerHTML = `
-                      <div class="p-8 text-center text-gray-500">
-                        <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
-                        <p class="text-sm font-medium mb-2">Erro ao carregar imagem</p>
-                        <p class="text-xs text-gray-400 mb-4">A imagem pode estar temporariamente indisponível</p>
-                        <div class="space-y-2">
-                          <a href="${fileUrl}" target="_blank" class="text-blue-600 text-xs hover:underline block">Tentar abrir em nova aba</a>
-                          <button onclick="window.location.reload()" class="text-blue-600 text-xs hover:underline block">Recarregar página</button>
+              {isValidUrl(fileUrl) ? (
+                <Image 
+                  src={fileUrl as string} 
+                  alt={post.title}
+                  className="max-w-full h-auto max-h-96 object-contain mx-auto"
+                  width={600}
+                  height={400}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    // Mostrar informações de erro
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.innerHTML = `
+                        <div class="p-8 text-center text-gray-500">
+                          <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                          </svg>
+                          <p class="text-sm font-medium mb-2">Erro ao carregar imagem</p>
+                          <p class="text-xs text-gray-400 mb-4">A imagem pode estar temporariamente indisponível</p>
+                          <div class="space-y-2">
+                            <a href="${fileUrl}" target="_blank" class="text-blue-600 text-xs hover:underline block">Tentar abrir em nova aba</a>
+                            <button onclick="window.location.reload()" class="text-blue-600 text-xs hover:underline block">Recarregar página</button>
+                          </div>
                         </div>
-                      </div>
-                    `;
-                  }
-                }}
-                onLoad={() => {
-                  console.log('✅ Imagem carregada com sucesso:', fileUrl);
-                }}
-              />
+                      `;
+                    }
+                  }}
+                  onLoad={() => {
+                    console.log('✅ Imagem carregada com sucesso:', fileUrl);
+                  }}
+                />
+              ) : (
+                <div className="p-6 text-center text-gray-500">
+                  <div className="font-medium">Thumbnail inválida</div>
+                  <div className="text-xs mt-1">A URL do ficheiro não é válida para pré-visualização.</div>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -1094,37 +1113,44 @@ export default function DetalhesConteudo() {
           <div className="mb-6">
             <div className="text-xs text-gray-500 font-bold mb-2">Imagem Externa</div>
             <div className="border rounded-lg overflow-hidden">
-              <Image 
-                src={url} 
-                alt={post.title}
-                className="max-w-full h-auto max-h-96 object-contain mx-auto"
-                width={600}
-                height={400}
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  // Mostrar informações de erro
-                  const parent = target.parentElement;
-                  if (parent) {
-                    parent.innerHTML = `
-                      <div class="p-8 text-center text-gray-500">
-                        <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
-                        <p class="text-sm font-medium mb-2">Erro ao carregar imagem externa</p>
-                        <p class="text-xs text-gray-400 mb-4">A URL pode estar indisponível ou bloqueada</p>
-                        <div class="space-y-2">
-                          <a href="${url}" target="_blank" class="text-blue-600 text-xs hover:underline block">Tentar abrir em nova aba</a>
-                          <button onclick="window.location.reload()" class="text-blue-600 text-xs hover:underline block">Recarregar página</button>
+              {isValidUrl(url) ? (
+                <Image 
+                  src={url as string} 
+                  alt={post.title}
+                  className="max-w-full h-auto max-h-96 object-contain mx-auto"
+                  width={600}
+                  height={400}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    // Mostrar informações de erro
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.innerHTML = `
+                        <div class="p-8 text-center text-gray-500">
+                          <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                          </svg>
+                          <p class="text-sm font-medium mb-2">Erro ao carregar imagem externa</p>
+                          <p class="text-xs text-gray-400 mb-4">A URL pode estar indisponível ou bloqueada</p>
+                          <div class="space-y-2">
+                            <a href="${url}" target="_blank" class="text-blue-600 text-xs hover:underline block">Tentar abrir em nova aba</a>
+                            <button onclick="window.location.reload()" class="text-blue-600 text-xs hover:underline block">Recarregar página</button>
+                          </div>
                         </div>
-                      </div>
-                    `;
-                  }
-                }}
-                onLoad={() => {
-                  console.log('✅ Imagem externa carregada com sucesso:', url);
-                }}
-              />
+                      `;
+                    }
+                  }}
+                  onLoad={() => {
+                    console.log('✅ Imagem externa carregada com sucesso:', url);
+                  }}
+                />
+              ) : (
+                <div className="p-6 text-center text-gray-500">
+                  <div className="font-medium">Imagem inválida</div>
+                  <div className="text-xs mt-1">A URL externa não é válida para exibição.</div>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -1140,7 +1166,7 @@ export default function DetalhesConteudo() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
               <div>
-                <div className="font-medium text-gray-900">Conteúdo Externo</div>
+                      src={post.thumbnail_url} 
                 <div className="text-sm text-gray-500 break-all">{url}</div>
               </div>
             </div>
@@ -1521,42 +1547,52 @@ export default function DetalhesConteudo() {
 
               <div className="my-6 border-b border-gray-200" />
 
-              {/* Thumbnail do Podcast */}
-              {post.category === "Podcast" && post.thumbnail_url && (
+              {/* Thumbnail do Podcast - apenas exibir se o podcast foi criado via link (content_url) */}
+              {post.category === "Podcast" && post.thumbnail_url && post.content_url && !post.file_path && (
                 <div className="mb-6">
                   <div className="text-xs text-gray-500 font-bold mb-2">Thumbnail do Podcast</div>
                   <div className="border rounded-lg overflow-hidden max-w-md">
-                    <Image 
-                      src={post.thumbnail_url} 
-                      alt={`Thumbnail do podcast: ${post.title}`}
-                      className="w-full h-auto object-cover"
-                      width={400}
-                      height={300}
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        // Mostrar informações de erro
-                        const parent = target.parentElement;
-                        if (parent) {
-                          parent.innerHTML = `
-                            <div class="p-8 text-center text-gray-500">
-                              <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                              </svg>
-                              <p class="text-sm font-medium mb-2">Erro ao carregar thumbnail</p>
-                              <p class="text-xs text-gray-400 mb-4">A thumbnail pode estar temporariamente indisponível</p>
-                              <div class="space-y-2">
-                                <a href="${post.thumbnail_url}" target="_blank" class="text-blue-600 text-xs hover:underline block">Tentar abrir em nova aba</a>
-                                <button onclick="window.location.reload()" class="text-blue-600 text-xs hover:underline block">Recarregar página</button>
+                    {isValidUrl(post.thumbnail_url) ? (
+                      <Image 
+                        src={post.thumbnail_url as string} 
+                        alt={`Thumbnail do podcast: ${post.title}`}
+                        className="w-full h-auto object-cover"
+                        width={400}
+                        height={300}
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          // Mostrar informações de erro
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="p-8 text-center text-gray-500">
+                                <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                                <p class="text-sm font-medium mb-2">Erro ao carregar thumbnail</p>
+                                <p class="text-xs text-gray-400 mb-4">A thumbnail pode estar temporariamente indisponível</p>
+                                <div class="space-y-2">
+                                  <a href="${post.thumbnail_url}" target="_blank" class="text-blue-600 text-xs hover:underline block">Tentar abrir em nova aba</a>
+                                  <button onclick="window.location.reload()" class="text-blue-600 text-xs hover:underline block">Recarregar página</button>
+                                </div>
                               </div>
-                            </div>
-                          `;
-                        }
-                      }}
-                      onLoad={() => {
-                        console.log('✅ Thumbnail do podcast carregada com sucesso:', post.thumbnail_url);
-                      }}
-                    />
+                            `;
+                          }
+                        }}
+                        onLoad={() => {
+                          console.log('✅ Thumbnail do podcast carregada com sucesso:', post.thumbnail_url);
+                        }}
+                      />
+                    ) : (
+                      <div className="p-6 text-center text-gray-500">
+                        <div className="font-medium">Thumbnail inválida</div>
+                        <div className="text-xs mt-1">A URL da thumbnail não é válida para exibição.</div>
+                        <div className="mt-2">
+                          <a href={post.thumbnail_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline">Abrir URL</a>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="mt-2 text-xs text-gray-500">
                     Imagem representativa do podcast
@@ -1669,20 +1705,23 @@ export default function DetalhesConteudo() {
                 </>
               )}
 
-              {/* Thumbnail Info - apenas para posts de podcast */}
-              {post.category === "Podcast" && post.thumbnail_url && (
+              {/* Thumbnail Info - apenas para podcasts criados via link (não mostrar a URL bruta) */}
+              {post.category === "Podcast" && post.thumbnail_url && post.content_url && !post.file_path && (
                 <div className="mb-4">
                   <div className="text-xs text-gray-500 font-bold">Thumbnail do Podcast</div>
-                  <div className="text-gray-600 text-sm break-all">{post.thumbnail_url}</div>
                   <div className="mt-1">
-                    <a 
-                      href={post.thumbnail_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 underline text-xs"
-                    >
-                      Ver thumbnail em nova aba
-                    </a>
+                    {isValidUrl(post.thumbnail_url) ? (
+                      <a
+                        href={post.thumbnail_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 underline text-xs"
+                      >
+                        Ver thumbnail em nova aba
+                      </a>
+                    ) : (
+                      <div className="text-xs text-gray-500 italic">Thumbnail fornecida (não pública)</div>
+                    )}
                   </div>
                 </div>
               )}
