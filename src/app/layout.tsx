@@ -4,6 +4,7 @@ import "./globals.css";
 import EnvironmentCheck from "@/components/EnvironmentCheck";
 import { AuthProvider } from "@/context/AuthContext";
 import SessionDebug from "@/components/SessionDebug";
+import HotToaster from '@/components/HotToaster';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,6 +38,7 @@ export default function RootLayout({
         <EnvironmentCheck>
           <AuthProvider>
             {children}
+            <HotToaster />
             <SessionDebug show={process.env.NODE_ENV === 'development'} />
           </AuthProvider>
         </EnvironmentCheck>
