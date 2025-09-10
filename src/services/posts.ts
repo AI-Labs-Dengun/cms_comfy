@@ -233,6 +233,7 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
     let filePath = null
     let fileName = null
     let fileType = null
+    let thumbnailUrl = postData.thumbnail_url || null // ✅ INICIALIZAR THUMBNAIL_URL
     let category = postData.category
     let duration = postData.duration
 
@@ -264,7 +265,7 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       // Se nenhum dos dois foi fornecido, buscar o post atual para manter o valor existente
       const { data: currentPost } = await supabase
         .from('posts')
-        .select('content_url, file_path, file_name, file_type, category, duration')
+        .select('content_url, file_path, file_name, file_type, thumbnail_url, category, duration') // ✅ ADICIONAR THUMBNAIL_URL
         .eq('id', postId)
         .single()
       
@@ -273,6 +274,10 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
         filePath = currentPost.file_path
         fileName = currentPost.file_name
         fileType = currentPost.file_type
+        // ✅ PRESERVAR THUMBNAIL_URL SE NÃO FOI FORNECIDO
+        if (!thumbnailUrl) {
+          thumbnailUrl = currentPost.thumbnail_url
+        }
         // Se a categoria não foi fornecida, preservar a existente
         if (!category) {
           category = currentPost.category
@@ -298,6 +303,7 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       category_param: category,
       content_param: postData.content || null, // Adicionado content_param
       content_url_param: contentUrl,
+      thumbnail_url_param: thumbnailUrl, // ✅ USAR A VARIÁVEL LOCAL
       tags_param: postData.tags || [],
       emotion_tags_param: postData.emotion_tags || [],
       // categoria_leitura_param será preenchido automaticamente pelo trigger
