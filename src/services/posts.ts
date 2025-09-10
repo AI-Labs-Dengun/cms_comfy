@@ -6,18 +6,18 @@ export interface CreatePostData {
   title: string
   description: string
   category: 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura'
-  content?: string // ✅ ADICIONANDO CAMPO CONTENT
+  content?: string 
   content_url?: string
   file_path?: string
   file_name?: string
   file_type?: string
   file_size?: number
-  duration?: number // ✅ ADICIONANDO CAMPO DURATION
-  thumbnail_url?: string // ✅ ADICIONANDO CAMPO THUMBNAIL_URL
-  min_age?: number // ✅ ADICIONANDO CAMPO MIN_AGE
+  duration?: number 
+  thumbnail_url?: string | null 
+  min_age?: number 
   tags?: string[]
   emotion_tags?: string[]
-  categoria_leitura?: string[] // ✅ ADICIONANDO CAMPO CATEGORIA_LEITURA
+  categoria_leitura?: string[] 
 }
 
 export interface Post {
@@ -25,18 +25,18 @@ export interface Post {
   title: string
   description: string
   category: string
-  content?: string // ✅ ADICIONANDO CAMPO CONTENT
+  content?: string
   content_url?: string
   file_path?: string
   file_name?: string
   file_size?: number
   file_type?: string
-  duration?: number // ✅ ADICIONANDO CAMPO DURATION
-  thumbnail_url?: string // ✅ ADICIONANDO CAMPO THUMBNAIL_URL
-  min_age?: number // ✅ ADICIONANDO CAMPO MIN_AGE
+  duration?: number
+  thumbnail_url?: string | null
+  min_age?: number
   tags: string[]
   emotion_tags: string[]
-  categoria_leitura?: string[] // ✅ ADICIONANDO CAMPO CATEGORIA_LEITURA
+  categoria_leitura?: string[] 
   is_published: boolean
   is_featured: boolean
   view_count: number
@@ -105,17 +105,16 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       title_param: postData.title,
       description_param: postData.description,
       category_param: postData.category,
-      content_param: postData.content || null, // Adicionado content_param
+      content_param: postData.content || null, 
       content_url_param: postData.content_url || null,
       tags_param: postData.tags || [],
       emotion_tags_param: postData.emotion_tags || [],
-      // categoria_leitura_param será preenchido automaticamente pelo trigger
       file_path_param: postData.file_path || null,
       file_name_param: postData.file_name || null,
       file_type_param: postData.file_type || null,
-      duration_param: duration || null, // ✅ ADICIONANDO DURATION_PARAM
-      thumbnail_url_param: postData.thumbnail_url || null, // ✅ ADICIONANDO THUMBNAIL_URL_PARAM
-      min_age_param: postData.min_age || 12 // ✅ ADICIONANDO MIN_AGE_PARAM
+      duration_param: duration || null, 
+      thumbnail_url_param: postData.thumbnail_url || null, 
+      min_age_param: postData.min_age || 12 
     })
 
     if (error) {
@@ -153,7 +152,6 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
 }
 
 // Função para buscar todos os posts (CMS)
-// NOTA: Todos os usuários do CMS podem ver e gerenciar todos os posts, independentemente do autor
 export async function getAllPosts(): Promise<ApiResponse<Post[]>> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -210,7 +208,6 @@ export async function getAllPosts(): Promise<ApiResponse<Post[]>> {
 }
 
 // Função para buscar posts do usuário (CMS) - mantida para compatibilidade
-// NOTA: Agora retorna todos os posts, não apenas os do usuário atual
 export async function getUserPosts(): Promise<ApiResponse<Post[]>> {
   return getAllPosts();
 }
@@ -228,12 +225,11 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
     }
 
     // Lógica para respeitar o constraint posts_content_check
-    // Apenas um dos campos (content_url ou file_path) pode estar preenchido
     let contentUrl = null
     let filePath = null
     let fileName = null
     let fileType = null
-    let thumbnailUrl = postData.thumbnail_url || null // ✅ INICIALIZAR THUMBNAIL_URL
+    let thumbnailUrl = postData.thumbnail_url || null 
     let category = postData.category
     let duration = postData.duration
 
@@ -262,10 +258,9 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       fileName = postData.file_name || null
       fileType = postData.file_type || null
     } else {
-      // Se nenhum dos dois foi fornecido, buscar o post atual para manter o valor existente
       const { data: currentPost } = await supabase
         .from('posts')
-        .select('content_url, file_path, file_name, file_type, thumbnail_url, category, duration') // ✅ ADICIONAR THUMBNAIL_URL
+        .select('content_url, file_path, file_name, file_type, thumbnail_url, category, duration') 
         .eq('id', postId)
         .single()
       
@@ -274,7 +269,6 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
         filePath = currentPost.file_path
         fileName = currentPost.file_name
         fileType = currentPost.file_type
-        // ✅ PRESERVAR THUMBNAIL_URL SE NÃO FOI FORNECIDO
         if (!thumbnailUrl) {
           thumbnailUrl = currentPost.thumbnail_url
         }
@@ -282,7 +276,6 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
         if (!category) {
           category = currentPost.category
         }
-        // Se a duração não foi fornecida, preservar a existente
         if (!duration) {
           duration = currentPost.duration
         }
@@ -301,17 +294,16 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       title_param: postData.title || '',
       description_param: postData.description || '',
       category_param: category,
-      content_param: postData.content || null, // Adicionado content_param
+      content_param: postData.content || null, 
       content_url_param: contentUrl,
-      thumbnail_url_param: thumbnailUrl, // ✅ USAR A VARIÁVEL LOCAL
+      thumbnail_url_param: thumbnailUrl, 
       tags_param: postData.tags || [],
       emotion_tags_param: postData.emotion_tags || [],
-      // categoria_leitura_param será preenchido automaticamente pelo trigger
       file_path_param: filePath,
       file_name_param: fileName,
       file_type_param: fileType,
-      duration_param: duration || null, // ✅ ADICIONANDO DURATION_PARAM
-      min_age_param: postData.min_age || 12 // ✅ ADICIONANDO MIN_AGE_PARAM
+      duration_param: duration || null, 
+      min_age_param: postData.min_age || 12 
     })
 
     if (error) {
@@ -484,7 +476,6 @@ export async function deletePost(postId: string): Promise<ApiResponse> {
 }
 
 // Função para buscar um post específico
-// NOTA: Qualquer usuário do CMS pode visualizar qualquer post, independentemente do autor
 export async function getPost(postId: string): Promise<ApiResponse<Post>> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
