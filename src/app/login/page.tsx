@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import toast from 'react-hot-toast';
 import { useRouter } from "next/navigation";
 import { AuthService } from "@/services/auth";
 import { useAuth } from "@/context/AuthContext";
@@ -135,6 +136,14 @@ export default function LoginPage() {
     }
 
     try {
+      // Simple client-side validation to give immediate feedback
+      if (!email.trim() || !password.trim()) {
+        const msg = 'Por favor preencha email e palavra-passe.';
+        setError(msg);
+        toast.error(msg);
+        setIsLoading(false);
+        return;
+      }
       // Primeiro tentar CMS, depois psicólogo
       console.log('🔑 LoginPage - Tentando login com role CMS...');
       let result = await AuthService.loginWithRole(email, password, 'cms');
@@ -159,6 +168,7 @@ export default function LoginPage() {
       if (result.success) {
         setError('');
         setSuccessMessage('Login bem-sucedido! Verificando permissões...');
+  toast.success('Login bem-sucedido! Verificando permissões...');
         loginSuccessRef.current = true; // Marcar que o login foi bem-sucedido
         
         console.log('✅ LoginPage - Login bem-sucedido, atualizando contexto...');
@@ -203,24 +213,28 @@ export default function LoginPage() {
           case 'ACCOUNT_NOT_AUTHORIZED':
             errorMessage = 'Sua conta ainda não foi autorizada pelo responsável';
             break;
-          case 'INSUFFICIENT_PERMISSIONS':
-            errorMessage = `Acesso negado. Este sistema é apenas para administradores (role CMS). Seu role atual: ${result.user_role || 'desconhecido'}`;
-            break;
           case 'INVALID_CREDENTIALS':
             errorMessage = 'Email ou palavra-passe incorretos';
             break;
           case 'PERMISSION_CHECK_ERROR':
             errorMessage = 'Erro ao verificar permissões. Tente novamente.';
             break;
+          case 'INSUFFICIENT_PERMISSIONS':
+            errorMessage = `Acesso negado. Este sistema é apenas para administradores (role CMS). Seu role atual: ${result.user_role || 'desconhecido'}`;
+            break;
+
           default:
             errorMessage = result.error || 'Erro no login';
         }
         
         setError(errorMessage);
+        // Mostrar toast de erro para falhas de login
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error('❌ LoginPage - Erro inesperado no login:', error);
       setError('Erro de conexão. Verifique sua internet e tente novamente.');
+      toast.error('Erro de conexão. Verifique sua internet e tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -297,14 +311,7 @@ export default function LoginPage() {
               <p className="text-red-700 text-sm sm:text-base">{error}</p>
             </div>
           )}
-          
-          {/* Success Message */}
-          {successMessage && (
-            <div className="w-full mb-4 p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-green-700 text-sm sm:text-base">{successMessage}</p>
-            </div>
-          )}
-          
+                    
           {/* Email Field */}
           <div className="w-full mb-4">
             <label className="block text-sm sm:text-base font-medium mb-2 text-gray-900" htmlFor="email">
