@@ -199,6 +199,51 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
     };
   }, [profile?.id, profile?.user_role, isOnline, updateStatus, inactivityTimeout]);
 
+  // Garantir que ao fechar a aba/janela o status seja atualizado para offline
+  useEffect(() => {
+    if (!profile?.id || profile.user_role !== 'psicologo') return;
+
+    // Função que tenta atualizar o status usando sendBeacon quando possível
+    const setOfflineOnUnload = () => {
+      try {
+        // Preferir navigator.sendBeacon para requisições no unload
+        const payload = JSON.stringify({ psicologo_id: profile.id, new_status: false });
+        const url = '/api/psicologos/set-status-keepalive';
+
+        if (navigator && 'sendBeacon' in navigator) {
+          const blob = new Blob([payload], { type: 'application/json' });
+          // sendBeacon não garante cabeçalhos, a rota deve ler o body cru
+          navigator.sendBeacon(url, blob);
+          console.log('🔔 useOnlineStatus - sendBeacon enviado para setar offline');
+          return;
+        }
+
+        // Fallback: fetch com keepalive (funciona na maioria dos browsers modernos)
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          keepalive: true
+        }).then(() => {
+          console.log('🔔 useOnlineStatus - fetch keepalive enviado para setar offline');
+        }).catch((err) => {
+          console.error('❌ useOnlineStatus - erro ao enviar fetch keepalive:', err);
+        });
+      } catch (error) {
+        console.error('❌ useOnlineStatus - erro no setOfflineOnUnload:', error);
+      }
+    };
+
+    // Usar pagehide (mais confiável em mobile) e beforeunload
+    window.addEventListener('pagehide', setOfflineOnUnload);
+    window.addEventListener('beforeunload', setOfflineOnUnload);
+
+    return () => {
+      window.removeEventListener('pagehide', setOfflineOnUnload);
+      window.removeEventListener('beforeunload', setOfflineOnUnload);
+    };
+  }, [profile?.id, profile?.user_role]);
+
   return {
     isOnline,
     isUpdating,
