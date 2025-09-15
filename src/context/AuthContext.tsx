@@ -21,6 +21,7 @@ interface UserProfile {
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
+  updateProfile?: (patch: Partial<UserProfile>) => void;
   authInfo: AuthResponse | null;
   loading: boolean;
   error: string | null;
@@ -112,6 +113,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('❌ AuthContext - Erro ao salvar cache:', error);
     }
   }, [savePersistentData]);
+
+  // Função para atualizar apenas campos do profile no contexto
+  const updateProfile = useCallback((patch: Partial<UserProfile>) => {
+    setProfile(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...patch } as UserProfile;
+
+      try {
+        // Atualizar cache de sessão com o profile atualizado
+        if (user && (authInfo !== undefined)) {
+          const cacheData: CachedAuthData = {
+            user,
+            profile: updated,
+            authInfo: authInfo ?? null,
+            timestamp: Date.now()
+          };
+          saveToCache(cacheData);
+        }
+      } catch (err) {
+        console.warn('⚠️ AuthContext - Falha ao salvar profile atualizado no cache:', err);
+      }
+
+      return updated;
+    });
+  }, [saveToCache, user, authInfo]);
 
   // Função para limpar cache
   const clearCache = useCallback(() => {
@@ -521,6 +547,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const contextValue: AuthContextType = {
     user,
     profile,
+  updateProfile,
     authInfo,
     loading,
     error,

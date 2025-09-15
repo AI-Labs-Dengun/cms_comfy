@@ -16,7 +16,7 @@ interface UseOnlineStatusReturn {
 }
 
 export function useOnlineStatus(): UseOnlineStatusReturn {
-  const { profile } = useAuth();
+  const { profile, updateProfile } = useAuth();
   const [isOnline, setIsOnline] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [wasAutoOffline, setWasAutoOffline] = useState(false);
@@ -52,15 +52,22 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
         console.error('❌ Erro ao atualizar status:', error);
         throw new Error(error.message);
       }
-
+      // Atualizar estado local e propagar para o contexto global imediatamente
       setIsOnline(newStatus);
+      try {
+        if (updateProfile && typeof updateProfile === 'function') {
+          updateProfile({ is_online: newStatus });
+        }
+      } catch (err) {
+        console.warn('⚠️ useOnlineStatus - Falha ao propagar status para AuthContext:', err);
+      }
     } catch (error) {
       console.error('❌ Erro inesperado ao atualizar status:', error);
       throw error;
     } finally {
       setIsUpdating(false);
     }
-  }, [profile]);
+  }, [profile, updateProfile]);
 
   // Função para limpar flag de auto-offline
   const clearAutoOfflineFlag = useCallback(() => {
@@ -92,11 +99,21 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
         return;
       }
 
-      setIsOnline(data.is_online || false);
+      const newStatus = data.is_online || false;
+      setIsOnline(newStatus);
+
+      // Atualizar o profile global para refletir mudança imediata e desbloquear inputs
+      try {
+        if (updateProfile && typeof updateProfile === 'function') {
+          updateProfile({ is_online: newStatus });
+        }
+      } catch (err) {
+        console.warn('⚠️ useOnlineStatus - Falha ao atualizar profile no contexto:', err);
+      }
     } catch (error) {
       console.error('❌ Erro inesperado ao buscar status:', error);
     }
-  }, [profile]);
+  }, [profile, updateProfile]);
 
   // Timer para auto-offline - VERSÃO COMPLETA COM DETECÇÃO DE INATIVIDADE
   useEffect(() => {
