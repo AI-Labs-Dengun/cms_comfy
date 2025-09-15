@@ -10,6 +10,7 @@ import { useChatRealtime } from '@/hooks/useChatRealtime';
 import { EncryptionService } from '@/services/encryption';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { supabase } from '@/lib/supabase';
+import notificationService from '@/lib/notificationService';
 import { useAuth } from '@/context/AuthContext';
 
 // Estilos CSS personalizados
@@ -465,7 +466,7 @@ export default function PsicologosPage() {
               ? (chat.unread_count_psicologo || 0) + 1 
               : (chat.unread_count_psicologo || 0);
           
-          // ✅ ATUALIZAR com conteúdo já desencriptado
+          // ✅ ATUALIZAR com conteúdo já desencripado
           updatedChats[chatIndex] = {
             ...chat,
             last_message_at: message.created_at,
@@ -568,44 +569,52 @@ export default function PsicologosPage() {
                   pageVisible: pageIsVisible
                 });
                 
-                // Notificação do navegador (sempre que possível)
-                new Notification('Nova mensagem', {
-                  body: `${userName}: ${preview}`,
-                  icon: '/cms-logo.png',
-                  tag: `chat-${message.chat_id}`, // Evitar notificações duplicadas
-                  requireInteraction: false,
-                  silent: false
-                });
+                // Try using centralized notification service
+                try {
+                  const result = await notificationService.notify({
+                    messageId: message.id,
+                    chatId: message.chat_id,
+                    processedContent: processedContent,
+                    senderName: userName,
+                    senderType: message.sender_type,
+                    previewAllowed: true,
+                    created_at: message.created_at,
+                    tag: `chat-${message.chat_id}`
+                  });
 
-                // Notificação visual na interface (se a página estiver visível mas chat não aberto)
-                if (pageIsVisible && !isChatSelected) {
-                  setNotificationMessage(`${userName}: ${preview}`);
-                  setShowNotification(true);
-                  
-                  // Esconder a notificação após 5 segundos
-                  setTimeout(() => {
-                    setShowNotification(false);
-                  }, 5000);
+                  // If service falls back to in-app, show existing visual toast
+                  if (!result.shown && pageIsVisible && !isChatSelected) {
+                    setNotificationMessage(`${userName}: ${preview}`);
+                    setShowNotification(true);
+                    setTimeout(() => { setShowNotification(false); }, 5000);
+                    // timeout intentionally not referenced here; component cleanup handles lifecycle
+                  }
+                } catch {
+                  // If something fails, fallback to direct notification to avoid regress
+                  new Notification('Nova mensagem', {
+                    body: `${userName}: ${preview}`,
+                    icon: '/cms-logo.png',
+                    tag: `chat-${message.chat_id}`,
+                    requireInteraction: false,
+                    silent: false
+                  });
                 }
               } else if ('Notification' in window && Notification.permission === 'default') {
-                // Se a permissão ainda não foi solicitada, solicitar
+                // Se a permissão ainda não foi solicitada, solicitar via service
                 console.log('🔔 Solicitando permissão para notificações...');
-                Notification.requestPermission().then(permission => {
+                notificationService.requestPermission().then(permission => {
                   if (permission === 'granted') {
-                    // Tentar novamente após obter permissão
-                    const userName = chatData.masked_user_name || 'Utilizador';
-                    const messageContent = processedContent || 'Nova mensagem'; // ✅ Usar conteúdo processado
-                    const preview = messageContent.length > 50 
-                      ? messageContent.substring(0, 50) + '...' 
-                      : messageContent;
-                    
-                    new Notification('Nova mensagem', {
-                      body: `${userName}: ${preview}`,
-                      icon: '/cms-logo.png',
-                      tag: `chat-${message.chat_id}`,
-                      requireInteraction: false,
-                      silent: false
-                    });
+                    // Tentar novamente atrav\u00e9s do service
+                    notificationService.notify({
+                      messageId: message.id,
+                      chatId: message.chat_id,
+                      processedContent: processedContent,
+                      senderName: chatData.masked_user_name || 'Utilizador',
+                      senderType: message.sender_type,
+                      previewAllowed: true,
+                      created_at: message.created_at,
+                      tag: `chat-${message.chat_id}`
+                    }).catch(() => {/* ignore */});
                   }
                 });
               }
