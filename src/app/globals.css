@@ -242,3 +242,84 @@ body {
     }
   }
 }
+
+/* TipTap Editor Styles */
+.tiptap-editor {
+  outline: none !important;
+  border: none !important;
+  padding: 12px;
+  min-height: 150px;
+  font-family: var(--font-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1f2937;
+}
+
+.tiptap-editor p {
+  margin: 0 0 0.75rem 0;
+}
+
+.tiptap-editor p:last-child {
+  margin-bottom: 0;
+}
+
+.tiptap-editor p.is-editor-empty:first-child::before {
+  color: #9ca3af;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap-editor strong {
+  font-weight: 700;
+  color: #111827;
+}
+
+.tiptap-editor em {
+  font-style: italic;
+  color: #374151;
+}
+
+.tiptap-editor u {
+  text-decoration: underline;
+  color: #374151;
+}
+
+/* Placeholder para o editor */
+.editor-content-wrapper [data-placeholder]:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+  font-style: normal;
+}
+
+/* HtmlRenderer Styles */
+.html-content {
+  font-family: var(--font-primary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.html-content p {
+  margin: 0 0 0.75rem 0;
+}
+
+.html-content p:last-child {
+  margin-bottom: 0;
+}
+
+.html-content strong {
+  font-weight: 700;
+  color: #111827;
+}
+
+.html-content em {
+  font-style: italic;
+  color: #374151;
+}
+
+.html-content u {
+  text-decoration: underline;
+  color: #374151;
+}

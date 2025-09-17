@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { CloudUpload, X, Plus, Image } from "lucide-react";
 import CMSLayout from "@/components/CMSLayout";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import TipTapEditor from "@/components/TipTapEditor";
 import { createPost, CreatePostData, uploadFileForPost, getAllReadingTags, associateTagWithPost, createReadingTag } from "@/services/posts";
 import { getMediaDuration } from "@/services/storage";
 import { useRouter } from "next/navigation";
@@ -1068,7 +1069,7 @@ export default function CreateContent() {
                   required
                 />
             </div>
-            {/* Descrição com Editor Markdown */}
+            {/* Descrição com Editor TipTap */}
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-900">
                 Descrição
@@ -1078,11 +1079,10 @@ export default function CreateContent() {
                 Digite a descrição do seu post
               </p>
 
-              <MarkdownEditor
-                value={description}
-                onChange={setDescription}
+              <TipTapEditor
+                initialHtml={description}
+                onChangeHtml={setDescription}
                 placeholder="Escreva aqui uma descrição..."
-                showToolbar={false}
               />
             </div>
 

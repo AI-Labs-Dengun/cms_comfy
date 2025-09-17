@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import FlexibleRenderer from "@/components/FlexibleRenderer";
 import { getPost, deletePost, togglePostPublication, updatePost, Post, getTagsForPost, getAllReadingTags, associateTagWithPost, removeTagFromPost, uploadFileForPost, CreatePostData } from "@/services/posts";
 import { getFileUrl, getSignedUrl } from "@/services/storage";
 import { useAuth } from "@/context/AuthContext";
@@ -1747,7 +1748,7 @@ export default function DetalhesConteudo() {
                   <div className="mb-2">
                     <div className="text-xs text-gray-500 font-bold">Descrição</div>
                     <div className="text-gray-900">
-                      <MarkdownRenderer content={post.description} />
+                      <FlexibleRenderer content={post.description} />
                     </div>
                   </div>
 
