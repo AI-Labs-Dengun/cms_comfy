@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
-import MarkdownRenderer from "@/components/MarkdownRenderer";
 import FlexibleRenderer from "@/components/FlexibleRenderer";
 import { getPost, deletePost, togglePostPublication, updatePost, Post, getTagsForPost, getAllReadingTags, associateTagWithPost, removeTagFromPost, uploadFileForPost, CreatePostData } from "@/services/posts";
 import { getFileUrl, getSignedUrl } from "@/services/storage";
@@ -1329,15 +1328,15 @@ export default function DetalhesConteudo() {
                     </div>
                   </div>
 
-                  {/* ✅ CAMPO PARA EDITAR THUMBNAIL URL (especialmente para Podcasts) */}
-                  {post.category === "Podcast" && post.content_url && !post.file_path && (
+                  {/* ✅ CAMPO PARA EDITAR THUMBNAIL URL (Podcasts e Artigos) */}
+                  {((post.category === "Podcast" && post.content_url && !post.file_path) || (post.category === "Artigo" && !post.file_path)) && (
                     <div className="mb-6">
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-3">
                           <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
-                          <label className="text-sm font-semibold text-gray-900">Thumbnail do Podcast</label>
+                          <label className="text-sm font-semibold text-gray-900">{post.category === 'Podcast' ? 'Thumbnail do Podcast' : 'Thumbnail do Artigo'}</label>
                         </div>
                         
                         {/* Preview atual da thumbnail */}
@@ -1543,8 +1542,8 @@ export default function DetalhesConteudo() {
                      <div className="mb-2">
                        <div className="text-xs text-gray-500 font-bold">Conteúdo</div>
                                             <div className="text-gray-900">
-                       <MarkdownRenderer content={post.content || ""} />
-                     </div>
+                                              <FlexibleRenderer content={post.content || ""} />
+                                            </div>
                      </div>
                    )}
                 </>
@@ -1552,8 +1551,8 @@ export default function DetalhesConteudo() {
 
               <div className="my-6 border-b border-gray-200" />
 
-              {/* Thumbnail do Podcast - apenas exibir se o podcast foi criado via link (content_url) */}
-              {post.category === "Podcast" && post.thumbnail_url && post.content_url && !post.file_path && (
+              {/* Thumbnail - exibir para Podcasts e Artigos quando houver thumbnail */}
+              {((post.category === "Podcast" && post.thumbnail_url && post.content_url && !post.file_path) || (post.category === "Artigo" && post.thumbnail_url && !post.file_path)) && (
                 <div className="mb-6">
                   <div className="text-xs text-gray-500 font-bold mb-2">Thumbnail do Podcast</div>
                   <div className="border rounded-lg overflow-hidden max-w-md">
@@ -1603,9 +1602,9 @@ export default function DetalhesConteudo() {
                     Imagem representativa do podcast
                   </div>
                                 {/* Thumbnail Info - apenas para podcasts criados via link (não mostrar a URL bruta) */}
-              {post.category === "Podcast" && post.thumbnail_url && post.content_url && !post.file_path && (
+              {((post.category === "Podcast" && post.thumbnail_url && post.content_url && !post.file_path) || (post.category === "Artigo" && post.thumbnail_url && !post.file_path)) && (
                 <div className="mb-4">
-                  <div className="text-xs text-gray-500 font-bold">Thumbnail do Podcast</div>
+                  <div className="text-xs text-gray-500 font-bold">{post.category === 'Podcast' ? 'Thumbnail do Podcast' : 'Thumbnail do Artigo'}</div>
                   <div className="mt-1">
                     {isValidUrl(post.thumbnail_url) ? (
                       <a
