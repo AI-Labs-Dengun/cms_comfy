@@ -176,6 +176,7 @@ export default function CreateContent() {
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [content, setContent] = useState(""); // Novo campo para conteúdo textual
   const [category, setCategory] = useState<"Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura">("Vídeo");
   // Removido readingCategory pois não é mais necessário
   const [contentUrl, setContentUrl] = useState("");
@@ -263,8 +264,8 @@ export default function CreateContent() {
         return;
       }
 
-      // Validar descrição textual (exceto para Shorts)
-      if (category !== "Shorts" && !description.trim()) {
+      // Validar conteúdo textual (obrigatório para todas as categorias exceto Shorts)
+      if (category !== "Shorts" && !content.trim()) {
         setError("Conteúdo textual é obrigatório");
         toast.error("Conteúdo textual é obrigatório");
         return;
@@ -308,7 +309,7 @@ export default function CreateContent() {
       }
 
       // Validar que Shorts não pode ter conteúdo textual
-      if (category === "Shorts" && description.trim()) {
+      if (category === "Shorts" && content.trim()) {
         setError("Posts da categoria Shorts não podem ter conteúdo textual");
         toast.error("Posts da categoria Shorts não podem ter conteúdo textual");
         return;
@@ -339,9 +340,9 @@ export default function CreateContent() {
         // categoria_leitura será preenchida automaticamente pelo trigger quando as tags forem associadas
       };
 
-      // A descrição já contém o conteúdo textual principal (HTML)
-      if (description.trim()) {
-        postData.content = undefined; // manter vazio; a descrição será usada como texto
+      // Adicionar conteúdo textual se fornecido (exceto para Shorts)
+      if (category !== "Shorts" && content.trim()) {
+        postData.content = content.trim();
       }
 
       // Removido código de reading_category pois não é mais necessário
@@ -366,6 +367,12 @@ export default function CreateContent() {
 
       // Upload de arquivo se fornecido
       if (file && !contentUrl.trim()) {
+        console.log(`📁 Fazendo upload de arquivo principal para categoria ${category}:`, {
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type
+        });
+        
         setUploadProgress(0);
         setError(null);
         
@@ -389,19 +396,28 @@ export default function CreateContent() {
             postData.file_type = uploadResult.data.file_type;
             postData.file_size = uploadResult.data.file_size;
             
+            console.log(`✅ Arquivo principal uploadado com sucesso para ${category}:`, {
+              path: uploadResult.data.path,
+              fileName: uploadResult.data.file_name,
+              fileType: uploadResult.data.file_type,
+              fileSize: uploadResult.data.file_size
+            });
+            
             // Adicionar duração se obtida
             if (uploadResult.data.duration) {
               postData.duration = uploadResult.data.duration;
+              console.log(`⏱️ Duração obtida para ${category}:`, uploadResult.data.duration);
             }
             
             setUploadProgress(100);
             } else {
+            console.error(`❌ Erro no upload do arquivo principal para ${category}:`, uploadResult.error);
             setError(uploadResult.error || "Erro no upload do arquivo");
             toast.error(uploadResult.error || "Erro no upload do arquivo");
             return;
           }
           } catch (uploadError) {
-          console.error("Erro no upload:", uploadError);
+          console.error(`❌ Erro inesperado no upload do arquivo para ${category}:`, uploadError);
           setError("Erro inesperado no upload do arquivo");
           toast.error("Erro inesperado no upload do arquivo");
           return;
@@ -410,20 +426,28 @@ export default function CreateContent() {
         }
       }
 
-      // Upload de thumbnail se fornecida (apenas para Podcast)
-      if (category === "Podcast" && thumbnailFile) {
+      // Upload de thumbnail se fornecida (para Podcast e Artigo)
+      if ((category === "Podcast" || category === "Artigo") && thumbnailFile) {
+        console.log(`🖼️ Fazendo upload de thumbnail para categoria ${category}:`, {
+          fileName: thumbnailFile.name,
+          fileSize: thumbnailFile.size,
+          fileType: thumbnailFile.type
+        });
+        
         try {
           const thumbnailUploadResult = await uploadFileForPost(thumbnailFile);
           
           if (thumbnailUploadResult.success && thumbnailUploadResult.data) {
             postData.thumbnail_url = thumbnailUploadResult.data.url;
+            console.log(`✅ Thumbnail uploadada com sucesso para ${category}:`, thumbnailUploadResult.data.url);
           } else {
+            console.error(`❌ Erro no upload da thumbnail para ${category}:`, thumbnailUploadResult.error);
             setError(thumbnailUploadResult.error || "Erro no upload da thumbnail");
             toast.error(thumbnailUploadResult.error || "Erro no upload da thumbnail");
             return;
           }
         } catch (thumbnailError) {
-          console.error("Erro no upload da thumbnail:", thumbnailError);
+          console.error(`❌ Erro inesperado no upload da thumbnail para ${category}:`, thumbnailError);
           setError("Erro inesperado no upload da thumbnail");
           toast.error("Erro inesperado no upload da thumbnail");
           return;
@@ -431,6 +455,20 @@ export default function CreateContent() {
       }
 
       // Criar o post
+      console.log(`📝 Criando post da categoria ${category} com dados:`, {
+        title: postData.title,
+        category: postData.category,
+        hasDescription: !!postData.description,
+        hasContent: !!postData.content,
+        hasContentUrl: !!postData.content_url,
+        hasFilePath: !!postData.file_path,
+        hasThumbnailUrl: !!postData.thumbnail_url,
+        file_path: postData.file_path,
+        file_name: postData.file_name,
+        file_type: postData.file_type,
+        thumbnail_url: postData.thumbnail_url
+      });
+      
       const result = await createPost(postData);
 
       if (result.success && result.data?.id && category === 'Leitura' && selectedReadingTags.length > 0) {
@@ -458,7 +496,8 @@ export default function CreateContent() {
         
         // Limpar formulário
         setTitle("");
-  setDescription("");
+        setDescription("");
+        setContent(""); // Limpar conteúdo textual
         // Removido setReadingCategory pois não é mais necessário
         setContentUrl("");
         setCategory("Vídeo");
@@ -788,15 +827,15 @@ export default function CreateContent() {
               {renderContentPreview()}
             </div>
 
-            {/* Upload de Thumbnail (apenas para Podcast) */}
-            {category === "Podcast" && (
+            {/* Upload de Thumbnail (para Podcast e Artigo) */}
+            {(category === "Podcast" || category === "Artigo") && (
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-900">
-                  Thumbnail do Podcast
+                  Thumbnail do {category}
                   <span className="text-xs text-gray-500 ml-2">(opcional)</span>
                 </label>
                 <p className="text-xs text-gray-500 mb-2">
-                  Faça upload de uma imagem para servir como thumbnail do podcast. 
+                  Faça upload de uma imagem para servir como thumbnail do {category.toLowerCase()}. 
                   Formatos aceitos: JPG, PNG, GIF. Máximo: 5MB.
                 </p>
                 <div className="border-2 border-gray-300 border-dashed rounded-lg flex flex-col items-center justify-center py-6 transition-colors relative bg-black cursor-pointer hover:border-gray-400">
@@ -847,41 +886,86 @@ export default function CreateContent() {
                   required
                 />
             </div>
-            {/* Descrição com Editor TipTap */}
+            {/* Descrição com Input Simples */}
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-900">
                 Descrição
                 <span className="text-red-500 ml-1">*</span>
               </label>
               <p className="text-xs text-gray-500 mt-1 mb-4">
-                Digite a descrição do seu post
+                Digite uma breve descrição do seu post (resumo/introdução)
               </p>
 
-              <TipTapEditor
-                initialHtml={description}
-                onChangeHtml={setDescription}
-                placeholder="Escreva aqui uma descrição..."
+              <textarea
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium resize-none"
+                placeholder="Escreva aqui uma descrição breve..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                required
               />
             </div>
 
-            {/* Live preview da Descrição (substitui o antigo 'Conteúdo Textual') */}
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-900">
-                Pré-visualização da Descrição
-              </label>
-              <p className="text-xs text-gray-500 mt-1 mb-4">
-                A pré-visualização atualiza automaticamente enquanto você digita na descrição.
-              </p>
+            {/* Conteúdo Textual com Editor TipTap */}
+            {category !== "Shorts" && (
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-900">
+                  Conteúdo Textual
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 mb-4">
+                  Digite o conteúdo principal do seu post (texto completo do artigo/post)
+                </p>
 
-              <div className="mt-2">
-                <div className="mt-4 p-4 bg-gray-50 rounded-md border">
-                  <div className="text-xs text-gray-500 font-bold mb-2">Prévia da descrição:</div>
-                  <div className="bg-white p-3 rounded border">
-                    <FlexibleRenderer content={description} />
+                <TipTapEditor
+                  initialHtml={content}
+                  onChangeHtml={setContent}
+                  placeholder="Escreva aqui o conteúdo principal do post..."
+                />
+              </div>
+            )}
+
+            {/* Live preview da Descrição */}
+            {description.trim() && (
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-900">
+                  Pré-visualização da Descrição
+                </label>
+                <p className="text-xs text-gray-500 mt-1 mb-4">
+                  A pré-visualização atualiza automaticamente enquanto você digita na descrição.
+                </p>
+
+                <div className="mt-2">
+                  <div className="mt-4 p-4 bg-gray-50 rounded-md border">
+                    <div className="text-xs text-gray-500 font-bold mb-2">Prévia da descrição:</div>
+                    <div className="bg-white p-3 rounded border">
+                      <p className="text-gray-900 whitespace-pre-wrap">{description}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Live preview do Conteúdo Textual */}
+            {category !== "Shorts" && content.trim() && (
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-900">
+                  Pré-visualização do Conteúdo
+                </label>
+                <p className="text-xs text-gray-500 mt-1 mb-4">
+                  A pré-visualização atualiza automaticamente enquanto você digita o conteúdo.
+                </p>
+
+                <div className="mt-2">
+                  <div className="mt-4 p-4 bg-gray-50 rounded-md border">
+                    <div className="text-xs text-gray-500 font-bold mb-2">Prévia do conteúdo:</div>
+                    <div className="bg-white p-3 rounded border max-h-96 overflow-y-auto">
+                      <FlexibleRenderer content={content} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Categorias de Leitura (apenas para categoria Leitura) */}
             {category === 'Leitura' && (
               <div>
@@ -1055,8 +1139,8 @@ export default function CreateContent() {
                   isUploading || 
                   !title.trim() ||
                   !description.trim() ||
+                  (category !== "Shorts" && !content.trim()) ||
                   (!contentUrl.trim() && !file) ||
-                  (category !== "Shorts" && !description.trim()) ||
                   tags.length === 0 ||
                   emotions.length === 0 ||
                   (category === "Leitura" && selectedReadingTags.length === 0) ||
@@ -1071,19 +1155,19 @@ export default function CreateContent() {
                         ? "Adicione um título"
                         : !description.trim()
                           ? "Adicione uma descrição"
-                          : (!contentUrl.trim() && !file)
-                            ? "Adicione URL ou arquivo"
-                            : category !== "Shorts" && !description.trim()
-                              ? "Adicione conteúdo textual"
+                          : category !== "Shorts" && !content.trim()
+                            ? "Adicione conteúdo textual"
+                            : (!contentUrl.trim() && !file)
+                              ? "Adicione URL ou arquivo"
                               : tags.length === 0
                                 ? "Adicione pelo menos uma tag"
                                 : emotions.length === 0
                                   ? "Selecione uma tag de emoção"
-                                                                  : category === "Leitura" && selectedReadingTags.length === 0
-                                  ? "Selecione uma categoria de leitura"
-                                  : (minAge !== 12 && minAge !== 16)
-                                    ? "Selecione uma idade mínima"
-                                    : "Enviar Conteúdo"
+                                  : category === "Leitura" && selectedReadingTags.length === 0
+                                    ? "Selecione uma categoria de leitura"
+                                    : (minAge !== 12 && minAge !== 16)
+                                      ? "Selecione uma idade mínima"
+                                      : "Enviar Conteúdo"
                   }
                 </button>
             </div>
