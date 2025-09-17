@@ -60,3 +60,24 @@ export function textToHtml(text: string): string {
     .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
     .join('');
 }
+
+/**
+ * Decodifica entidades HTML escapadas em uma string.
+ * Ex: "&lt;p&gt;Hello&lt;/p&gt;" -> "<p>Hello</p>"
+ */
+export function decodeHtmlEntities(encoded: string): string {
+  if (!encoded || typeof encoded !== 'string') return '';
+  // Criar um elemento DOM temporário para aproveitar o parser do browser
+  if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
+    const txt = document.createElement('textarea');
+    txt.innerHTML = encoded;
+    return txt.value;
+  }
+  // Fallback simples para ambientes sem DOM (server-side)
+  return encoded
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}

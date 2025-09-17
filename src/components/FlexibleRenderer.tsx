@@ -4,6 +4,7 @@ import React from 'react';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import HtmlRenderer from '@/components/HtmlRenderer';
 import { isHtml } from '@/lib/sanitizeHtml';
+import { decodeHtmlEntities } from '@/lib/sanitizeHtml';
 
 interface FlexibleRendererProps {
   content: string;
@@ -22,12 +23,16 @@ const FlexibleRenderer: React.FC<FlexibleRendererProps> = ({
     return null;
   }
 
-  // Detecta se é HTML e usa o renderer apropriado
-  if (isHtml(content)) {
-    return <HtmlRenderer content={content} className={className} />;
+  // Alguns conteúdos são salvos com entidades HTML escapadas (ex: &lt;p&gt;...)
+  // Decodifica entidades e verifica novamente se é HTML válido.
+  const decoded = decodeHtmlEntities(content).trim();
+
+  // Se após decodificar houver tags HTML, renderiza como HTML seguro
+  if (isHtml(decoded)) {
+    return <HtmlRenderer content={decoded} className={className} />;
   }
 
-  // Se não é HTML, assume que é Markdown
+  // Caso contrário, assume Markdown/texto e usa o renderer de Markdown
   return <MarkdownRenderer content={content} className={className} />;
 };
 
