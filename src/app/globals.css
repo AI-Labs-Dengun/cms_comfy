@@ -255,6 +255,28 @@ body {
   color: #1f2937;
 }
 
+/* Make the whole editor wrapper show focus instead of inner blue ring */
+.editor-content-wrapper:focus-within {
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.25); /* subtle blue ring on wrapper */
+  border-radius: 6px;
+}
+
+/* Prevent the internal editor element from showing native outline/box-shadow */
+.tiptap-editor:focus,
+.tiptap-editor:focus-visible,
+.tiptap-editor *:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Ensure EditorContent fills available area so the whole box is clickable */
+.editor-content-wrapper .tiptap-editor {
+  width: 100%;
+  min-height: 150px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
 .tiptap-editor p {
   margin: 0 0 0.75rem 0;
 }
@@ -284,6 +306,16 @@ body {
 .tiptap-editor u {
   text-decoration: underline;
   color: #374151;
+}
+
+/* Toolbar button polish for TipTap editor */
+.tiptap-toolbar-button {
+  transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.tiptap-toolbar-button-active {
+  background-color: #000 !important;
+  color: #fff !important;
 }
 
 /* Placeholder para o editor */
