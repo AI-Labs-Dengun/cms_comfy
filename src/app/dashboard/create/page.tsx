@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { CloudUpload, X, Plus, Image } from "lucide-react";
 import CMSLayout from "@/components/CMSLayout";
-import MarkdownRenderer from "@/components/MarkdownRenderer";
+import FlexibleRenderer from '@/components/FlexibleRenderer';
 import TipTapEditor from "@/components/TipTapEditor";
 import { createPost, CreatePostData, uploadFileForPost, getAllReadingTags, associateTagWithPost, createReadingTag } from "@/services/posts";
 import { getMediaDuration } from "@/services/storage";
@@ -13,226 +13,6 @@ import { supabase } from "@/lib/supabase";
 import { toast } from 'react-hot-toast';
 
 import { EMOTIONS } from '@/lib/emotions';
-
-// Componente do Editor Markdown
-const MarkdownEditor = ({ value, onChange, placeholder, showToolbar = true }: { 
-  value: string; 
-  onChange: (value: string) => void; 
-  placeholder?: string;
-  showToolbar?: boolean;
-}) => {
-  const [selectionStart, setSelectionStart] = useState(0);
-  const [selectionEnd, setSelectionEnd] = useState(0);
-
-  const handleTextAreaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange(e.target.value);
-    setSelectionStart(e.target.selectionStart);
-    setSelectionEnd(e.target.selectionEnd);
-  };
-
-  const handleTextAreaSelect = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setSelectionStart(e.target.selectionStart);
-    setSelectionEnd(e.target.selectionEnd);
-  };
-
-  const insertText = (before: string, after: string = "") => {
-    const textArea = document.getElementById('markdown-editor') as HTMLTextAreaElement;
-    if (!textArea) return;
-
-    const beforeText = value.substring(0, selectionStart);
-    const selectedText = value.substring(selectionStart, selectionEnd);
-    const afterText = value.substring(selectionEnd);
-
-    // Remover espaços desnecessários do texto selecionado para garantir formatação correta
-    const trimmedSelectedText = selectedText.trim();
-    
-    // Se não há texto selecionado, apenas inserir os marcadores
-    if (trimmedSelectedText === "") {
-      const newText = beforeText + before + after + afterText;
-      onChange(newText);
-      
-      // Posicionar cursor entre os marcadores
-      setTimeout(() => {
-        textArea.focus();
-        const newCursorPos = selectionStart + before.length;
-        textArea.setSelectionRange(newCursorPos, newCursorPos);
-      }, 0);
-      return;
-    }
-
-    // Aplicar formatação ao texto trimmed
-    const newText = beforeText + before + trimmedSelectedText + after + afterText;
-    onChange(newText);
-
-    // Restaurar foco e seleção
-    setTimeout(() => {
-      textArea.focus();
-      const newCursorPos = selectionStart + before.length;
-      textArea.setSelectionRange(newCursorPos, newCursorPos + trimmedSelectedText.length);
-    }, 0);
-  };
-
-  const insertLine = (prefix: string) => {
-    const textArea = document.getElementById('markdown-editor') as HTMLTextAreaElement;
-    if (!textArea) return;
-
-    const beforeText = value.substring(0, selectionStart);
-    const selectedText = value.substring(selectionStart, selectionEnd);
-    const afterText = value.substring(selectionEnd);
-
-    // Se há texto selecionado, aplicar o prefixo ao texto selecionado
-    if (selectedText.trim()) {
-      const trimmedSelectedText = selectedText.trim();
-      const newText = beforeText + prefix + trimmedSelectedText + afterText;
-      onChange(newText);
-      
-      setTimeout(() => {
-        textArea.focus();
-        const newCursorPos = selectionStart + prefix.length;
-        textArea.setSelectionRange(newCursorPos, newCursorPos + trimmedSelectedText.length);
-      }, 0);
-      return;
-    }
-
-    // Se não há texto selecionado, trabalhar com a linha atual
-    const lines = value.split('\n');
-    const currentLineIndex = value.substring(0, selectionStart).split('\n').length - 1;
-    const currentLine = lines[currentLineIndex] || '';
-    
-    // Se a linha já tem o prefixo, remover. Senão, adicionar.
-    if (currentLine.startsWith(prefix)) {
-      lines[currentLineIndex] = currentLine.substring(prefix.length);
-    } else {
-      lines[currentLineIndex] = prefix + currentLine;
-    }
-
-    const newText = lines.join('\n');
-    onChange(newText);
-
-    // Restaurar foco
-    setTimeout(() => {
-      textArea.focus();
-      const newCursorPos = selectionStart + (currentLine.startsWith(prefix) ? -prefix.length : prefix.length);
-      textArea.setSelectionRange(newCursorPos, newCursorPos);
-    }, 0);
-  };
-
-  return (
-    <div className="border border-gray-300 rounded-md overflow-hidden">
-      {/* Barra de ferramentas - apenas se showToolbar for true */}
-      {showToolbar && (
-        <div className="bg-gray-100 border-b border-gray-300 p-2 flex flex-wrap gap-1">
-          {/* Títulos */}
-          <button
-            type="button"
-            onClick={() => insertLine('# ')}
-            className="px-2 py-1 text-xs font-bold bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm"
-            title="Título H1"
-          >
-            H1
-          </button>
-          <button
-            type="button"
-            onClick={() => insertLine('## ')}
-            className="px-2 py-1 text-xs font-bold bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm"
-            title="Título H2"
-          >
-            H2
-          </button>
-          <button
-            type="button"
-            onClick={() => insertLine('### ')}
-            className="px-2 py-1 text-xs font-bold bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm"
-            title="Título H3"
-          >
-            H3
-          </button>
-          
-          <div className="w-px h-6 bg-gray-400 mx-1"></div>
-          
-          {/* Formatação de texto */}
-          <button
-            type="button"
-            onClick={() => insertText('**', '**')}
-            className="px-2 py-1 text-xs font-bold bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm"
-            title="Negrito"
-          >
-            <strong className="text-gray-900">B</strong>
-          </button>
-          <button
-            type="button"
-            onClick={() => insertText('*', '*')}
-            className="px-2 py-1 text-xs italic bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm"
-            title="Itálico"
-          >
-            I
-          </button>
-          <button
-            type="button"
-            onClick={() => insertText('~~', '~~')}
-            className="px-2 py-1 text-xs line-through bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm"
-            title="Riscado"
-          >
-            S
-          </button>
-          
-          <div className="w-px h-6 bg-gray-400 mx-1"></div>
-          
-          {/* Listas */}
-          <button
-            type="button"
-            onClick={() => insertLine('- ')}
-            className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm font-medium"
-            title="Lista com marcadores"
-          >
-            •
-          </button>
-          <button
-            type="button"
-            onClick={() => insertLine('1. ')}
-            className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm font-medium"
-            title="Lista numerada"
-          >
-            1.
-          </button>
-          
-          <div className="w-px h-6 bg-gray-400 mx-1"></div>
-          
-          {/* Citação */}
-          <button
-            type="button"
-            onClick={() => insertLine('> ')}
-            className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm font-medium"
-            title="Citação"
-          >
-            &quot;
-          </button>
-          
-          {/* Código */}
-          <button
-            type="button"
-            onClick={() => insertText('`', '`')}
-            className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors text-gray-800 shadow-sm font-mono"
-            title="Código inline"
-          >
-            &lt;/&gt;
-          </button>
-        </div>
-      )}
-      
-      {/* Área de texto */}
-      <textarea
-        id="markdown-editor"
-        value={value}
-        onChange={handleTextAreaChange}
-        onSelect={handleTextAreaSelect}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 focus:outline-none text-gray-900 font-medium resize-none"
-        rows={6}
-      />
-    </div>
-  );
-};
 
 // Modal para criar nova categoria de leitura
 const CreateReadingTagModal = ({ 
@@ -396,7 +176,6 @@ export default function CreateContent() {
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [content, setContent] = useState(""); // ✅ ADICIONANDO ESTADO PARA CONTENT
   const [category, setCategory] = useState<"Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura">("Vídeo");
   // Removido readingCategory pois não é mais necessário
   const [contentUrl, setContentUrl] = useState("");
@@ -484,8 +263,8 @@ export default function CreateContent() {
         return;
       }
 
-      // Validar conteúdo textual (exceto para Shorts)
-      if (category !== "Shorts" && !content.trim()) {
+      // Validar descrição textual (exceto para Shorts)
+      if (category !== "Shorts" && !description.trim()) {
         setError("Conteúdo textual é obrigatório");
         toast.error("Conteúdo textual é obrigatório");
         return;
@@ -529,7 +308,7 @@ export default function CreateContent() {
       }
 
       // Validar que Shorts não pode ter conteúdo textual
-      if (category === "Shorts" && content.trim()) {
+      if (category === "Shorts" && description.trim()) {
         setError("Posts da categoria Shorts não podem ter conteúdo textual");
         toast.error("Posts da categoria Shorts não podem ter conteúdo textual");
         return;
@@ -560,9 +339,9 @@ export default function CreateContent() {
         // categoria_leitura será preenchida automaticamente pelo trigger quando as tags forem associadas
       };
 
-      // Adicionar conteúdo se fornecido
-      if (content.trim()) { // ✅ ADICIONANDO CONTEÚDO AO POST DATA
-        postData.content = content.trim();
+      // A descrição já contém o conteúdo textual principal (HTML)
+      if (description.trim()) {
+        postData.content = undefined; // manter vazio; a descrição será usada como texto
       }
 
       // Removido código de reading_category pois não é mais necessário
@@ -679,8 +458,7 @@ export default function CreateContent() {
         
         // Limpar formulário
         setTitle("");
-        setDescription("");
-        setContent(""); // ✅ LIMPAR ESTADO PARA CONTENT
+  setDescription("");
         // Removido setReadingCategory pois não é mais necessário
         setContentUrl("");
         setCategory("Vídeo");
@@ -1086,35 +864,24 @@ export default function CreateContent() {
               />
             </div>
 
-            {/* Conteúdo Textual (não disponível para Shorts) */}
-            {category !== "Shorts" && (
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-900">
-                  Conteúdo Textual
-                  <span className="text-red-500 ml-1">*</span>
-                  <span className="text-xs text-gray-500 ml-2">(não disponível para Shorts)</span>
-                </label>
-                <p className="text-xs text-gray-500 mt-1 mb-4">
-                  Este campo é para o conteúdo textual completo do post. Use markdown para formatação.
-                </p>
+            {/* Live preview da Descrição (substitui o antigo 'Conteúdo Textual') */}
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-900">
+                Pré-visualização da Descrição
+              </label>
+              <p className="text-xs text-gray-500 mt-1 mb-4">
+                A pré-visualização atualiza automaticamente enquanto você digita na descrição.
+              </p>
 
-                <MarkdownEditor
-                  value={content}
-                  onChange={setContent}
-                  placeholder="Escreva aqui o conteúdo completo do post usando markdown..."
-                />
-                
-                {/* Prévia do Conteúdo */}
-                {content.trim() && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-md border">
-                    <div className="text-xs text-gray-500 font-bold mb-2">Prévia do conteúdo:</div>
-                    <div className="bg-white p-3 rounded border">
-                      <MarkdownRenderer content={content} />
-                    </div>
+              <div className="mt-2">
+                <div className="mt-4 p-4 bg-gray-50 rounded-md border">
+                  <div className="text-xs text-gray-500 font-bold mb-2">Prévia da descrição:</div>
+                  <div className="bg-white p-3 rounded border">
+                    <FlexibleRenderer content={description} />
                   </div>
-                )}
+                </div>
               </div>
-            )}
+            </div>
             {/* Categorias de Leitura (apenas para categoria Leitura) */}
             {category === 'Leitura' && (
               <div>
@@ -1289,7 +1056,7 @@ export default function CreateContent() {
                   !title.trim() ||
                   !description.trim() ||
                   (!contentUrl.trim() && !file) ||
-                  (category !== "Shorts" && !content.trim()) ||
+                  (category !== "Shorts" && !description.trim()) ||
                   tags.length === 0 ||
                   emotions.length === 0 ||
                   (category === "Leitura" && selectedReadingTags.length === 0) ||
@@ -1306,7 +1073,7 @@ export default function CreateContent() {
                           ? "Adicione uma descrição"
                           : (!contentUrl.trim() && !file)
                             ? "Adicione URL ou arquivo"
-                            : category !== "Shorts" && !content.trim()
+                            : category !== "Shorts" && !description.trim()
                               ? "Adicione conteúdo textual"
                               : tags.length === 0
                                 ? "Adicione pelo menos uma tag"
