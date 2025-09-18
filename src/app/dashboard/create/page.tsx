@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { CloudUpload, X, Plus, Image } from "lucide-react";
+import { CloudUpload, X } from "lucide-react";
+import { Image as ImageIcon } from "lucide-react";
+import Image from "next/image";
 import CMSLayout from "@/components/CMSLayout";
 import FlexibleRenderer from '@/components/FlexibleRenderer';
 import TipTapEditor from "@/components/TipTapEditor";
@@ -174,6 +176,7 @@ export default function CreateContent() {
   const { canAccessCMS, loading: authLoading, error: authError } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState(""); // Novo campo para conteúdo textual
@@ -190,6 +193,7 @@ export default function CreateContent() {
   const [selectedReadingTags, setSelectedReadingTags] = useState<string[]>([]);
   const [showCreateTagModal, setShowCreateTagModal] = useState(false);
   const [minAge, setMinAge] = useState<12 | 16>(12); // ✅ ADICIONANDO ESTADO PARA IDADE MÍNIMA
+  const [mediaMode, setMediaMode] = useState<'url' | 'file'>('url'); // Modo de mídia: URL ou Upload de ficheiro
 
   // Função para recarregar as categorias de leitura
   const reloadReadingTags = async () => {
@@ -233,7 +237,32 @@ export default function CreateContent() {
       }
       
       setThumbnailFile(selectedFile);
+      
+      // Criar preview da imagem
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setThumbnailPreview(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(selectedFile);
+      
       setError(null);
+    }
+  };
+
+  const removeThumbnail = () => {
+    setThumbnailFile(null);
+    setThumbnailPreview(null);
+  };
+
+  const handleMediaModeChange = (mode: 'url' | 'file') => {
+    setMediaMode(mode);
+    // Limpar o campo que não está sendo usado
+    if (mode === 'url') {
+      setFile(null);
+    } else {
+      setContentUrl('');
     }
   };
 
@@ -505,9 +534,11 @@ export default function CreateContent() {
         setEmotions([]);
         setFile(null);
         setThumbnailFile(null);
+        setThumbnailPreview(null);
         setTagInput("");
         setSelectedReadingTags([]); // Limpar tags de leitura selecionadas
         setMinAge(12); // ✅ LIMPAR IDADE MÍNIMA
+        setMediaMode('url'); // Resetar para modo URL
 
         // Redirecionar para página de detalhes do post criado após 2 segundos
         if (result.data?.id) {
@@ -675,255 +706,444 @@ export default function CreateContent() {
 
   return (
     <CMSLayout currentPage="create">
-      <div className="flex flex-col items-center py-12 px-8">
-        <div className="w-full max-w-xl">
-          <h1 className="text-2xl font-bold mb-6 text-gray-900 text-center" style={{ fontFamily: 'Quicksand, Inter, sans-serif' }}>
-            Adicionar Novo Conteúdo
-          </h1>
+      <div className="min-h-screen bg-gray-50">
+        <div className="px-4 sm:px-6 lg:px-8 py-6">
+          {/* Header */}
+          <div className="max-w-6xl mx-auto mb-8">
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2" style={{ fontFamily: 'Quicksand, Inter, sans-serif' }}>
+                Criar Novo Conteúdo
+              </h1>
+              <p className="text-gray-600 text-lg">
+                Adicione um novo post ao seu CMS de forma simples e intuitiva
+              </p>
+            </div>
+          </div>
           
           {/* Mensagens de feedback */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
-              <p className="text-sm font-medium">{error}</p>
-            </div>
-          )}
-          
-          {/* success handled via global toasts (HotToaster) */}
-
-          {/* Aviso para categoria de leitura sem categorias selecionadas */}
-          {category === 'Leitura' && selectedReadingTags.length === 0 && readingTags.length > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md mb-4">
-              <p className="text-sm font-medium">
-                ⚠️ Selecione pelo menos uma categoria de leitura para continuar
-              </p>
-            </div>
-          )}
-
-
-          
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Categoria - agora em primeiro lugar */}
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-900">Categoria</label>
-              <select
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium cursor-pointer"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as "Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura")}
-              >
-                <option value="Vídeo">Vídeo</option>
-                <option value="Podcast">Podcast</option>
-                <option value="Artigo">Artigo</option>
-                <option value="Livro">Livro</option>
-                <option value="Áudio">Áudio</option>
-                <option value="Shorts">Shorts</option>
-                <option value="Leitura">Leitura</option>
-              </select>
-            </div>
-
-            {/* Removido campo de categoria de leitura pois não é mais necessário */}
-            {/* Conteúdo dividido em URL ou Ficheiro */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-900">
-                Conteúdo
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <p className="text-xs text-gray-500 mb-2">
-                Insira uma URL ou faça upload de um ficheiro para o seu post. 
-                {category === 'Shorts' && (
-                  <span className="text-blue-600 font-medium"> Para Shorts, use URLs do YouTube Shorts, Instagram Reels ou TikTok.</span>
-                )}
-                <span className="text-red-500 font-medium"> * Obrigatório</span>
-              </p>
-              <div className="mb-4">
-                <label className="block text-xs font-medium mb-1 text-gray-900">
-                  URL do Conteúdo: {contentUrl.trim() ? contentUrl : "(nenhum url inserido)"}
-                </label>
-                <div className={`flex items-center border border-gray-300 rounded-md px-3 py-2 ${file ? 'bg-gray-100' : 'bg-gray-50'} ${file ? 'opacity-50' : ''}`}>
-                  <span className="text-gray-400 mr-2">🌐</span>
-                  <input
-                    type="url"
-                    className="flex-1 bg-transparent outline-none text-gray-900 disabled:cursor-not-allowed"
-                    placeholder={
-                      file 
-                        ? "Remova o ficheiro para inserir URL" 
-                        : category === 'Shorts'
-                          ? "https://youtube.com/shorts/... ou https://instagram.com/reel/... ou https://tiktok.com/..."
-                          : "www.exemplo.com/conteudo"
-                    }
-                    value={contentUrl}
-                    onChange={(e) => setContentUrl(e.target.value)}
-                    disabled={!!file}
-                  />
-                  {file && (
-                    <button
-                      type="button"
-                      onClick={() => setFile(null)}
-                      className="ml-2 text-red-500 hover:text-red-700 text-xs font-medium"
-                      title="Remover ficheiro para permitir URL"
-                    >
-                      Remover ficheiro
-                    </button>
-                  )}
+          <div className="max-w-6xl mx-auto mb-6">
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-400 text-red-700 px-4 py-3 rounded-md shadow-sm">
+                <div className="flex">
+                  <svg className="w-5 h-5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <p className="font-medium">{error}</p>
                 </div>
               </div>
-              <div className="flex items-center my-2">
-                <div className="flex-1 border-t border-gray-300"></div>
-                <span className="mx-4 text-gray-400 text-xs font-medium">Ou</span>
-                <div className="flex-1 border-t border-gray-300"></div>
+            )}
+            
+            {/* Aviso para categoria de leitura sem categorias selecionadas */}
+            {category === 'Leitura' && selectedReadingTags.length === 0 && readingTags.length > 0 && (
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700 px-4 py-3 rounded-md shadow-sm">
+                <div className="flex">
+                  <svg className="w-5 h-5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <p className="font-medium">
+                    ⚠️ Selecione pelo menos uma categoria de leitura para continuar
+                  </p>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium mb-1 text-gray-900">
-                  Ficheiro: {file ? file.name : "(nenhum ficheiro selecionado)"}
-                </label>
-                <div className={`border-2 border-gray-300 border-dashed rounded-lg flex flex-col items-center justify-center py-6 transition-colors relative ${contentUrl.trim() ? 'bg-gray-400 opacity-50 cursor-not-allowed' : 'bg-black cursor-pointer hover:border-gray-400'}`}>
-                  <input
-                    type="file"
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                    onChange={handleFileChange}
-                    disabled={isUploading || !!contentUrl.trim()}
-                  />
-                  <CloudUpload className={`w-8 h-8 mb-2 ${contentUrl.trim() ? 'text-gray-600' : 'text-white'}`} />
-                  <span className={contentUrl.trim() ? 'text-gray-600' : 'text-white'}>
-                    {contentUrl.trim() ? "Remova a URL para fazer upload" : 
-                     isUploading ? "A fazer upload..." : "Escolher um ficheiro"}
-                  </span>
-                  {contentUrl.trim() && (
-                    <button
-                      type="button"
-                      onClick={() => setContentUrl("")}
-                      className="mt-2 text-red-400 hover:text-red-300 text-xs font-medium"
-                      title="Remover URL para permitir upload"
-                    >
-                      Remover URL
-                    </button>
-                  )}
-                  {file && !contentUrl.trim() && (
-                    <div className="mt-2 text-center">
-                      <span className="text-xs text-gray-200 block">{file.name}</span>
-                      <span className="text-xs text-gray-400 block">
-                        {(file.size / (1024 * 1024)).toFixed(2)} MB
-                      </span>
+            )}
+          </div>
+
+          {/* Formulário Principal */}
+          <div className="max-w-8xl mx-auto">
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                
+                {/* Seção 1: Configurações Básicas */}
+                <div className="px-6 py-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                  <div className="flex items-center mb-4">
+                    <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium mr-3">
+                      1
                     </div>
-                  )}
+                    <h2 className="text-xl font-semibold text-gray-900">Configurações Básicas</h2>
+                  </div>
                   
-                  {/* Barra de progresso */}
-                  {isUploading && uploadProgress > 0 && !contentUrl.trim() && (
-                    <div className="w-full max-w-xs mt-3">
-                      <div className="bg-gray-700 rounded-full h-2">
-                        <div 
-                          className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${uploadProgress}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-xs text-gray-300 mt-1 block">
-                        {uploadProgress}% completo
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Prévia do conteúdo para Shorts */}
-              {renderContentPreview()}
-            </div>
-
-            {/* Upload de Thumbnail (para Podcast e Artigo) */}
-            {(category === "Podcast" || category === "Artigo") && (
-              <div>
-                <label className="block text-sm font-medium mb-2 text-gray-900">
-                  Thumbnail do {category}
-                  <span className="text-xs text-gray-500 ml-2">(opcional)</span>
-                </label>
-                <p className="text-xs text-gray-500 mb-2">
-                  Faça upload de uma imagem para servir como thumbnail do {category.toLowerCase()}. 
-                  Formatos aceitos: JPG, PNG, GIF. Máximo: 5MB.
-                </p>
-                <div className="border-2 border-gray-300 border-dashed rounded-lg flex flex-col items-center justify-center py-6 transition-colors relative bg-black cursor-pointer hover:border-gray-400">
-                  <input
-                    type="file"
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                    onChange={handleThumbnailChange}
-                    accept="image/*"
-                    disabled={isUploading}
-                  />
-                  {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                  <Image className="w-8 h-8 mb-2 text-white" />
-                  <span className="text-white">
-                    {isUploading ? "A fazer upload..." : 
-                     thumbnailFile ? thumbnailFile.name : "Escolher uma imagem para thumbnail"}
-                  </span>
-                  {thumbnailFile && (
-                    <div className="mt-2 text-center">
-                      <span className="text-xs text-gray-200 block">{thumbnailFile.name}</span>
-                      <span className="text-xs text-gray-400 block">
-                        {(thumbnailFile.size / (1024 * 1024)).toFixed(2)} MB
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setThumbnailFile(null)}
-                        className="mt-1 text-red-400 hover:text-red-300 text-xs font-medium"
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Categoria */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-gray-700">
+                        <span className="flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                          </svg>
+                          Categoria
+                        </span>
+                      </label>
+                      <select
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-medium cursor-pointer bg-white shadow-sm"
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value as "Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura")}
                       >
-                        Remover thumbnail
-                      </button>
+                        <option value="Vídeo">📹 Vídeo</option>
+                        <option value="Podcast">🎙️ Podcast</option>
+                        <option value="Artigo">📰 Artigo</option>
+                        <option value="Livro">📚 Livro</option>
+                        <option value="Áudio">🎵 Áudio</option>
+                        <option value="Shorts">⚡ Shorts</option>
+                        <option value="Leitura">📖 Leitura</option>
+                      </select>
                     </div>
-                  )}
+
+                    {/* Idade Mínima */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-gray-700">
+                        <span className="flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                          </svg>
+                          Idade Mínima
+                          <span className="text-red-500 ml-1">*</span>
+                        </span>
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="flex items-center gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                          <input
+                            type="radio"
+                            name="minAge"
+                            value="12"
+                            checked={minAge === 12}
+                            onChange={() => setMinAge(12)}
+                            className="accent-blue-600 cursor-pointer"
+                          />
+                          <div>
+                            <div className="font-medium text-gray-900">12+</div>
+                          </div>
+                        </label>
+                        <label className="flex items-center gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                          <input
+                            type="radio"
+                            name="minAge"
+                            value="16"
+                            checked={minAge === 16}
+                            onChange={() => setMinAge(16)}
+                            className="accent-blue-600 cursor-pointer"
+                          />
+                          <div>
+                            <div className="font-medium text-gray-900">16+</div>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {/* Título */}
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-900">
-                Título
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-                              <input
-                  type="text"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
-                  placeholder="Escreva aqui um título"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
-            </div>
-            {/* Descrição com Input Simples */}
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-900">
-                Descrição
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <p className="text-xs text-gray-500 mt-1 mb-4">
-                Digite uma breve descrição do seu post (resumo/introdução)
-              </p>
+                {/* Seção 2: Conteúdo Principal */}
+                <div className="px-8 py-6 border-b border-gray-200">
+                  <div className="flex items-center mb-6">
+                    <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-medium mr-3">
+                      2
+                    </div>
+                    <h2 className="text-xl font-semibold text-gray-900">Conteúdo Principal</h2>
+                  </div>
 
-              <textarea
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium resize-none"
-                placeholder="Escreva aqui uma descrição breve..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                required
-              />
-            </div>
+                  <div className="space-y-6">
+                    {/* Título */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-gray-700">
+                        <span className="flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                          </svg>
+                          Título
+                          <span className="text-red-500 ml-1">*</span>
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-medium bg-white shadow-sm"
+                        placeholder="Escreva um título atrativo para o seu conteúdo..."
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        required
+                      />
+                    </div>
 
-            {/* Conteúdo Textual com Editor TipTap */}
-            {category !== "Shorts" && (
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-900">
-                  Conteúdo Textual
-                  <span className="text-red-500 ml-1">*</span>
-                </label>
-                <p className="text-xs text-gray-500 mt-1 mb-4">
-                  Digite o conteúdo principal do seu post (texto completo do artigo/post)
-                </p>
+                    {/* Descrição */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-gray-700">
+                        <span className="flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                          </svg>
+                          Descrição
+                          <span className="text-red-500 ml-1">*</span>
+                        </span>
+                      </label>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Digite uma breve descrição do seu post (resumo/introdução)
+                      </p>
+                      <textarea
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-medium resize-none bg-white shadow-sm"
+                        placeholder="Escreva uma descrição breve e atrativa..."
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        rows={3}
+                        required
+                      />
+                    </div>
 
-                <TipTapEditor
-                  initialHtml={content}
-                  onChangeHtml={setContent}
-                  placeholder="Escreva aqui o conteúdo principal do post..."
-                />
-              </div>
-            )}
+                    {/* Conteúdo Textual com Editor TipTap */}
+                    {category !== "Shorts" && (
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-700">
+                          <span className="flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                            </svg>
+                            Conteúdo Textual
+                            <span className="text-red-500 ml-1">*</span>
+                          </span>
+                        </label>
+                        <p className="text-xs text-gray-500 mb-3">
+                          Digite o conteúdo principal do seu post (texto completo do artigo/post)
+                        </p>
+                        <div className="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm">
+                          <TipTapEditor
+                            initialHtml={content}
+                            onChangeHtml={setContent}
+                            placeholder="Escreva aqui o conteúdo principal do post..."
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Seção 3: Upload de Arquivos */}
+                <div className="px-8 py-6 border-b border-gray-200">
+                  <div className="flex items-center mb-6">
+                    <div className="w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-medium mr-3">
+                      3
+                    </div>
+                    <h2 className="text-xl font-semibold text-gray-900">Arquivos e Mídia</h2>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* Conteúdo Principal */}
+                    <div>
+                      <label className="block text-sm font-medium mb-3 text-gray-700">
+                        <span className="flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                          Conteúdo
+                          <span className="text-red-500 ml-1">*</span>
+                        </span>
+                      </label>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Escolha como adicionar o conteúdo do seu post.
+                        {category === 'Shorts' && (
+                          <span className="text-blue-600 font-medium"> Para Shorts, use URLs do YouTube Shorts, Instagram Reels ou TikTok.</span>
+                        )}
+                      </p>
+                      
+                      {/* Seletor de Modo */}
+                      <div className="mb-6">
+                        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+                          <button
+                            type="button"
+                            onClick={() => handleMediaModeChange('url')}
+                            className={`flex-1 flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                              mediaMode === 'url'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+                            </svg>
+                            URL
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMediaModeChange('file')}
+                            className={`flex-1 flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                              mediaMode === 'file'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                          >
+                            <CloudUpload className="w-4 h-4 mr-2" />
+                            Upload de Ficheiro
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Campo de URL */}
+                      {mediaMode === 'url' && (
+                        <div>
+                          <label className="block text-sm font-medium mb-2 text-gray-700">
+                            URL do Conteúdo
+                          </label>
+                          <div className="relative rounded-lg border border-gray-300 bg-white">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <svg className="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <input
+                              type="url"
+                              className="block w-full pl-10 pr-4 py-3 border-0 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-transparent"
+                              placeholder={
+                                category === 'Shorts'
+                                  ? "https://youtube.com/shorts/... ou https://instagram.com/reel/..."
+                                  : "https://exemplo.com/conteudo"
+                              }
+                              value={contentUrl}
+                              onChange={(e) => setContentUrl(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Campo de Upload */}
+                      {mediaMode === 'file' && (
+                        <div>
+                          <label className="block text-sm font-medium mb-2 text-gray-700">
+                            Upload de Ficheiro
+                          </label>
+                          <div className={`relative border-2 border-dashed rounded-xl transition-all ${
+                            file 
+                              ? 'border-green-300 bg-green-50' 
+                              : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50'
+                          }`}>
+                            <input
+                              type="file"
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                              onChange={handleFileChange}
+                              disabled={isUploading}
+                            />
+                            <div className="flex flex-col items-center justify-center py-8 px-6">
+                              {file ? (
+                                <>
+                                  <svg className="w-12 h-12 text-green-500 mb-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                  <p className="text-green-700 text-center">
+                                    <span className="font-medium">{file.name}</span>
+                                    <br />
+                                    <span className="text-sm text-green-600">
+                                      {(file.size / (1024 * 1024)).toFixed(2)} MB
+                                    </span>
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => setFile(null)}
+                                    className="mt-3 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                  >
+                                    Remover Ficheiro
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <CloudUpload className="w-12 h-12 text-blue-500 mb-3" />
+                                  <p className="text-gray-700 text-center">
+                                    <span className="font-medium">Clique para fazer upload</span> ou arraste e solte
+                                    <br />
+                                    <span className="text-sm text-gray-500">Todos os formatos são aceitos</span>
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                            
+                            {/* Barra de progresso */}
+                            {isUploading && uploadProgress > 0 && (
+                              <div className="absolute inset-x-0 bottom-0 px-6 pb-4">
+                                <div className="bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${uploadProgress}%` }}
+                                  />
+                                </div>
+                                <p className="text-xs text-gray-600 mt-1 text-center">
+                                  {uploadProgress}% completo
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Prévia do conteúdo para Shorts */}
+                      {renderContentPreview()}
+                    </div>
+
+                    {/* Upload de Thumbnail (para Podcast e Artigo) */}
+                    {(category === "Podcast" || category === "Artigo") && (
+                      <div>
+                        <label className="block text-sm font-medium mb-3 text-gray-700">
+                          <span className="flex items-center">
+                            <ImageIcon className="w-4 h-4 mr-2" />
+                            Thumbnail do {category}
+                            <span className="text-gray-500 ml-2 text-xs">(opcional)</span>
+                          </span>
+                        </label>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Faça upload de uma imagem para servir como thumbnail. 
+                          Formatos aceitos: JPG, PNG, GIF. Máximo: 5MB.
+                        </p>
+                        <div className={`relative border-2 border-dashed rounded-xl transition-all ${
+                          thumbnailFile 
+                            ? 'border-green-300 bg-green-50' 
+                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50'
+                        }`}>
+                          <input
+                            type="file"
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            onChange={handleThumbnailChange}
+                            accept="image/*"
+                            disabled={isUploading}
+                          />
+                          <div className="flex flex-col items-center justify-center py-6 px-6">
+                            {thumbnailFile ? (
+                              <>
+                                <div className="relative mb-4 max-w-md w-full">
+                                  {thumbnailPreview && (
+                                    <Image 
+                                      src={thumbnailPreview} 
+                                      alt="Preview da thumbnail selecionada" 
+                                      width={448}
+                                      height={320}
+                                      className="w-full max-h-80 object-contain rounded-lg border-2 border-green-300 shadow-sm bg-gray-50"
+                                    />
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={removeThumbnail}
+                                    className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md"
+                                    title="Remover imagem"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                                <p className="text-green-700 text-center">
+                                  <span className="font-medium">{thumbnailFile.name}</span>
+                                  <br />
+                                  <span className="text-sm text-green-600">
+                                    {(thumbnailFile.size / (1024 * 1024)).toFixed(2)} MB
+                                  </span>
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <ImageIcon className="w-10 h-10 text-blue-500 mb-3" />
+                                <p className="text-gray-700 text-center">
+                                  <span className="font-medium">Clique para adicionar thumbnail</span>
+                                  <br />
+                                  <span className="text-sm text-gray-500">JPG, PNG, GIF até 5MB</span>
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
             {/* Live preview da Descrição */}
             {description.trim() && (
@@ -969,218 +1189,262 @@ export default function CreateContent() {
             {/* Categorias de Leitura (apenas para categoria Leitura) */}
             {category === 'Leitura' && (
               <div>
-                <label className="block text-sm font-medium mb-1 text-gray-900">
-                  Categorias de Leitura
-                  <span className="text-red-500 ml-1">*</span>
+                <label className="block text-sm font-medium mb-2 text-gray-700">
+                  <span className="flex items-center">
+                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                    </svg>
+                    Categorias de Leitura
+                    <span className="text-red-500 ml-1">*</span>
+                  </span>
                 </label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {readingTags.length === 0 ? (
-                    <div className="w-full text-center py-4 bg-gray-50 rounded-md border-2 border-dashed border-gray-300">
-                      <p className="text-gray-500 mb-2">Nenhuma categoria cadastrada</p>
-                      <p className="text-xs text-gray-400 mb-3">Crie uma nova categoria para organizar seus posts de leitura</p>
-                      <button
-                        type="button"
-                        onClick={() => setShowCreateTagModal(true)}
-                        className="flex items-center gap-2 mx-auto text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Criar Primeira Categoria
-                      </button>
-                    </div>
-                  ) : (
-                    readingTags.map(tag => (
-                      <label key={tag.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-200 transition-all duration-200" style={{ 
-                        background: selectedReadingTags.includes(tag.id) ? (tag.color || '#3B82F6') : '#f3f4f6', 
-                        color: selectedReadingTags.includes(tag.id) ? '#fff' : '#222', 
-                        borderRadius: '9999px', 
-                        padding: '0.25rem 0.75rem' 
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedReadingTags.includes(tag.id)}
-                          onChange={() => setSelectedReadingTags(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
-                          className="accent-black cursor-pointer"
-                        />
-                        {tag.name}
-                      </label>
-                    ))
-                  )}
-                </div>
-                {readingTags.length > 0 && (
-                  <>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Selecione pelo menos uma categoria que melhor represente o post de leitura.
-                    </p>
+                <p className="text-sm text-gray-600 mb-3">
+                  Selecione as categorias que melhor se adequam ao seu conteúdo de leitura.
+                </p>
+                <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                  <div className="flex flex-wrap gap-2">
+                    {readingTags.length === 0 ? (
+                      <div className="w-full text-center py-6 bg-white rounded-lg border-2 border-dashed border-gray-300">
+                        <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-gray-600 font-medium mb-2">Nenhuma categoria cadastrada</p>
+                        <p className="text-sm text-gray-500 mb-4">Crie uma nova categoria para organizar seus posts de leitura</p>
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateTagModal(true)}
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                          </svg>
+                          Criar Primeira Categoria
+                        </button>
+                      </div>
+                    ) : (
+                      readingTags.map(tag => (
+                        <label 
+                          key={tag.id} 
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer transition-all duration-200 text-sm font-medium hover:shadow-md" 
+                          style={{ 
+                            background: selectedReadingTags.includes(tag.id) ? (tag.color || '#3B82F6') : '#ffffff', 
+                            color: selectedReadingTags.includes(tag.id) ? '#ffffff' : '#374151',
+                            border: selectedReadingTags.includes(tag.id) ? 'none' : '2px solid #e5e7eb'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedReadingTags.includes(tag.id)}
+                            onChange={() => setSelectedReadingTags(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
+                            className="sr-only"
+                          />
+                          <svg 
+                            className={`w-4 h-4 transition-opacity ${selectedReadingTags.includes(tag.id) ? 'opacity-100' : 'opacity-0'}`} 
+                            fill="currentColor" 
+                            viewBox="0 0 20 20"
+                          >
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                          {tag.name}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {readingTags.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setShowCreateTagModal(true)}
-                      className="mt-4 flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                      className="mt-3 inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                     >
-                      <Plus className="w-4 h-4" />
-                      Adicionar Nova Categoria
+                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                      </svg>
+                      Criar Nova Categoria
                     </button>
-                  </>
-                )}
+                  )}
+                </div>
               </div>
             )}
-            {/* Campo de tags para todas as categorias */}
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-900">
-                Tags
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <p className="text-xs text-gray-500 mt-1 mb-4">
-                {category === 'Leitura' 
-                  ? 'Tags gerais para o post (além das categorias de leitura específicas)' 
-                  : 'Adicione tags que descrevam o conteúdo'
-                }
-              </p>
 
-              <input
-                type="text"
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black text-gray-900 font-medium"
-                placeholder="Adicione tags e pressione Enter"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleTagKeyDown}
-              />
-              {/* Exibir tags abaixo do input */}
-              <div className="flex flex-wrap gap-2 mt-2">
-                {tags.length === 0 ? (
-                  <span className="bg-gray-100 text-gray-400 px-3 py-1 rounded-full flex items-center text-sm font-medium opacity-80 select-none pointer-events-none">
-                    Exemplo
-                  </span>
-                ) : (
-                  tags.map((tag) => (
-                    <span key={tag} className="bg-gray-200 text-gray-800 px-3 py-1 rounded-full flex items-center text-sm font-medium">
-                      {tag}
-                      <button type="button" className="ml-2 text-gray-500 hover:text-red-500" onClick={() => removeTag(tag)}>
-                        ×
-                      </button>
+            {/* Seção 4: Tags e Categorização */}
+            <div className="px-8 py-6 border-b border-gray-200">
+              <div className="flex items-center mb-6">
+                <div className="w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-medium mr-3">
+                  4
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900">Tags e Categorização</h2>
+              </div>
+
+              <div className="space-y-6">
+                {/* Tags Gerais */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700">
+                    <span className="flex items-center">
+                      <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                      </svg>
+                      Tags
+                      <span className="text-red-500 ml-1">*</span>
                     </span>
-                  ))
-                )}
-              </div>
-            </div>
-
-
-            {/* Emotion Tags */}
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-900">
-                Tags de Emoção
-                <span className="text-red-500 ml-1">*</span>
-
-                <p className="text-xs text-gray-500 mt-2 mb-4">
-                Selecione as emoções que o conteúdo desperta
-              </p>
-
-              </label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {EMOTIONS.map((emotion) => (
-                  <label key={emotion} className="flex items-center gap-2 text-sm text-gray-900 font-medium">
-                    <input
-                      type="checkbox"
-                      checked={emotions.includes(emotion)}
-                      onChange={() => handleEmotionChange(emotion)}
-                      className="accent-black cursor-pointer"
-                    />
-                    {emotion}
                   </label>
-                ))}
+                  <p className="text-sm text-gray-600 mb-3">
+                    {category === 'Leitura' 
+                      ? 'Tags gerais para o post (além das categorias de leitura específicas)' 
+                      : 'Adicione tags que descrevam o conteúdo'
+                    }
+                  </p>
+
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500 transition-all"
+                    placeholder="Adicione tags e pressione Enter"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleTagKeyDown}
+                  />
+                  
+                  {/* Exibir tags abaixo do input */}
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {tags.length === 0 ? (
+                      <span className="bg-gray-100 text-gray-500 px-3 py-1 rounded-full flex items-center text-sm font-medium opacity-70 select-none pointer-events-none">
+                        Nenhuma tag adicionada
+                      </span>
+                    ) : (
+                      tags.map((tag) => (
+                        <span key={tag} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full flex items-center text-sm font-medium">
+                          {tag}
+                          <button 
+                            type="button" 
+                            className="ml-2 text-blue-600 hover:text-red-500 transition-colors" 
+                            onClick={() => removeTag(tag)}
+                            title="Remover tag"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Tags de Emoção */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700">
+                    <span className="flex items-center">
+                      <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z" clipRule="evenodd" />
+                      </svg>
+                      Tags de Emoção
+                      <span className="text-red-500 ml-1">*</span>
+                    </span>
+                  </label>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Selecione as emoções que o conteúdo desperta ou transmite.
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    {EMOTIONS.map((emotion) => (
+                      <label key={emotion} className="flex items-center gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={emotions.includes(emotion)}
+                          onChange={() => handleEmotionChange(emotion)}
+                          className="accent-blue-600 cursor-pointer"
+                        />
+                        <span className="text-gray-900 font-medium">{emotion}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Idade Mínima */}
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-900">
-                Idade Mínima
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <p className="text-xs text-gray-500 mt-1 mb-4">
-                Selecione a idade mínima recomendada para visualizar este conteúdo
-              </p>
-              <div className="grid grid-cols-2 gap-4 mt-2">
-                <label className="flex items-center gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                  <input
-                    type="radio"
-                    name="minAge"
-                    value="12"
-                    checked={minAge === 12}
-                    onChange={() => setMinAge(12)}
-                    className="accent-black cursor-pointer"
-                  />
-                  <div>
-                    <div className="font-medium text-gray-900">12+</div>
-                    <div className="text-xs text-gray-500">Conteúdo adequado para 12 anos ou mais</div>
+            {/* Seção 5: Ações */}
+            <div className="px-8 py-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-medium mr-3">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
                   </div>
-                </label>
-                <label className="flex items-center gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                  <input
-                    type="radio"
-                    name="minAge"
-                    value="16"
-                    checked={minAge === 16}
-                    onChange={() => setMinAge(16)}
-                    className="accent-black cursor-pointer"
-                  />
-                  <div>
-                    <div className="font-medium text-gray-900">16+</div>
-                    <div className="text-xs text-gray-500">Conteúdo adequado para 16 anos ou mais</div>
-                  </div>
-                </label>
+                  <h2 className="text-xl font-semibold text-gray-900">Finalizar Criação</h2>
+                </div>
+                
+                <div className="flex space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => window.history.back()}
+                    className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 font-medium transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={
+                      isUploading || 
+                      !title.trim() ||
+                      !description.trim() ||
+                      (category !== "Shorts" && !content.trim()) ||
+                      (!contentUrl.trim() && !file) ||
+                      tags.length === 0 ||
+                      emotions.length === 0 ||
+                      (category === "Leitura" && selectedReadingTags.length === 0) ||
+                      (minAge !== 12 && minAge !== 16)
+                    }
+                    className="px-8 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center"
+                  >
+                    {isUploading ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        {uploadProgress > 0 ? `A fazer upload... ${uploadProgress}%` : "A enviar..."}
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        {!title.trim()
+                          ? "Adicione um título"
+                          : !description.trim()
+                            ? "Adicione uma descrição"
+                            : category !== "Shorts" && !content.trim()
+                              ? "Adicione conteúdo textual"
+                              : (!contentUrl.trim() && !file)
+                                ? "Adicione URL ou arquivo"
+                                : tags.length === 0
+                                  ? "Adicione pelo menos uma tag"
+                                  : emotions.length === 0
+                                    ? "Selecione uma tag de emoção"
+                                    : category === "Leitura" && selectedReadingTags.length === 0
+                                      ? "Selecione uma categoria de leitura"
+                                      : (minAge !== 12 && minAge !== 16)
+                                        ? "Selecione uma idade mínima"
+                                        : "Criar Post"
+                        }
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
-            {/* Upload Button */}
-            <div className="flex justify-center">
-              <button
-                type="submit"
-                className="bg-black text-white px-6 py-2 rounded-md font-semibold hover:bg-gray-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                disabled={
-                  isUploading || 
-                  !title.trim() ||
-                  !description.trim() ||
-                  (category !== "Shorts" && !content.trim()) ||
-                  (!contentUrl.trim() && !file) ||
-                  tags.length === 0 ||
-                  emotions.length === 0 ||
-                  (category === "Leitura" && selectedReadingTags.length === 0) ||
-                  (minAge !== 12 && minAge !== 16)
-                }
-                              >
-                  {isUploading 
-                    ? uploadProgress > 0 
-                      ? `A fazer upload... ${uploadProgress}%` 
-                      : "A enviar..." 
-                    : !title.trim()
-                        ? "Adicione um título"
-                        : !description.trim()
-                          ? "Adicione uma descrição"
-                          : category !== "Shorts" && !content.trim()
-                            ? "Adicione conteúdo textual"
-                            : (!contentUrl.trim() && !file)
-                              ? "Adicione URL ou arquivo"
-                              : tags.length === 0
-                                ? "Adicione pelo menos uma tag"
-                                : emotions.length === 0
-                                  ? "Selecione uma tag de emoção"
-                                  : category === "Leitura" && selectedReadingTags.length === 0
-                                    ? "Selecione uma categoria de leitura"
-                                    : (minAge !== 12 && minAge !== 16)
-                                      ? "Selecione uma idade mínima"
-                                      : "Enviar Conteúdo"
-                  }
-                </button>
             </div>
           </form>
         </div>
       </div>
-
-      {/* Modal para criar nova categoria de leitura */}
+    </div>
+  </div>
+  
+    {/* Modal para criar nova categoria de leitura */}
+    {showCreateTagModal && (
       <CreateReadingTagModal
         isOpen={showCreateTagModal}
         onClose={() => setShowCreateTagModal(false)}
         onSuccess={reloadReadingTags}
       />
-    </CMSLayout>
+    )}
+  </CMSLayout>
   );
 } 
