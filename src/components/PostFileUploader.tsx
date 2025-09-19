@@ -155,9 +155,9 @@ export default function PostFileUploader({
 
   // Ícone baseado no tipo de arquivo
   const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith('image/')) return <Image className="w-4 h-4" />;
-    if (fileType.startsWith('video/')) return <Video className="w-4 h-4" />;
-    return <FileText className="w-4 h-4" />;
+    if (fileType.startsWith('image/')) return <Image className="w-4 h-4" aria-hidden="true" />;
+    if (fileType.startsWith('video/')) return <Video className="w-4 h-4" aria-hidden="true" />;
+    return <FileText className="w-4 h-4" aria-hidden="true" />;
   };
 
   // Texto de instruções baseado na categoria
