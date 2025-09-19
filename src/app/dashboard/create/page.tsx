@@ -7,8 +7,9 @@ import Image from "next/image";
 import CMSLayout from "@/components/CMSLayout";
 import FlexibleRenderer from '@/components/FlexibleRenderer';
 import TipTapEditor from "@/components/TipTapEditor";
-import { createPost, CreatePostData, uploadFileForPost, getAllReadingTags, associateTagWithPost, createReadingTag } from "@/services/posts";
+import { createPost, CreatePostData, uploadFileForPost, getAllReadingTags, associateTagWithPost, createReadingTag, validatePostFiles, uploadPostFiles, type FileValidation } from "@/services/posts";
 import { getMediaDuration } from "@/services/storage";
+import PostFileUploader from "@/components/PostFileUploader";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -194,6 +195,17 @@ export default function CreateContent() {
   const [showCreateTagModal, setShowCreateTagModal] = useState(false);
   const [minAge, setMinAge] = useState<12 | 16>(12); // ✅ ADICIONANDO ESTADO PARA IDADE MÍNIMA
   const [mediaMode, setMediaMode] = useState<'url' | 'file'>('url'); // Modo de mídia: URL ou Upload de ficheiro
+  
+  // ✅ NOVOS ESTADOS PARA ARQUIVOS MÚLTIPLOS
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [fileValidation, setFileValidation] = useState<FileValidation | null>(null);
+  const [uploadedFilesData, setUploadedFilesData] = useState<{
+    file_paths: string[];
+    file_names: string[];
+    file_types: string[];
+    file_sizes: number[];
+    durations?: number[];
+  } | null>(null);
 
   // Função para recarregar as categorias de leitura
   const reloadReadingTags = async () => {
@@ -314,16 +326,27 @@ export default function CreateContent() {
         return;
       }
 
-      // Validar conteúdo (URL ou arquivo) - obrigatório para todas as categorias
-      if (!contentUrl.trim() && !file) {
-        setError("Conteúdo é obrigatório. Forneça uma URL ou faça upload de um arquivo");
-        toast.error("Conteúdo é obrigatório. Forneça uma URL ou faça upload de um arquivo");
+      // ✅ NOVA VALIDAÇÃO: Conteúdo (URL, arquivos múltiplos ou arquivo único)
+      const hasContentUrl = contentUrl.trim();
+      const hasUploadedFiles = uploadedFilesData && uploadedFilesData.file_paths.length > 0;
+      const hasOldFile = file; // Compatibilidade
+      
+      if (!hasContentUrl && !hasUploadedFiles && !hasOldFile) {
+        setError("Conteúdo é obrigatório. Forneça uma URL ou faça upload de arquivo(s)");
+        toast.error("Conteúdo é obrigatório. Forneça uma URL ou faça upload de arquivo(s)");
         return;
       }
 
-      if (contentUrl.trim() && file) {
-        setError("Escolha apenas uma opção: URL ou arquivo, não ambos");
-        toast.error("Escolha apenas uma opção: URL ou arquivo, não ambos");
+      if (hasContentUrl && (hasUploadedFiles || hasOldFile)) {
+        setError("Escolha apenas uma opção: URL ou arquivo(s), não ambos");
+        toast.error("Escolha apenas uma opção: URL ou arquivo(s), não ambos");
+        return;
+      }
+
+      // ✅ Validação específica para arquivos múltiplos
+      if (hasUploadedFiles && fileValidation && !fileValidation.valid) {
+        setError(`Erro nos arquivos: ${fileValidation.error}`);
+        toast.error(`Erro nos arquivos: ${fileValidation.error}`);
         return;
       }
 
@@ -394,9 +417,27 @@ export default function CreateContent() {
         }
       }
 
-      // Upload de arquivo se fornecido
-      if (file && !contentUrl.trim()) {
-        console.log(`📁 Fazendo upload de arquivo principal para categoria ${category}:`, {
+      // ✅ NOVA LÓGICA: Usar dados dos arquivos já uploadados OU fazer upload se necessário
+      if (uploadedFilesData && !contentUrl.trim()) {
+        // Usar dados dos arquivos já uploadados pelo PostFileUploader
+        postData.file_paths = uploadedFilesData.file_paths;
+        postData.file_names = uploadedFilesData.file_names;
+        postData.file_types = uploadedFilesData.file_types;
+        postData.file_sizes = uploadedFilesData.file_sizes;
+        
+        // Adicionar duração se disponível
+        if (uploadedFilesData.durations && uploadedFilesData.durations.length > 0) {
+          postData.duration = uploadedFilesData.durations[0]; // Usar primeira duração
+        }
+        
+        console.log(`✅ Usando arquivos já uploadados para ${category}:`, {
+          filesCount: uploadedFilesData.file_paths.length,
+          paths: uploadedFilesData.file_paths,
+          types: uploadedFilesData.file_types
+        });
+      } else if (file && !contentUrl.trim()) {
+        // ⚠️ COMPATIBILIDADE: Upload único (será removido na Fase 5)
+        console.log(`📁 Fazendo upload de arquivo único (modo compatibilidade) para categoria ${category}:`, {
           fileName: file.name,
           fileSize: file.size,
           fileType: file.type
@@ -419,13 +460,14 @@ export default function CreateContent() {
         try {
           const uploadResult = await uploadFileForPost(file);
           
-            if (uploadResult.success && uploadResult.data) {
-            postData.file_path = uploadResult.data.path;
-            postData.file_name = uploadResult.data.file_name;
-            postData.file_type = uploadResult.data.file_type;
-            postData.file_size = uploadResult.data.file_size;
+          if (uploadResult.success && uploadResult.data) {
+            // Converter para formato array para manter compatibilidade
+            postData.file_paths = [uploadResult.data.path];
+            postData.file_names = [uploadResult.data.file_name];
+            postData.file_types = [uploadResult.data.file_type];
+            postData.file_sizes = [uploadResult.data.file_size];
             
-            console.log(`✅ Arquivo principal uploadado com sucesso para ${category}:`, {
+            console.log(`✅ Arquivo único uploadado e convertido para array para ${category}:`, {
               path: uploadResult.data.path,
               fileName: uploadResult.data.file_name,
               fileType: uploadResult.data.file_type,
@@ -439,13 +481,13 @@ export default function CreateContent() {
             }
             
             setUploadProgress(100);
-            } else {
-            console.error(`❌ Erro no upload do arquivo principal para ${category}:`, uploadResult.error);
+          } else {
+            console.error(`❌ Erro no upload do arquivo único para ${category}:`, uploadResult.error);
             setError(uploadResult.error || "Erro no upload do arquivo");
             toast.error(uploadResult.error || "Erro no upload do arquivo");
             return;
           }
-          } catch (uploadError) {
+        } catch (uploadError) {
           console.error(`❌ Erro inesperado no upload do arquivo para ${category}:`, uploadError);
           setError("Erro inesperado no upload do arquivo");
           toast.error("Erro inesperado no upload do arquivo");
@@ -539,6 +581,11 @@ export default function CreateContent() {
         setSelectedReadingTags([]); // Limpar tags de leitura selecionadas
         setMinAge(12); // ✅ LIMPAR IDADE MÍNIMA
         setMediaMode('url'); // Resetar para modo URL
+        
+        // ✅ LIMPAR NOVOS ESTADOS DE ARQUIVOS MÚLTIPLOS
+        setSelectedFiles([]);
+        setFileValidation(null);
+        setUploadedFilesData(null);
 
         // Redirecionar para página de detalhes do post criado após 2 segundos
         if (result.data?.id) {
@@ -1000,71 +1047,20 @@ export default function CreateContent() {
                         </div>
                       )}
 
-                      {/* Campo de Upload */}
+                      {/* ✅ NOVO COMPONENTE UNIFICADO DE UPLOAD */}
                       {mediaMode === 'file' && (
                         <div>
                           <label className="block text-sm font-medium mb-2 text-gray-700">
-                            Upload de Ficheiro
+                            {category === 'Shorts' ? 'Upload de Arquivos (Carousel)' : 'Upload de Arquivo'}
                           </label>
-                          <div className={`relative border-2 border-dashed rounded-xl transition-all ${
-                            file 
-                              ? 'border-green-300 bg-green-50' 
-                              : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50'
-                          }`}>
-                            <input
-                              type="file"
-                              className="absolute inset-0 opacity-0 cursor-pointer"
-                              onChange={handleFileChange}
-                              disabled={isUploading}
-                            />
-                            <div className="flex flex-col items-center justify-center py-8 px-6">
-                              {file ? (
-                                <>
-                                  <svg className="w-12 h-12 text-green-500 mb-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                  <p className="text-green-700 text-center">
-                                    <span className="font-medium">{file.name}</span>
-                                    <br />
-                                    <span className="text-sm text-green-600">
-                                      {(file.size / (1024 * 1024)).toFixed(2)} MB
-                                    </span>
-                                  </p>
-                                  <button
-                                    type="button"
-                                    onClick={() => setFile(null)}
-                                    className="mt-3 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500"
-                                  >
-                                    Remover Ficheiro
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <CloudUpload className="w-12 h-12 text-blue-500 mb-3" />
-                                  <p className="text-gray-700 text-center">
-                                    <span className="font-medium">Clique para fazer upload</span> ou arraste e solte
-                                    <br />
-                                    <span className="text-sm text-gray-500">Todos os formatos são aceitos</span>
-                                  </p>
-                                </>
-                              )}
-                            </div>
-                            
-                            {/* Barra de progresso */}
-                            {isUploading && uploadProgress > 0 && (
-                              <div className="absolute inset-x-0 bottom-0 px-6 pb-4">
-                                <div className="bg-gray-200 rounded-full h-2">
-                                  <div 
-                                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                                    style={{ width: `${uploadProgress}%` }}
-                                  />
-                                </div>
-                                <p className="text-xs text-gray-600 mt-1 text-center">
-                                  {uploadProgress}% completo
-                                </p>
-                              </div>
-                            )}
-                          </div>
+                          <PostFileUploader
+                            category={category}
+                            onFilesChange={setSelectedFiles}
+                            onValidationChange={setFileValidation}
+                            onUploadComplete={setUploadedFilesData}
+                            disabled={isUploading}
+                            value={selectedFiles}
+                          />
                         </div>
                       )}
                       
