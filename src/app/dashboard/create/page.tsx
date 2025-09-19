@@ -7,7 +7,7 @@ import Image from "next/image";
 import CMSLayout from "@/components/CMSLayout";
 import FlexibleRenderer from '@/components/FlexibleRenderer';
 import TipTapEditor from "@/components/TipTapEditor";
-import { createPost, CreatePostData, uploadFileForPost, getAllReadingTags, associateTagWithPost, createReadingTag, validatePostFiles, uploadPostFiles, type FileValidation } from "@/services/posts";
+import { createPost, CreatePostData, uploadFileForPost, getAllReadingTags, associateTagWithPost, createReadingTag, type FileValidation } from "@/services/posts";
 import { getMediaDuration } from "@/services/storage";
 import PostFileUploader from "@/components/PostFileUploader";
 import { useRouter } from "next/navigation";
@@ -225,12 +225,6 @@ export default function CreateContent() {
       getAllReadingTags().then(setReadingTags).catch(() => setReadingTags([]));
     }
   }, [category]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-    }
-  };
 
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
