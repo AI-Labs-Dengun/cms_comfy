@@ -33,9 +33,9 @@ const DropdownMenu: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 const DropdownMenuTrigger = React.forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }
->(({ className, children, asChild, onClick, ...props }, ref) => {
+>(({ className, children, onClick, ...props }, ref) => {
   const { open, setOpen } = useDropdownMenu()
-  
+
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault()
     setOpen(!open)
@@ -64,6 +64,17 @@ const DropdownMenuContent = React.forwardRef<
   const { open, setOpen } = useDropdownMenu()
   const contentRef = React.useRef<HTMLDivElement>(null)
 
+  // Assign forwarded ref to the internal ref so outside click detection works
+  const assignRef = (el: HTMLDivElement | null) => {
+    contentRef.current = el
+    if (!ref) return
+    if (typeof ref === 'function') {
+      try { ref(el) } catch {}
+    } else {
+      try { (ref as React.MutableRefObject<HTMLDivElement | null>).current = el } catch {}
+    }
+  }
+
   // Fecha o dropdown quando clica fora
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -82,7 +93,7 @@ const DropdownMenuContent = React.forwardRef<
 
   return (
     <div
-      ref={contentRef}
+      ref={assignRef}
       className={cn(
         "absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-white p-1 shadow-lg animate-in fade-in-0 zoom-in-95",
         align === "start" && "left-0",
@@ -133,7 +144,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
     onCheckedChange?: (checked: boolean) => void
   }
 >(({ className, children, checked, onCheckedChange, onClick, ...props }, ref) => {
-  const { setOpen } = useDropdownMenu()
+  // not using setOpen here; checkbox doesn't automatically close the dropdown
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     onCheckedChange?.(!checked)
