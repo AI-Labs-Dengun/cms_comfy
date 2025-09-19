@@ -2,9 +2,8 @@ import { Post } from "@/services/posts"
 import { ColumnDef } from "@tanstack/react-table"
 
 // Tipos específicos para o Data Table
-export interface DataTablePost extends Post {
-  // Estendemos Post para adicionar campos específicos do data table se necessário
-}
+// Alias para possíveis extensões específicas do data table em futuro
+export type DataTablePost = Post
 
 // Estados para filtros (simplificados para esta implementação)
 export interface FilterState {

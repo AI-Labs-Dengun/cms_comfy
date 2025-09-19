@@ -27,11 +27,10 @@ interface ManagementPageIntegrationProps {
   readingTagsMap: {[postId: string]: {id: string, name: string, color?: string}[]}
   onOpenPublishModal: (postId: string, postTitle: string, isPublished: boolean) => void
   onOpenDeleteModal: (postId: string, postTitle: string) => void
-  onViewPost: (postId: string) => void
 }
 
 export function useManagementPageIntegration({
-  posts,
+  posts: _posts,
   filteredPosts,
   loading,
   search,
@@ -39,8 +38,9 @@ export function useManagementPageIntegration({
   readingTagsMap,
   onOpenPublishModal,
   onOpenDeleteModal,
-  onViewPost,
 }: ManagementPageIntegrationProps) {
+  // Marca _posts como intencionalmente não usado para satisfazer o linter
+  void _posts
   const [isProcessingBulk, setIsProcessingBulk] = useState(false)
 
   // Converter filtros originais para o formato do DataTable
@@ -107,10 +107,6 @@ export function useManagementPageIntegration({
     onOpenDeleteModal(postId, title)
   }, [onOpenDeleteModal])
 
-  // Handler para ver post
-  const handleViewPost = useCallback((postId: string) => {
-    onViewPost(postId)
-  }, [onViewPost])
 
   return {
     // Dados para o DataTable
@@ -120,10 +116,9 @@ export function useManagementPageIntegration({
     readingTagsMap,
     
     // Handlers para o DataTable
-    handleBulkAction,
-    handlePublishToggle,
-    handleDeletePost,
-    handleViewPost,
+  handleBulkAction,
+  handlePublishToggle,
+  handleDeletePost,
     
     // Estado
     isProcessingBulk,

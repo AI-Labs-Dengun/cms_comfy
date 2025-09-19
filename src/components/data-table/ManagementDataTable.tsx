@@ -61,7 +61,6 @@ export function ManagementDataTable({
     handleBulkAction,
     handlePublishToggle,
     handleDeletePost,
-    handleViewPost,
   } = useManagementPageIntegration({
     posts,
     filteredPosts,
@@ -71,7 +70,6 @@ export function ManagementDataTable({
     readingTagsMap,
     onOpenPublishModal,
     onOpenDeleteModal,
-    onViewPost,
   })
 
   return (
