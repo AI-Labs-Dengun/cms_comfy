@@ -36,6 +36,19 @@ interface GroupedPosts {
   [key: string]: Post[];
 }
 
+// Tipos para ações em lote
+interface BulkActionState {
+  selectedPosts: Set<string>;
+  isPerformingAction: boolean;
+}
+
+interface BulkActionModal {
+  isOpen: boolean;
+  action: 'delete' | 'publish' | 'unpublish' | null;
+  posts: Post[];
+  isLoading: boolean;
+}
+
 export default function Management() {
   const router = useRouter();
   const { isAuthenticated, canAccessCMS, loading: authLoading } = useAuth();
@@ -104,6 +117,30 @@ export default function Management() {
     type: "info",
     title: "",
     message: ""
+  });
+
+  // Estados para seleção múltipla
+  const [bulkAction, setBulkAction] = useState<BulkActionState>({
+    selectedPosts: new Set(),
+    isPerformingAction: false
+  });
+
+  // Log das mudanças no estado de seleção
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔄 Estado bulkAction mudou:`, {
+        selectedCount: bulkAction.selectedPosts.size,
+        selectedIds: Array.from(bulkAction.selectedPosts),
+        isPerformingAction: bulkAction.isPerformingAction
+      });
+    }
+  }, [bulkAction]);
+
+  const [bulkActionModal, setBulkActionModal] = useState<BulkActionModal>({
+    isOpen: false,
+    action: null,
+    posts: [],
+    isLoading: false
   });
 
   const [readingTagsMap, setReadingTagsMap] = useState<{[postId: string]: {id: string, name: string, color?: string}[]}>({});
@@ -374,6 +411,384 @@ export default function Management() {
     }));
   };
 
+  // Funções para seleção múltipla
+  const togglePostSelection = (postId: string) => {
+    setBulkAction(prev => {
+      const newSelected = new Set(prev.selectedPosts);
+      if (newSelected.has(postId)) {
+        newSelected.delete(postId);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`➖ Post desmarcado: ${postId}. Total selecionados: ${newSelected.size}`);
+        }
+      } else {
+        newSelected.add(postId);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`➕ Post marcado: ${postId}. Total selecionados: ${newSelected.size}`);
+        }
+      }
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`📊 Posts selecionados:`, Array.from(newSelected));
+      }
+      return {
+        ...prev,
+        selectedPosts: newSelected
+      };
+    });
+  };
+
+  const selectAllPosts = () => {
+    setBulkAction(prev => ({
+      ...prev,
+      selectedPosts: new Set(filteredPosts.map(post => post.id))
+    }));
+  };
+
+  const selectAllPostsInGroup = (groupPosts: Post[]) => {
+    setBulkAction(prev => {
+      const newSelected = new Set(prev.selectedPosts);
+      groupPosts.forEach(post => newSelected.add(post.id));
+      return {
+        ...prev,
+        selectedPosts: newSelected
+      };
+    });
+  };
+
+  const clearSelection = () => {
+    setBulkAction(prev => ({
+      ...prev,
+      selectedPosts: new Set()
+    }));
+  };
+
+  const getSelectedPosts = () => {
+    const selectedIds = Array.from(bulkAction.selectedPosts);
+    const selected = posts.filter(post => bulkAction.selectedPosts.has(post.id));
+    
+    // Debug: Remover em produção
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📋 getSelectedPosts debug:`, {
+        selectedPostIds: selectedIds,
+        totalPosts: posts.length,
+        postsEncontrados: selected.length,
+        selectedPosts: selected.map(p => ({ id: p.id, title: p.title, published: p.is_published }))
+      });
+      
+      // Verificar se há IDs selecionados que não foram encontrados
+      const notFoundIds = selectedIds.filter(id => !posts.find(p => p.id === id));
+      if (notFoundIds.length > 0) {
+        console.warn(`⚠️ Posts selecionados não encontrados:`, notFoundIds);
+      }
+    }
+    
+    return selected;
+  };
+
+  // Função alternativa para obter posts selecionados dos filtrados (para ações de seleção)
+  const getSelectedPostsFromFiltered = () => {
+    return filteredPosts.filter(post => bulkAction.selectedPosts.has(post.id));
+  };
+
+  // Função para determinar ações disponíveis para posts selecionados
+  const getAvailableBulkActions = () => {
+    const selectedPosts = getSelectedPosts();
+    if (selectedPosts.length === 0) return [];
+
+    const publishedCount = selectedPosts.filter(post => post.is_published).length;
+    const unpublishedCount = selectedPosts.filter(post => !post.is_published).length;
+
+    const actions = [];
+
+    // Ação de deletar - só é possível se todos os posts estão despublicados
+    if (unpublishedCount === selectedPosts.length) {
+      actions.push('delete');
+    }
+
+    // Ações de publicar/despublicar
+    if (publishedCount === selectedPosts.length) {
+      // Todos publicados - mostrar opção de despublicar
+      actions.push('unpublish');
+    } else if (unpublishedCount === selectedPosts.length) {
+      // Todos despublicados - mostrar opção de publicar
+      actions.push('publish');
+    }
+    // Se há posts com status diferentes, não mostra ações de publicar/despublicar
+
+    return actions;
+  };
+
+  const openBulkActionModal = (action: 'delete' | 'publish' | 'unpublish') => {
+    const selectedPosts = getSelectedPosts();
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔓 Abrindo modal para ação "${action}" com ${selectedPosts.length} posts:`, selectedPosts.map(p => p.title));
+      console.log(`📋 Posts selecionados (IDs):`, Array.from(bulkAction.selectedPosts));
+      console.log(`📊 Estado da seleção:`, { 
+        selectedCount: bulkAction.selectedPosts.size,
+        postsEncontrados: selectedPosts.length,
+        todosOsPosts: posts.length 
+      });
+      console.log(`🔍 Verificação de consistência:`, {
+        bulkActionSize: bulkAction.selectedPosts.size,
+        getSelectedPostsLength: selectedPosts.length,
+        saoIguais: bulkAction.selectedPosts.size === selectedPosts.length
+      });
+    }
+    
+    if (selectedPosts.length === 0) {
+      showNotification("error", "Erro", "Nenhum post selecionado");
+      return;
+    }
+    
+    setBulkActionModal({
+      isOpen: true,
+      action,
+      posts: selectedPosts,
+      isLoading: false
+    });
+  };
+
+  const closeBulkActionModal = () => {
+    setBulkActionModal(prev => ({ ...prev, isOpen: false }));
+  };
+
+  // Handler para conectar DataTable bulk actions com nosso sistema
+  const handleDataTableBulkAction = (action: 'delete' | 'publish' | 'unpublish', selectedPosts: Post[]) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔗 DataTable bulk action interceptada: ${action} para ${selectedPosts.length} posts`);
+    }
+    
+    // Usar nosso sistema de modal de confirmação bulk
+    setBulkActionModal({
+      isOpen: true,
+      action,
+      posts: selectedPosts,
+      isLoading: false
+    });
+  };
+
+  // Função para validar a consistência dos dados antes de executar ações em lote
+  const validateBulkAction = (action: 'delete' | 'publish' | 'unpublish', selectedPosts: Post[]) => {
+    if (selectedPosts.length === 0) {
+      return { valid: false, error: 'Nenhum post selecionado' };
+    }
+
+    const publishedCount = selectedPosts.filter(post => post.is_published).length;
+    const unpublishedCount = selectedPosts.filter(post => !post.is_published).length;
+
+    switch (action) {
+      case 'delete':
+        if (publishedCount > 0) {
+          return { 
+            valid: false, 
+            error: `Não é possível deletar posts publicados. ${publishedCount} post${publishedCount !== 1 ? 's' : ''} publicado${publishedCount !== 1 ? 's' : ''} encontrado${publishedCount !== 1 ? 's' : ''}` 
+          };
+        }
+        break;
+      case 'publish':
+        if (publishedCount > 0) {
+          return { 
+            valid: false, 
+            error: `Não é possível publicar posts já publicados. ${publishedCount} post${publishedCount !== 1 ? 's' : ''} já publicado${publishedCount !== 1 ? 's' : ''} encontrado${publishedCount !== 1 ? 's' : ''}` 
+          };
+        }
+        break;
+      case 'unpublish':
+        if (unpublishedCount > 0) {
+          return { 
+            valid: false, 
+            error: `Não é possível despublicar posts já despublicados. ${unpublishedCount} post${unpublishedCount !== 1 ? 's' : ''} já despublicado${unpublishedCount !== 1 ? 's' : ''} encontrado${unpublishedCount !== 1 ? 's' : ''}` 
+          };
+        }
+        break;
+    }
+
+    return { valid: true };
+  };
+
+  // Função para executar ações em lote
+  const handleBulkAction = async (action: 'delete' | 'publish' | 'unpublish') => {
+    setBulkActionModal(prev => ({ ...prev, isLoading: true }));
+    
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🎯 INÍCIO handleBulkAction:`, {
+          action,
+          modalPosts: bulkActionModal.posts.length,
+          bulkActionSelectedPosts: bulkAction.selectedPosts.size,
+          modalPostTitles: bulkActionModal.posts.map(p => p.title),
+          selectedPostIds: Array.from(bulkAction.selectedPosts),
+          modalState: {
+            isOpen: bulkActionModal.isOpen,
+            action: bulkActionModal.action,
+            isLoading: bulkActionModal.isLoading
+          }
+        });
+      }
+      
+      // Usar os posts que estão no modal em vez de chamar getSelectedPosts() novamente
+      const selectedPosts = bulkActionModal.posts;
+      
+      if (selectedPosts.length === 0) {
+        showNotification("error", "Erro", "Nenhum post selecionado para processar");
+        setBulkActionModal(prev => ({ ...prev, isLoading: false }));
+        return;
+      }
+      
+      // Validar antes de executar
+      const validation = validateBulkAction(action, selectedPosts);
+      if (!validation.valid) {
+        showNotification("error", "Validação Falhou", validation.error!);
+        setBulkActionModal(prev => ({ ...prev, isLoading: false }));
+        return;
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🔄 Iniciando ação em lote "${action}" para ${selectedPosts.length} posts:`, selectedPosts.map(p => p.title));
+      }
+      
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+      const successfulPostIds: string[] = [];
+
+      // Processar todos os posts em paralelo para melhor performance
+      const promises = selectedPosts.map(async (post) => {
+        try {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`📝 Processando post: ${post.title} (ID: ${post.id})`);
+          }
+          let response;
+          
+          switch (action) {
+            case 'delete':
+              response = await deletePost(post.id);
+              break;
+            case 'publish':
+              response = await togglePostPublication(post.id, true);
+              break;
+            case 'unpublish':
+              response = await togglePostPublication(post.id, false);
+              break;
+          }
+
+          if (response?.success) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`✅ Sucesso para post: ${post.title}`);
+            }
+            return { success: true, postId: post.id, title: post.title };
+          } else {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`❌ Erro para post: ${post.title} - ${response?.error}`);
+            }
+            return { success: false, postId: post.id, title: post.title, error: response?.error || 'Erro desconhecido' };
+          }
+        } catch (error) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`💥 Exceção para post: ${post.title} - ${error}`);
+          }
+          return { success: false, postId: post.id, title: post.title, error: 'Erro inesperado' };
+        }
+      });
+
+      // Aguardar todos os resultados
+      const results = await Promise.all(promises);
+
+      // Processar resultados
+      results.forEach(result => {
+        if (result.success) {
+          successCount++;
+          successfulPostIds.push(result.postId);
+        } else {
+          errorCount++;
+          errors.push(`${result.title}: ${result.error}`);
+        }
+      });
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`📊 Resultados: ${successCount} sucessos, ${errorCount} erros`);
+        console.log(`📋 Posts processados com sucesso:`, successfulPostIds);
+      }
+
+      // Atualizar estado local baseado na ação
+      if (successCount > 0) {
+        if (action === 'delete') {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`🗑️ Removendo ${successfulPostIds.length} posts do estado local`);
+          }
+          // Remover posts deletados com sucesso
+          setPosts(prev => {
+            const filtered = prev.filter(post => !successfulPostIds.includes(post.id));
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📦 Estado atualizado: ${prev.length} -> ${filtered.length} posts`);
+            }
+            return filtered;
+          });
+        } else {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`📝 Atualizando status de publicação para ${successfulPostIds.length} posts`);
+          }
+          // Atualizar status de publicação dos posts que foram atualizados com sucesso
+          const newPublishState = action === 'publish';
+          setPosts(prev => {
+            const updated = prev.map(post => 
+              successfulPostIds.includes(post.id) 
+                ? { ...post, is_published: newPublishState }
+                : post
+            );
+            if (process.env.NODE_ENV === 'development') {
+              const updatedCount = updated.filter(p => successfulPostIds.includes(p.id)).length;
+              console.log(`📦 Status atualizado para ${updatedCount} posts (is_published: ${newPublishState})`);
+            }
+            return updated;
+          });
+        }
+      }
+
+      // Limpar seleção
+      clearSelection();
+      closeBulkActionModal();
+
+      // Recarregar dados para garantir consistência (opcional, para casos críticos)
+      if (successCount > 0 && process.env.NODE_ENV === 'development') {
+        setTimeout(() => {
+          loadPosts();
+        }, 1000);
+      }
+
+      // Mostrar notificação
+      if (errorCount === 0) {
+        const actionText = action === 'delete' ? 'eliminados' : 
+                          action === 'publish' ? 'publicados' : 'despublicados';
+        showNotification(
+          "success", 
+          "Sucesso!", 
+          `${successCount} post${successCount !== 1 ? 's' : ''} ${actionText} com sucesso!`
+        );
+      } else if (successCount === 0) {
+        showNotification(
+          "error", 
+          "Erro", 
+          `Erro ao processar todos os posts: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? ` e mais ${errors.length - 3}...` : ''}`
+        );
+      } else {
+        const actionText = action === 'delete' ? 'eliminados' : 
+                          action === 'publish' ? 'publicados' : 'despublicados';
+        showNotification(
+          "info", 
+          "Ação Parcial", 
+          `${successCount} post${successCount !== 1 ? 's' : ''} ${actionText}. ${errorCount} falharam: ${errors.slice(0, 2).join(', ')}${errors.length > 2 ? '...' : ''}`
+        );
+      }
+
+    } catch (error) {
+      console.error('💥 Erro geral na ação em lote:', error);
+      showNotification("error", "Erro", 'Erro inesperado ao processar ação em lote');
+    } finally {
+      setBulkActionModal(prev => ({ ...prev, isLoading: false }));
+    }
+  };
+
   // Função para obter ícone de ordenação
   const getSortIcon = (field: SortField) => {
     if (sortState.field !== field) {
@@ -518,6 +933,348 @@ export default function Management() {
       month: 'long',
       day: 'numeric'
     });
+  };
+
+  // Componente da barra de ações em lote
+  const BulkActionBar = () => {
+    const selectedCount = bulkAction.selectedPosts.size;
+    const availableActions = getAvailableBulkActions();
+    const selectedPosts = getSelectedPosts();
+    const publishedCount = selectedPosts.filter(post => post.is_published).length;
+    const unpublishedCount = selectedPosts.filter(post => !post.is_published).length;
+
+    if (selectedCount === 0) return null;
+
+    // Verificar se cada ação está disponível
+    const canDelete = availableActions.includes('delete');
+    const canPublish = availableActions.includes('publish');
+    const canUnpublish = availableActions.includes('unpublish');
+    const hasMixedStatus = publishedCount > 0 && unpublishedCount > 0;
+
+    // Debug log em desenvolvimento
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🎯 BulkActionBar debug:`, {
+        selectedCount,
+        selectedPosts: selectedPosts.map(p => p.title),
+        availableActions,
+        publishedCount,
+        unpublishedCount,
+        hasMixedStatus
+      });
+    }
+
+    return (
+      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg px-6 py-4 z-50">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-900">
+              {selectedCount} post{selectedCount !== 1 ? 's' : ''} selecionado{selectedCount !== 1 ? 's' : ''}
+            </span>
+            <button
+              onClick={clearSelection}
+              className="text-gray-500 hover:text-gray-700 text-sm"
+            >
+              Limpar seleção
+            </button>
+          </div>
+
+          <div className="h-4 border-l border-gray-300"></div>
+
+          <div className="flex items-center gap-3">
+            {/* Mensagem para status mistos */}
+            {hasMixedStatus && (
+              <div className="text-sm text-yellow-600 font-medium flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+                </svg>
+                Posts com status diferentes
+              </div>
+            )}
+
+            {/* Botão Deletar */}
+            <button
+              onClick={canDelete ? () => openBulkActionModal('delete') : undefined}
+              disabled={!canDelete}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                canDelete 
+                  ? 'bg-red-600 text-white hover:bg-red-700 cursor-pointer' 
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+              }`}
+              title={!canDelete ? 'Só é possível deletar posts que estão todos despublicados' : ''}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/>
+              </svg>
+              Eliminar {selectedCount} post{selectedCount !== 1 ? 's' : ''}
+            </button>
+
+            {/* Botão Publicar */}
+            <button
+              onClick={canPublish ? () => openBulkActionModal('publish') : undefined}
+              disabled={!canPublish}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                canPublish 
+                  ? 'bg-green-600 text-white hover:bg-green-700 cursor-pointer' 
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+              }`}
+              title={!canPublish ? 'Só é possível publicar posts que estão todos despublicados' : ''}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Publicar {selectedCount} post{selectedCount !== 1 ? 's' : ''}
+            </button>
+
+            {/* Botão Despublicar */}
+            <button
+              onClick={canUnpublish ? () => openBulkActionModal('unpublish') : undefined}
+              disabled={!canUnpublish}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                canUnpublish 
+                  ? 'bg-yellow-600 text-white hover:bg-yellow-700 cursor-pointer' 
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+              }`}
+              title={!canUnpublish ? 'Só é possível despublicar posts que estão todos publicados' : ''}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728"/>
+              </svg>
+              Despublicar {selectedCount} post{selectedCount !== 1 ? 's' : ''}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Componente do modal de ações em lote
+  const BulkActionModal = () => {
+    if (!bulkActionModal.isOpen || !bulkActionModal.action) return null;
+
+    // Debug log do modal
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📱 BulkActionModal debug:`, {
+        isOpen: bulkActionModal.isOpen,
+        action: bulkActionModal.action,
+        postsCount: bulkActionModal.posts.length,
+        posts: bulkActionModal.posts.map(p => ({ id: p.id, title: p.title }))
+      });
+    }
+
+    const getModalConfig = () => {
+      const count = bulkActionModal.posts.length;
+      switch (bulkActionModal.action) {
+        case 'delete':
+          return {
+            title: 'Eliminar Conteúdo',
+            actionText: 'Eliminar',
+            actionDescription: 'O conteúdo será eliminado permanentemente.',
+            statusText: 'Este conteúdo está atualmente publicado e será eliminado.',
+            iconBg: 'bg-red-100',
+            iconColor: 'text-red-600',
+            buttonBg: 'bg-red-600 hover:bg-red-700',
+            actionBoxBg: 'bg-red-50',
+            actionBoxBorder: 'border-red-200',
+            actionBoxIcon: 'text-red-600',
+            statusBoxBg: 'bg-blue-50',
+            statusBoxBorder: 'border-blue-200',
+            statusBoxIcon: 'text-blue-600',
+            icon: (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24">
+                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            )
+          };
+        case 'publish':
+          return {
+            title: 'Publicar Conteúdo',
+            actionText: 'Tornar público',
+            actionDescription: 'O conteúdo ficará visível para todos os usuários da plataforma.',
+            statusText: 'Este conteúdo está atualmente privado e não é visível publicamente.',
+            iconBg: 'bg-green-100',
+            iconColor: 'text-green-600',
+            buttonBg: 'bg-green-600 hover:bg-green-700',
+            actionBoxBg: 'bg-green-50',
+            actionBoxBorder: 'border-green-200',
+            actionBoxIcon: 'text-green-600',
+            statusBoxBg: 'bg-blue-50',
+            statusBoxBorder: 'border-blue-200',
+            statusBoxIcon: 'text-blue-600',
+            icon: (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24">
+                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            )
+          };
+        case 'unpublish':
+          return {
+            title: 'Despublicar Conteúdo',
+            actionText: 'Tornar privado',
+            actionDescription: 'O conteúdo deixará de estar visível publicamente.',
+            statusText: 'Este conteúdo está atualmente público e visível para todos.',
+            iconBg: 'bg-amber-100',
+            iconColor: 'text-amber-600',
+            buttonBg: 'bg-amber-600 hover:bg-amber-700',
+            actionBoxBg: 'bg-amber-50',
+            actionBoxBorder: 'border-amber-200',
+            actionBoxIcon: 'text-amber-600',
+            statusBoxBg: 'bg-blue-50',
+            statusBoxBorder: 'border-blue-200',
+            statusBoxIcon: 'text-blue-600',
+            icon: (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24">
+                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 11-4.243-4.243m4.242 4.242L9.88 9.88"/>
+              </svg>
+            )
+          };
+        default:
+          return {
+            title: 'Confirmar Ação',
+            actionText: 'Confirmar',
+            actionDescription: '',
+            statusText: '',
+            iconBg: 'bg-gray-100',
+            iconColor: 'text-gray-600',
+            buttonBg: 'bg-blue-600 hover:bg-blue-700',
+            actionBoxBg: 'bg-gray-50',
+            actionBoxBorder: 'border-gray-200',
+            actionBoxIcon: 'text-gray-600',
+            statusBoxBg: 'bg-blue-50',
+            statusBoxBorder: 'border-blue-200',
+            statusBoxIcon: 'text-blue-600',
+            icon: null
+          };
+      }
+    };
+
+    const config = getModalConfig();
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 overflow-hidden">
+          {/* Header */}
+          <div className="px-6 py-6 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${config.iconBg}`}>
+                  <div className={config.iconColor}>
+                    {config.icon}
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {config.title}
+                </h3>
+              </div>
+              <button
+                onClick={closeBulkActionModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24">
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="px-6 py-6 space-y-4">
+            {/* Posts List */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Conteúdo ({bulkActionModal.posts.length}):
+              </label>
+              <div className={`space-y-2 ${
+                bulkActionModal.posts.length > 10 
+                  ? 'max-h-60 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100' 
+                  : ''
+              }`}>
+                {bulkActionModal.posts.map((post) => (
+                  <div 
+                    key={post.id}
+                    className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700"
+                  >
+                    {post.title}
+                  </div>
+                ))}
+              </div>
+              {bulkActionModal.posts.length > 10 && (
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  Role para ver todos os {bulkActionModal.posts.length} posts selecionados
+                </p>
+              )}
+            </div>
+
+            {/* Action Info Box */}
+            <div className={`p-4 rounded-lg border ${config.actionBoxBg} ${config.actionBoxBorder}`}>
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 ${config.actionBoxIcon}`}>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 text-sm">
+                    {config.actionText}
+                  </h4>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {config.actionDescription}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Status Info Box */}
+            <div className={`p-4 rounded-lg border ${config.statusBoxBg} ${config.statusBoxBorder}`}>
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 ${config.statusBoxIcon}`}>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 text-sm">
+                    Status atual
+                  </h4>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {config.statusText}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="px-6 py-4 bg-gray-50 flex gap-3 justify-end">
+            <button
+              onClick={closeBulkActionModal}
+              disabled={bulkActionModal.isLoading}
+              className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => handleBulkAction(bulkActionModal.action!)}
+              disabled={bulkActionModal.isLoading}
+              className={`px-6 py-2.5 text-sm font-medium text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 ${config.buttonBg}`}
+            >
+              {bulkActionModal.isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  <span>Processando...</span>
+                </>
+              ) : (
+                <>
+                  <div className={config.iconColor}>
+                    {config.icon}
+                  </div>
+                  {config.actionText}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Verificações de segurança
@@ -1020,6 +1777,7 @@ export default function Management() {
                         readingTagsMap={readingTagsMap}
                         onOpenPublishModal={openPublishModal}
                         onOpenDeleteModal={openDeleteModal}
+                        onBulkAction={handleDataTableBulkAction}
                         onViewPost={(postId) => router.push(`/dashboard/details/${postId}`)}
                         showFilters={showFilters}
                         onToggleFilters={() => setShowFilters(!showFilters)}
@@ -1036,12 +1794,37 @@ export default function Management() {
                         {/* Cabeçalho do grupo */}
                         {showGroupedView && (
                           <div className="bg-gray-50 px-6 py-3 border-b">
-                            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                              <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
-                                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 0 1 0 2.828l-7 7a2 2 0 0 1-2.828 0l-7-7A1.994 1.994 0 0 1 3 12V7a4 4 0 0 1 4-4Z"/>
-                              </svg>
-                              {groupName} ({groupPosts.length} posts)
-                            </h3>
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 0 1 0 2.828l-7 7a2 2 0 0 1-2.828 0l-7-7A1.994 1.994 0 0 1 3 12V7a4 4 0 0 1 4-4Z"/>
+                                </svg>
+                                {groupName} ({groupPosts.length} posts)
+                              </h3>
+                              <div className="flex items-center gap-2">
+                                <label className="text-xs text-gray-600">Selecionar grupo:</label>
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  checked={groupPosts.every(post => bulkAction.selectedPosts.has(post.id))}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      selectAllPostsInGroup(groupPosts);
+                                    } else {
+                                      // Deselecionar todos os posts do grupo
+                                      setBulkAction(prev => {
+                                        const newSelected = new Set(prev.selectedPosts);
+                                        groupPosts.forEach(post => newSelected.delete(post.id));
+                                        return {
+                                          ...prev,
+                                          selectedPosts: newSelected
+                                        };
+                                      });
+                                    }
+                                  }}
+                                />
+                              </div>
+                            </div>
                           </div>
                         )}
                         
@@ -1051,6 +1834,28 @@ export default function Management() {
                             <table className="min-w-full divide-y divide-gray-200">
                               <thead className="bg-gray-50">
                                 <tr>
+                                  <th className="px-6 py-3 text-left">
+                                    <input
+                                      type="checkbox"
+                                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                      checked={groupPosts.length > 0 && groupPosts.every(post => bulkAction.selectedPosts.has(post.id))}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          selectAllPostsInGroup(groupPosts);
+                                        } else {
+                                          // Deselecionar todos os posts do grupo
+                                          setBulkAction(prev => {
+                                            const newSelected = new Set(prev.selectedPosts);
+                                            groupPosts.forEach(post => newSelected.delete(post.id));
+                                            return {
+                                              ...prev,
+                                              selectedPosts: newSelected
+                                            };
+                                          });
+                                        }
+                                      }}
+                                    />
+                                  </th>
                                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     <button
                                       onClick={() => toggleSort('title')}
@@ -1106,7 +1911,19 @@ export default function Management() {
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-200">
                                 {groupPosts.map((post) => (
-                                  <tr key={post.id} className="hover:bg-gray-50 transition-colors">
+                                  <tr key={post.id} className={`transition-colors ${
+                                    bulkAction.selectedPosts.has(post.id) 
+                                      ? 'bg-blue-50 hover:bg-blue-100' 
+                                      : 'hover:bg-gray-50'
+                                  }`}>
+                                    <td className="px-6 py-4">
+                                      <input
+                                        type="checkbox"
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        checked={bulkAction.selectedPosts.has(post.id)}
+                                        onChange={() => togglePostSelection(post.id)}
+                                      />
+                                    </td>
                                     <td className="px-6 py-4">
                                       <div className="flex flex-col">
                                         <button
@@ -1259,15 +2076,27 @@ export default function Management() {
                         {/* Layout Mobile - Cards */}
                         <div className="lg:hidden space-y-4">
                           {groupPosts.map((post) => (
-                            <div key={post.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                              {/* Título e Status */}
-                              <div className="flex items-start justify-between mb-3">
-                                <h3 
-                                  className="text-lg font-semibold text-gray-900 cursor-pointer hover:text-blue-600 flex-1 mr-3"
-                                  onClick={() => router.push(`/dashboard/details/${post.id}`)}
-                                >
-                                  {post.title}
-                                </h3>
+                            <div key={post.id} className={`border border-gray-200 rounded-lg p-4 transition-colors ${
+                              bulkAction.selectedPosts.has(post.id) 
+                                ? 'bg-blue-50 border-blue-300' 
+                                : 'hover:bg-gray-50'
+                            }`}>
+                              {/* Header com checkbox, título e status */}
+                              <div className="flex items-start gap-3 mb-3">
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1"
+                                  checked={bulkAction.selectedPosts.has(post.id)}
+                                  onChange={() => togglePostSelection(post.id)}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <h3 
+                                    className="text-lg font-semibold text-gray-900 cursor-pointer hover:text-blue-600 mb-2"
+                                    onClick={() => router.push(`/dashboard/details/${post.id}`)}
+                                  >
+                                    {post.title}
+                                  </h3>
+                                </div>
                                 <span className={`px-2 py-1 rounded text-xs font-medium flex-shrink-0 ${
                                   post.is_published 
                                     ? 'bg-green-100 text-green-800' 
@@ -1433,6 +2262,9 @@ export default function Management() {
         </div>
       </CMSLayout>
 
+      {/* Barra de ações em lote */}
+      <BulkActionBar />
+
       {/* Feature flag toggle - apenas em desenvolvimento */}
       {process.env.NODE_ENV === 'development' && (
         <DataTableFeatureFlag
@@ -1442,6 +2274,8 @@ export default function Management() {
       )}
 
       {/* Modais - Renderizados fora do CMSLayout para garantir z-index correto */}
+      <BulkActionModal />
+      
       <DeleteConfirmationModal
         isOpen={deleteModal.isOpen}
         onClose={closeDeleteModal}

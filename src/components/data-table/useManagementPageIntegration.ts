@@ -27,6 +27,8 @@ interface ManagementPageIntegrationProps {
   readingTagsMap: {[postId: string]: {id: string, name: string, color?: string}[]}
   onOpenPublishModal: (postId: string, postTitle: string, isPublished: boolean) => void
   onOpenDeleteModal: (postId: string, postTitle: string) => void
+  // Adicionar handlers para bulk actions
+  onBulkAction?: (action: BulkActionType, posts: Post[]) => void
 }
 
 export function useManagementPageIntegration({
@@ -38,6 +40,7 @@ export function useManagementPageIntegration({
   readingTagsMap,
   onOpenPublishModal,
   onOpenDeleteModal,
+  onBulkAction,
 }: ManagementPageIntegrationProps) {
   // Marca _posts como intencionalmente não usado para satisfazer o linter
   void _posts
@@ -58,13 +61,18 @@ export function useManagementPageIntegration({
   const handleBulkAction = useCallback(async (action: BulkActionType, selectedPosts: Post[]) => {
     if (selectedPosts.length === 0) return
 
+    console.log(`Executando ação em lote: ${action} para ${selectedPosts.length} posts`)
+    
+    // Se há um handler personalizado para bulk actions, usá-lo
+    if (onBulkAction) {
+      onBulkAction(action, selectedPosts)
+      return
+    }
+
+    // Caso contrário, usar a lógica de fallback (modal individual para o primeiro post)
     setIsProcessingBulk(true)
     try {
-      // Mostrar notificação sobre a ação em lote
-      console.log(`Executando ação em lote: ${action} para ${selectedPosts.length} posts`)
-      
-      // Para ações em lote, vamos processar um post de cada vez
-      // mas abrir apenas um modal por vez (para o primeiro post válido)
+      // Filtrar posts válidos para a ação
       const validPosts = selectedPosts.filter(post => {
         switch (action) {
           case 'publish':
@@ -80,6 +88,8 @@ export function useManagementPageIntegration({
 
       if (validPosts.length > 0) {
         const firstPost = validPosts[0]
+        console.warn(`⚠️ Usando fallback: processando apenas o primeiro de ${validPosts.length} posts válidos`)
+        
         switch (action) {
           case 'publish':
           case 'unpublish':
@@ -95,7 +105,7 @@ export function useManagementPageIntegration({
     } finally {
       setIsProcessingBulk(false)
     }
-  }, [onOpenPublishModal, onOpenDeleteModal])
+  }, [onOpenPublishModal, onOpenDeleteModal, onBulkAction])
 
   // Handler para publicar/despublicar individual
   const handlePublishToggle = useCallback((postId: string, title: string, isPublished: boolean) => {

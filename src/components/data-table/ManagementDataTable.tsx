@@ -3,6 +3,7 @@
 import { PostsDataTable } from "./PostsDataTable"
 import { useManagementPageIntegration } from "./useManagementPageIntegration"
 import { Post } from "@/services/posts"
+import { BulkActionType } from "./types"
 
 // Filtros da página atual (mantendo compatibilidade total)
 interface OriginalFilterState {
@@ -26,6 +27,7 @@ interface ManagementDataTableProps {
   readingTagsMap: {[postId: string]: {id: string, name: string, color?: string}[]}
   onOpenPublishModal: (postId: string, postTitle: string, isPublished: boolean) => void
   onOpenDeleteModal: (postId: string, postTitle: string) => void
+  onBulkAction?: (action: BulkActionType, posts: Post[]) => void
   onViewPost: (postId: string) => void
   // Novos props para controles
   showFilters?: boolean
@@ -45,6 +47,7 @@ export function ManagementDataTable({
   readingTagsMap,
   onOpenPublishModal,
   onOpenDeleteModal,
+  onBulkAction,
   onViewPost,
   showFilters = false,
   onToggleFilters,
@@ -70,6 +73,7 @@ export function ManagementDataTable({
     readingTagsMap,
     onOpenPublishModal,
     onOpenDeleteModal,
+    onBulkAction,
   })
 
   return (
