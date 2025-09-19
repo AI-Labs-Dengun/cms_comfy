@@ -1,13 +1,31 @@
 import { supabase } from '@/lib/supabase'
 import { uploadFile, getMediaDuration } from './storage'
 
-// Tipos para os posts
+// Tipos para validação de arquivos
+export interface FileValidation {
+  valid: boolean;
+  is_carousel: boolean;
+  is_single_video: boolean;
+  is_single_image: boolean;
+  error?: string;
+  file_count: number;
+  category: string;
+  type: 'carousel' | 'single_image' | 'single_video' | 'unknown';
+}
+
+// Tipos para os posts (ATUALIZADO para suportar arrays)
 export interface CreatePostData {
   title: string
   description: string
   category: 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura'
   content?: string 
   content_url?: string
+  // ✅ CAMPOS UNIFICADOS: suportam 1 ou múltiplos arquivos
+  file_paths?: string[]
+  file_names?: string[]
+  file_types?: string[]
+  file_sizes?: number[]
+  // ⚠️ CAMPOS ANTIGOS: mantidos para compatibilidade (serão removidos na Fase 5)
   file_path?: string
   file_name?: string
   file_type?: string
@@ -27,6 +45,12 @@ export interface Post {
   category: string
   content?: string
   content_url?: string
+  // ✅ CAMPOS UNIFICADOS: suportam 1 ou múltiplos arquivos
+  file_paths?: string[]
+  file_names?: string[]
+  file_sizes?: number[]
+  file_types?: string[]
+  // ⚠️ CAMPOS ANTIGOS: mantidos para compatibilidade (serão removidos na Fase 5)
   file_path?: string
   file_name?: string
   file_size?: number
@@ -54,6 +78,232 @@ export interface ApiResponse<T = unknown> {
   data?: T
 }
 
+// ✅ FUNÇÕES DE VALIDAÇÃO CLIENT-SIDE (espelham backend)
+
+// Validação client-side que espelha validate_post_files() do backend
+export function validatePostFiles(files: File[], category: string): FileValidation {
+  const filesCount = files.length;
+  
+  if (filesCount === 0) {
+    return {
+      valid: false,
+      is_carousel: false,
+      is_single_video: false,
+      is_single_image: false,
+      error: 'Nenhum arquivo selecionado',
+      file_count: 0,
+      category,
+      type: 'unknown'
+    };
+  }
+  
+  // Analisar tipos de arquivo
+  const imageFiles = files.filter(f => f.type.startsWith('image/'));
+  const videoFiles = files.filter(f => f.type.startsWith('video/'));
+  const audioFiles = files.filter(f => f.type.startsWith('audio/'));
+  
+  const allImages = imageFiles.length === filesCount;
+  const allVideos = videoFiles.length === filesCount;
+  const allAudios = audioFiles.length === filesCount;
+  const mixedTypes = (imageFiles.length > 0 ? 1 : 0) + 
+                     (videoFiles.length > 0 ? 1 : 0) + 
+                     (audioFiles.length > 0 ? 1 : 0) > 1;
+
+  // REGRA GLOBAL: Nunca misturar tipos de arquivo
+  if (mixedTypes) {
+    return {
+      valid: false,
+      is_carousel: false,
+      is_single_video: false,
+      is_single_image: false,
+      error: 'Não é possível misturar imagens, vídeos e áudios no mesmo post',
+      file_count: filesCount,
+      category,
+      type: 'unknown'
+    };
+  }
+
+  // REGRA ESPECÍFICA PARA SHORTS
+  if (category === 'Shorts') {
+    // Vídeo único para Shorts
+    if (allVideos && filesCount > 1) {
+      return {
+        valid: false,
+        is_carousel: false,
+        is_single_video: false,
+        is_single_image: false,
+        error: 'Apenas 1 vídeo permitido para Shorts',
+        file_count: filesCount,
+        category,
+        type: 'unknown'
+      };
+    }
+    
+    // Múltiplas imagens para Shorts (máximo 5)
+    if (allImages && filesCount > 5) {
+      return {
+        valid: false,
+        is_carousel: false,
+        is_single_video: false,
+        is_single_image: false,
+        error: 'Máximo 5 imagens permitidas para Shorts',
+        file_count: filesCount,
+        category,
+        type: 'unknown'
+      };
+    }
+    
+    // Múltiplos arquivos devem ser todas imagens
+    if (filesCount > 1 && !allImages) {
+      return {
+        valid: false,
+        is_carousel: false,
+        is_single_video: false,
+        is_single_image: false,
+        error: 'Para múltiplos arquivos em Shorts, todos devem ser imagens',
+        file_count: filesCount,
+        category,
+        type: 'unknown'
+      };
+    }
+
+    // Áudio não é suportado para Shorts
+    if (allAudios) {
+      return {
+        valid: false,
+        is_carousel: false,
+        is_single_video: false,
+        is_single_image: false,
+        error: 'Arquivos de áudio não são suportados para Shorts',
+        file_count: filesCount,
+        category,
+        type: 'unknown'
+      };
+    }
+  } else {
+    // REGRA PARA OUTRAS CATEGORIAS: apenas arquivo único
+    if (filesCount > 1) {
+      return {
+        valid: false,
+        is_carousel: false,
+        is_single_video: false,
+        is_single_image: false,
+        error: `Categoria "${category}" permite apenas 1 arquivo`,
+        file_count: filesCount,
+        category,
+        type: 'unknown'
+      };
+    }
+  }
+
+  // VALIDAÇÃO GERAL: arquivo deve ser imagem, vídeo ou áudio
+  if (!allImages && !allVideos && !allAudios) {
+    return {
+      valid: false,
+      is_carousel: false,
+      is_single_video: false,
+      is_single_image: false,
+      error: 'Tipo de arquivo não suportado',
+      file_count: filesCount,
+      category,
+      type: 'unknown'
+    };
+  }
+
+  // Se chegou até aqui, está válido
+  const isCarousel = filesCount > 1 && allImages && category === 'Shorts';
+  const isSingleVideo = filesCount === 1 && allVideos;
+  const isSingleImage = filesCount === 1 && allImages;
+
+  return {
+    valid: true,
+    is_carousel: isCarousel,
+    is_single_video: isSingleVideo,
+    is_single_image: isSingleImage,
+    file_count: filesCount,
+    category,
+    type: isCarousel ? 'carousel' : (isSingleVideo ? 'single_video' : 'single_image')
+  };
+}
+
+// Upload unificado: suporta 1 ou múltiplos arquivos
+export async function uploadPostFiles(files: File[]): Promise<{
+  success: boolean;
+  data?: {
+    file_paths: string[];
+    file_names: string[];
+    file_types: string[];
+    file_sizes: number[];
+    durations?: number[];
+  };
+  error?: string;
+}> {
+  try {
+    if (files.length === 0) {
+      return {
+        success: false,
+        error: 'Nenhum arquivo fornecido para upload'
+      };
+    }
+
+    const file_paths: string[] = [];
+    const file_names: string[] = [];
+    const file_types: string[] = [];
+    const file_sizes: number[] = [];
+    const durations: number[] = [];
+
+    // Upload de cada arquivo
+    for (const file of files) {
+      const uploadResult = await uploadFile(file);
+      
+      if (!uploadResult.success || !uploadResult.path) {
+        return {
+          success: false,
+          error: `Erro no upload do arquivo ${file.name}: ${uploadResult.error}`
+        };
+      }
+
+      file_paths.push(uploadResult.path);
+      file_names.push(uploadResult.file_name || file.name);
+      file_types.push(uploadResult.file_type || file.type);
+      file_sizes.push(uploadResult.file_size || file.size);
+
+      // Para vídeos/áudios, tentar obter duração
+      if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
+        try {
+          // Usar URL temporária para obter duração
+          if (uploadResult.url) {
+            const durationResult = await getMediaDuration(uploadResult.url);
+            if (durationResult.success && durationResult.duration) {
+              durations.push(durationResult.duration);
+            }
+          }
+        } catch (error) {
+          console.warn(`Não foi possível obter duração para ${file.name}:`, error);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        file_paths,
+        file_names,
+        file_types,
+        file_sizes,
+        durations: durations.length > 0 ? durations : undefined
+      }
+    };
+
+  } catch (error) {
+    console.error('Erro inesperado no upload dos arquivos:', error);
+    return {
+      success: false,
+      error: 'Erro inesperado no upload dos arquivos'
+    };
+  }
+}
+
 // Função para criar um post
 export async function createPost(postData: CreatePostData): Promise<ApiResponse<Post>> {
   try {
@@ -75,11 +325,15 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       }
     }
 
-    // Validar conteúdo (URL ou arquivo)
-    if (!postData.content_url && !postData.file_path) {
+    // Validar conteúdo (URL ou arquivos)
+    const hasContentUrl = postData.content_url && postData.content_url.trim();
+    const hasFiles = postData.file_paths && postData.file_paths.length > 0;
+    const hasOldFile = postData.file_path; // Compatibilidade com formato antigo
+    
+    if (!hasContentUrl && !hasFiles && !hasOldFile) {
       return {
         success: false,
-        error: 'É necessário fornecer uma URL ou fazer upload de um arquivo'
+        error: 'É necessário fornecer uma URL ou fazer upload de arquivo(s)'
       }
     }
 
@@ -99,7 +353,7 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       }
     }
 
-    // Chamar a função do banco de dados
+    // Chamar a função do banco de dados com campos unificados
     const { data, error } = await supabase.rpc('create_post', {
       author_id_param: user.id,
       title_param: postData.title,
@@ -109,9 +363,11 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       content_url_param: postData.content_url || null,
       tags_param: postData.tags || [],
       emotion_tags_param: postData.emotion_tags || [],
-      file_path_param: postData.file_path || null,
-      file_name_param: postData.file_name || null,
-      file_type_param: postData.file_type || null,
+      // ✅ CAMPOS UNIFICADOS: suportam 1 ou múltiplos arquivos
+      file_paths_param: postData.file_paths || (postData.file_path ? [postData.file_path] : null),
+      file_names_param: postData.file_names || (postData.file_name ? [postData.file_name] : null),
+      file_sizes_param: postData.file_sizes || (postData.file_size ? [postData.file_size] : null),
+      file_types_param: postData.file_types || (postData.file_type ? [postData.file_type] : null),
       duration_param: duration || null, 
       thumbnail_url_param: postData.thumbnail_url || null, 
       min_age_param: postData.min_age || 12 
