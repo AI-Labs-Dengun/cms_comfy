@@ -7,6 +7,7 @@ import { getUserPosts, togglePostPublication, deletePost, Post, getTagsForPost }
 import { useAuth } from "@/context/AuthContext";
 import { DeleteConfirmationModal, PublishToggleModal, NotificationModal } from "@/components/modals";
 import { EMOTIONS } from '@/lib/emotions';
+import { ManagementDataTable, DataTableFeatureFlag } from "@/components/data-table";
 
 // Tipos para os filtros
 interface FilterState {
@@ -106,6 +107,22 @@ export default function Management() {
   });
 
   const [readingTagsMap, setReadingTagsMap] = useState<{[postId: string]: {id: string, name: string, color?: string}[]}>({});
+
+  // Feature flag para alternar entre tabela atual e DataTable
+  const [useNewDataTable, setUseNewDataTable] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cms-use-new-datatable')
+      return saved === 'true'
+    }
+    return false
+  });
+
+  // Persist feature flag state
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cms-use-new-datatable', String(useNewDataTable))
+    }
+  }, [useNewDataTable]);
 
   // Buscar posts ao carregar o componente
   useEffect(() => {
@@ -535,80 +552,62 @@ export default function Management() {
               <p className="mt-1 text-gray-600">Monitore e edite o seu conteúdo de forma eficiente</p>
             </div>
             
-            {/* Controles e filtros */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-              {/* Barra de busca principal */}
-              <div className="mb-4">
-                <div className="relative max-w-2xl">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24">
-                      <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1 0 6.5 6.5a7.5 7.5 0 0 0 10.6 10.6Z"/>
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Pesquise por título, categoria, tag ou tag de emoção"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    style={{ fontFamily: 'Inter, Quicksand, sans-serif' }}
-                  />
-                </div>
-              </div>
-
-              {/* Linha de controles */}
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
-                      <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2.586a1 1 0 0 1-.293.707l-6.414 6.414a1 1 0 0 0-.293.707V17l-4 4v-6.586a1 1 0 0 0-.293-.707L3.293 7.293A1 1 0 0 1 3 6.586V4Z"/>
-                    </svg>
-                    {showFilters ? 'Ocultar Filtros' : 'Filtros Avançados'}
-                  </button>
-                  
-                  <button
-                    onClick={() => setShowGroupedView(!showGroupedView)}
-                    className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg focus:outline-none focus:ring-2 transition-colors ${
-                      showGroupedView 
-                        ? 'text-blue-700 bg-blue-50 border border-blue-300 hover:bg-blue-100 focus:ring-blue-500'
-                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 focus:ring-blue-500'
-                    }`}
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
-                      <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2m14 0V9a2 2 0 0 0-2-2M5 11V9a2 2 0 0 1 2-2m0 0V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M7 7h10"/>
-                    </svg>
-                    {showGroupedView ? 'Vista Normal' : 'Agrupar por Tag'}
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {!loading && !error && (
-                    <span className="text-sm text-gray-600 font-medium">
-                      {filteredPosts.length} de {posts.length} posts
-                    </span>
-                  )}
-                  
-                  {hasActiveFilters() && (
-                    <button
-                      onClick={clearAllFilters}
-                      className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                    >
-                      <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24">
-                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+            {/* Filtros avançados para implementação original */}
+            {!useNewDataTable && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                {/* Barra de busca principal */}
+                <div className="mb-4">
+                  <div className="relative max-w-2xl">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24">
+                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1 0 6.5 6.5a7.5 7.5 0 0 0 10.6 10.6Z"/>
                       </svg>
-                      Limpar
-                    </button>
-                  )}
+                    </div>
+                    <input
+                      type="text"
+                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Pesquise por título, categoria, tag ou tag de emoção"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      style={{ fontFamily: 'Inter, Quicksand, sans-serif' }}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {/* Painel de filtros expandido */}
-              {showFilters && (
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+                {/* Linha de controles */}
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2.586a1 1 0 0 1-.293.707l-6.414 6.414a1 1 0 0 0-.293.707V17l-4 4v-6.586a1 1 0 0 0-.293-.707L3.293 7.293A1 1 0 0 1 3 6.586V4Z"/>
+                      </svg>
+                      {showFilters ? 'Ocultar Filtros' : 'Filtros Avançados'}
+                    </button>
+                    
+                    <button
+                      onClick={() => setShowGroupedView(!showGroupedView)}
+                      className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+                        showGroupedView 
+                          ? 'text-blue-700 bg-blue-50 border border-blue-300 hover:bg-blue-100 focus:ring-blue-500'
+                          : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 focus:ring-blue-500'
+                      }`}
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2m14 0V9a2 2 0 0 0-2-2M5 11V9a2 2 0 0 1 2-2m0 0V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M7 7h10"/>
+                      </svg>
+                      {showGroupedView ? 'Vista Normal' : 'Agrupar por Tag'}
+                    </button>
+                  </div>
+
+                </div>
+
+                {/* Painel de filtros expandido */}
+                {showFilters && (
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
                     {/* Filtro por título */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -782,6 +781,7 @@ export default function Management() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Status e filtros ativos */}
             {!loading && !error && (
@@ -1008,6 +1008,29 @@ export default function Management() {
                   </div>
                 ) : (
                   <div className="w-full space-y-6">
+                    {/* Alternar entre implementação atual e nova DataTable */}
+                    {useNewDataTable ? (
+                      /* Nova implementação com DataTable */
+                      <ManagementDataTable
+                        posts={posts}
+                        filteredPosts={filteredPosts}
+                        loading={loading}
+                        search={search}
+                        filters={filters}
+                        readingTagsMap={readingTagsMap}
+                        onOpenPublishModal={openPublishModal}
+                        onOpenDeleteModal={openDeleteModal}
+                        onViewPost={(postId) => router.push(`/dashboard/details/${postId}`)}
+                        showFilters={showFilters}
+                        onToggleFilters={() => setShowFilters(!showFilters)}
+                        showGroupedView={showGroupedView}
+                        onToggleGroupedView={() => setShowGroupedView(!showGroupedView)}
+                        hasActiveFilters={hasActiveFilters()}
+                        onClearAllFilters={clearAllFilters}
+                      />
+                    ) : (
+                      /* Implementação atual (original) */
+                      <>
                     {Object.entries(processedPosts).map(([groupName, groupPosts]) => (
                       <div key={groupName} className="bg-white rounded-lg shadow border overflow-hidden">
                         {/* Cabeçalho do grupo */}
@@ -1400,6 +1423,8 @@ export default function Management() {
                         </div>
                       </div>
                     ))}
+                      </>
+                    )}
                   </div>
                 )}
               </>
@@ -1407,6 +1432,14 @@ export default function Management() {
           </div>
         </div>
       </CMSLayout>
+
+      {/* Feature flag toggle - apenas em desenvolvimento */}
+      {process.env.NODE_ENV === 'development' && (
+        <DataTableFeatureFlag
+          enabled={useNewDataTable}
+          onToggle={setUseNewDataTable}
+        />
+      )}
 
       {/* Modais - Renderizados fora do CMSLayout para garantir z-index correto */}
       <DeleteConfirmationModal
@@ -1438,6 +1471,14 @@ export default function Management() {
         title={notification.title}
         message={notification.message}
       />
+
+      {/* Feature flag para desenvolvimento */}
+      {process.env.NODE_ENV === 'development' && (
+        <DataTableFeatureFlag
+          enabled={useNewDataTable}
+          onToggle={setUseNewDataTable}
+        />
+      )}
     </>
   );
 } 
