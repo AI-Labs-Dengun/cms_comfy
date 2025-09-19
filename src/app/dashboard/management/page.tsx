@@ -436,6 +436,7 @@ export default function Management() {
     });
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const selectAllPosts = () => {
     setBulkAction(prev => ({
       ...prev,
@@ -485,6 +486,7 @@ export default function Management() {
   };
 
   // Função alternativa para obter posts selecionados dos filtrados (para ações de seleção)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getSelectedPostsFromFiltered = () => {
     return filteredPosts.filter(post => bulkAction.selectedPosts.has(post.id));
   };
@@ -1062,6 +1064,7 @@ export default function Management() {
     }
 
     const getModalConfig = () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const count = bulkActionModal.posts.length;
       switch (bulkActionModal.action) {
         case 'delete':
