@@ -266,9 +266,16 @@ export default function CreateContent() {
     setMediaMode(mode);
     // Limpar o campo que não está sendo usado
     if (mode === 'url') {
+      // Limpar arquivos (tanto sistema antigo quanto novo)
       setFile(null);
+      setSelectedFiles([]);
+      setFileValidation(null);
+      setUploadedFilesData(null);
+      setError(null); // Limpar erros de validação
     } else {
+      // Limpar URL
       setContentUrl('');
+      setError(null); // Limpar erros de validação
     }
   };
 
@@ -320,20 +327,29 @@ export default function CreateContent() {
         return;
       }
 
-      // ✅ NOVA VALIDAÇÃO: Conteúdo (URL, arquivos múltiplos ou arquivo único)
+      // ✅ VALIDAÇÃO ESPECÍFICA PARA CONTEÚDO: URL ou arquivos (um OU outro)
       const hasContentUrl = contentUrl.trim();
       const hasUploadedFiles = uploadedFilesData && uploadedFilesData.file_paths.length > 0;
       const hasOldFile = file; // Compatibilidade
+      const hasSelectedFiles = selectedFiles.length > 0 && fileValidation?.valid;
       
-      if (!hasContentUrl && !hasUploadedFiles && !hasOldFile) {
-        setError("Conteúdo é obrigatório. Forneça uma URL ou faça upload de arquivo(s)");
-        toast.error("Conteúdo é obrigatório. Forneça uma URL ou faça upload de arquivo(s)");
+      // Para todas as categorias, incluindo Shorts, é obrigatório ter OU URL OU arquivo
+      if (!hasContentUrl && !hasUploadedFiles && !hasOldFile && !hasSelectedFiles) {
+        const errorMsg = category === "Shorts" 
+          ? "Para Shorts, forneça uma URL (YouTube, Instagram, TikTok) ou faça upload de arquivo"
+          : "Conteúdo é obrigatório. Forneça uma URL ou faça upload de arquivo(s)";
+        setError(errorMsg);
+        toast.error(errorMsg);
         return;
       }
 
-      if (hasContentUrl && (hasUploadedFiles || hasOldFile)) {
-        setError("Escolha apenas uma opção: URL ou arquivo(s), não ambos");
-        toast.error("Escolha apenas uma opção: URL ou arquivo(s), não ambos");
+      // Não permitir URL e arquivo ao mesmo tempo (para todas as categorias)
+      if (hasContentUrl && (hasUploadedFiles || hasOldFile || hasSelectedFiles)) {
+        const errorMsg = category === "Shorts"
+          ? "Para Shorts, escolha apenas uma opção: URL ou upload de arquivo, não ambos"
+          : "Escolha apenas uma opção: URL ou arquivo(s), não ambos";
+        setError(errorMsg);
+        toast.error(errorMsg);
         return;
       }
 
@@ -429,6 +445,65 @@ export default function CreateContent() {
           paths: uploadedFilesData.file_paths,
           types: uploadedFilesData.file_types
         });
+      } else if (selectedFiles.length > 0 && fileValidation?.valid && !contentUrl.trim()) {
+        // ✅ NOVO: Upload dos arquivos selecionados durante a submissão
+        console.log(`📤 Fazendo upload de arquivos selecionados para categoria ${category}:`, {
+          filesCount: selectedFiles.length,
+          fileNames: selectedFiles.map(f => f.name),
+          fileSizes: selectedFiles.map(f => f.size),
+          fileTypes: selectedFiles.map(f => f.type)
+        });
+        
+        setUploadProgress(0);
+        setError(null);
+        
+        // Simular progresso de upload
+        const progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            if (prev >= 90) {
+              clearInterval(progressInterval);
+              return 90;
+            }
+            return prev + 10;
+          });
+        }, 200);
+
+        try {
+          const { uploadPostFiles } = await import('@/services/posts');
+          const uploadResult = await uploadPostFiles(selectedFiles);
+          
+          if (uploadResult.success && uploadResult.data) {
+            postData.file_paths = uploadResult.data.file_paths;
+            postData.file_names = uploadResult.data.file_names;
+            postData.file_types = uploadResult.data.file_types;
+            postData.file_sizes = uploadResult.data.file_sizes;
+            
+            // Adicionar duração se disponível
+            if (uploadResult.data.durations && uploadResult.data.durations.length > 0) {
+              postData.duration = uploadResult.data.durations[0];
+            }
+            
+            console.log(`✅ Arquivos selecionados uploadados com sucesso para ${category}:`, {
+              filesCount: uploadResult.data.file_paths.length,
+              paths: uploadResult.data.file_paths,
+              types: uploadResult.data.file_types
+            });
+            
+            setUploadProgress(100);
+          } else {
+            console.error(`❌ Erro no upload dos arquivos selecionados para ${category}:`, uploadResult.error);
+            setError(uploadResult.error || "Erro no upload dos arquivos");
+            toast.error(uploadResult.error || "Erro no upload dos arquivos");
+            return;
+          }
+        } catch (uploadError) {
+          console.error(`❌ Erro inesperado no upload dos arquivos para ${category}:`, uploadError);
+          setError("Erro inesperado no upload dos arquivos");
+          toast.error("Erro inesperado no upload dos arquivos");
+          return;
+        } finally {
+          clearInterval(progressInterval);
+        }
       } else if (file && !contentUrl.trim()) {
         // ⚠️ COMPATIBILIDADE: Upload único (será removido na Fase 5)
         console.log(`📁 Fazendo upload de arquivo único (modo compatibilidade) para categoria ${category}:`, {
@@ -976,41 +1051,68 @@ export default function CreateContent() {
                         </span>
                       </label>
                       <p className="text-sm text-gray-600 mb-4">
-                        Escolha como adicionar o conteúdo do seu post.
+                        <strong>Escolha uma das opções abaixo para adicionar o conteúdo do seu post.</strong>
                         {category === 'Shorts' && (
-                          <span className="text-blue-600 font-medium"> Para Shorts, use URLs do YouTube Shorts, Instagram Reels ou TikTok.</span>
+                          <span className="block text-blue-600 font-medium mt-1">
+                            💡 Para Shorts: use URLs do YouTube Shorts, Instagram Reels, TikTok OU faça upload de vídeo.
+                          </span>
+                        )}
+                        {category !== 'Shorts' && (
+                          <span className="block text-gray-500 mt-1">
+                            💡 Você pode usar uma URL externa ou fazer upload de arquivos.
+                          </span>
                         )}
                       </p>
                       
                       {/* Seletor de Modo */}
                       <div className="mb-6">
+                        <p className="text-xs text-gray-500 mb-2 font-medium">Selecione o modo de conteúdo:</p>
                         <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
                           <button
                             type="button"
                             onClick={() => handleMediaModeChange('url')}
                             className={`flex-1 flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all ${
                               mediaMode === 'url'
-                                ? 'bg-white text-blue-600 shadow-sm'
-                                : 'text-gray-600 hover:text-gray-900'
+                                ? 'bg-white text-blue-600 shadow-sm ring-1 ring-blue-200'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                             }`}
                           >
                             <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
                             </svg>
-                            URL
+                            URL {mediaMode === 'url' && '✓'}
                           </button>
                           <button
                             type="button"
                             onClick={() => handleMediaModeChange('file')}
                             className={`flex-1 flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all ${
                               mediaMode === 'file'
-                                ? 'bg-white text-blue-600 shadow-sm'
-                                : 'text-gray-600 hover:text-gray-900'
+                                ? 'bg-white text-blue-600 shadow-sm ring-1 ring-blue-200'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                             }`}
                           >
                             <CloudUpload className="w-4 h-4 mr-2" />
-                            Upload de Ficheiro
+                            Upload de Ficheiro {mediaMode === 'file' && '✓'}
                           </button>
+                        </div>
+                        
+                        {/* Status visual do que está ativo */}
+                        <div className="mt-2 text-xs">
+                          {mediaMode === 'url' && contentUrl.trim() && (
+                            <div className="text-green-600 font-medium">
+                              ✅ URL configurada: {contentUrl.substring(0, 50)}...
+                            </div>
+                          )}
+                          {mediaMode === 'file' && uploadedFilesData && uploadedFilesData.file_paths.length > 0 && (
+                            <div className="text-green-600 font-medium">
+                              ✅ {uploadedFilesData.file_paths.length} arquivo(s) carregado(s)
+                            </div>
+                          )}
+                          {mediaMode === 'file' && file && (
+                            <div className="text-green-600 font-medium">
+                              ✅ Arquivo selecionado: {file.name}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1371,17 +1473,47 @@ export default function CreateContent() {
                   </button>
                   <button
                     type="submit"
-                    disabled={
-                      isUploading || 
-                      !title.trim() ||
-                      !description.trim() ||
-                      (category !== "Shorts" && !content.trim()) ||
-                      (!contentUrl.trim() && !file) ||
-                      tags.length === 0 ||
-                      emotions.length === 0 ||
-                      (category === "Leitura" && selectedReadingTags.length === 0) ||
-                      (minAge !== 12 && minAge !== 16)
-                    }
+                    disabled={(() => {
+                      // Debug dos estados de arquivo
+                      const hasContentUrl = !!contentUrl.trim();
+                      const hasOldFile = !!file;
+                      const hasUploadedFiles = uploadedFilesData && uploadedFilesData.file_paths.length > 0;
+                      const hasSelectedFiles = selectedFiles.length > 0 && fileValidation?.valid;
+                      
+                      console.log('🔍 Debug do botão - Estados atuais:', {
+                        hasContentUrl,
+                        contentUrl: contentUrl.trim(),
+                        hasOldFile,
+                        fileName: file?.name,
+                        hasUploadedFiles,
+                        uploadedFilesCount: uploadedFilesData?.file_paths.length || 0,
+                        uploadedFilesPaths: uploadedFilesData?.file_paths || [],
+                        hasSelectedFiles,
+                        selectedFilesCount: selectedFiles.length,
+                        fileValidationValid: fileValidation?.valid,
+                        mediaMode,
+                        category,
+                        isUploading,
+                        title: title.trim(),
+                        description: description.trim(),
+                        content: content.trim(),
+                        tagsCount: tags.length,
+                        emotionsCount: emotions.length,
+                        minAge
+                      });
+                      
+                      return (
+                        isUploading || 
+                        !title.trim() ||
+                        !description.trim() ||
+                        (category !== "Shorts" && !content.trim()) ||
+                        (!hasContentUrl && !hasOldFile && !hasUploadedFiles && !hasSelectedFiles) ||
+                        tags.length === 0 ||
+                        emotions.length === 0 ||
+                        (category === "Leitura" && selectedReadingTags.length === 0) ||
+                        (minAge !== 12 && minAge !== 16)
+                      );
+                    })()}
                     className="px-8 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center"
                   >
                     {isUploading ? (
@@ -1397,24 +1529,22 @@ export default function CreateContent() {
                         <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                        {!title.trim()
-                          ? "Adicione um título"
-                          : !description.trim()
-                            ? "Adicione uma descrição"
-                            : category !== "Shorts" && !content.trim()
-                              ? "Adicione conteúdo textual"
-                              : (!contentUrl.trim() && !file)
-                                ? "Adicione URL ou arquivo"
-                                : tags.length === 0
-                                  ? "Adicione pelo menos uma tag"
-                                  : emotions.length === 0
-                                    ? "Selecione uma tag de emoção"
-                                    : category === "Leitura" && selectedReadingTags.length === 0
-                                      ? "Selecione uma categoria de leitura"
-                                      : (minAge !== 12 && minAge !== 16)
-                                        ? "Selecione uma idade mínima"
-                                        : "Criar Post"
-                        }
+                        {(() => {
+                          const hasContentUrl = !!contentUrl.trim();
+                          const hasOldFile = !!file;
+                          const hasUploadedFiles = uploadedFilesData && uploadedFilesData.file_paths.length > 0;
+                          const hasSelectedFiles = selectedFiles.length > 0 && fileValidation?.valid;
+                          
+                          if (!title.trim()) return "Adicione um título";
+                          if (!description.trim()) return "Adicione uma descrição";
+                          if (category !== "Shorts" && !content.trim()) return "Adicione conteúdo textual";
+                          if (!hasContentUrl && !hasOldFile && !hasUploadedFiles && !hasSelectedFiles) return "Adicione URL ou arquivo";
+                          if (tags.length === 0) return "Adicione pelo menos uma tag";
+                          if (emotions.length === 0) return "Selecione uma tag de emoção";
+                          if (category === "Leitura" && selectedReadingTags.length === 0) return "Selecione uma categoria de leitura";
+                          if (minAge !== 12 && minAge !== 16) return "Selecione uma idade mínima";
+                          return "Criar Post";
+                        })()}
                       </>
                     )}
                   </button>
