@@ -642,65 +642,99 @@ export default function DetalhesConteudo() {
   const renderContent = () => {
     if (!post) return null;
 
-    // Se tem arquivo local
-    if (post.file_path && post.file_type) {
-      const fileType = post.file_type.toLowerCase();
+    // ✅ VERIFICAR FORMATO NOVO (arrays) E ANTIGO (campos únicos)
+    const hasNewFormat = post.file_paths && post.file_paths.length > 0;
+    const hasOldFormat = post.file_path && post.file_type;
+    
+    // Se tem arquivos no formato novo (array)
+    if (hasNewFormat) {
+      const filePaths = post.file_paths!;
+      const fileTypes = post.file_types || [];
+      const fileNames = post.file_names || [];
       
-      // Se ainda está carregando a URL do arquivo
-      if (loadingFile) {
+      // Se é carousel (múltiplas imagens)
+      if (filePaths.length > 1 && fileTypes.every(type => type?.startsWith('image/'))) {
         return (
           <div className="mb-6">
-            <div className="text-xs text-gray-500 font-bold mb-2">Carregando conteúdo...</div>
-            <div className="border rounded-lg p-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-              <p className="text-gray-600">Preparando arquivo para visualização...</p>
+            <div className="text-xs text-gray-500 font-bold mb-2">
+              Carousel ({filePaths.length} imagens)
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filePaths.map((filePath, index) => {
+                const fileName = fileNames[index] || `Imagem ${index + 1}`;
+                const fileType = fileTypes[index] || 'image/jpeg';
+                const publicUrl = getFileUrl(filePath);
+                
+                return (
+                  <div key={index} className="border rounded-lg overflow-hidden">
+                    <div className="aspect-square relative">
+                      {isValidUrl(publicUrl) ? (
+                        <Image 
+                          src={publicUrl} 
+                          alt={`${post.title} - ${fileName}`}
+                          className="w-full h-full object-cover"
+                          width={300}
+                          height={300}
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = `
+                                <div class="w-full h-full flex items-center justify-center bg-gray-100">
+                                  <div class="text-center text-gray-500">
+                                    <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <p class="text-xs">Erro ao carregar</p>
+                                  </div>
+                                </div>
+                              `;
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                          <div className="text-center text-gray-500">
+                            <svg className="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <p className="text-xs">URL inválida</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <p className="text-xs text-gray-600 truncate" title={fileName}>
+                        {fileName}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {fileType}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
       }
-
-      // Se não conseguiu carregar a URL do arquivo
-      if (!fileUrl) {
-        return (
-          <div className="mb-6">
-            <div className="text-xs text-gray-500 font-bold mb-2">Arquivo não disponível para visualização</div>
-            <div className="border rounded-lg p-8 text-center text-gray-500">
-              <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <p className="text-sm">Arquivo carregado mas não visualizável</p>
-              <p className="text-xs text-gray-400 mt-1">Arquivo: {post.file_name}</p>
-              <div className="mt-4 space-y-2">
-                <button
-                  onClick={() => loadFileUrl(post.file_path!)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 mr-2"
-                >
-                  Tentar carregar novamente
-                </button>
-                <button
-                  onClick={() => {
-                    const publicUrl = getFileUrl(post.file_path!);
-                    window.open(publicUrl, '_blank');
-                  }}
-                  className="bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-700"
-                >
-                  Tentar URL pública
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // Imagens
-      if (fileType.startsWith('image/')) {
+      
+      // Se é arquivo único no formato novo
+      const singleFilePath = filePaths[0];
+      const singleFileType = fileTypes[0] || '';
+      const singleFileName = fileNames[0] || 'Arquivo';
+      const publicUrl = getFileUrl(singleFilePath);
+      
+      // Imagem única
+      if (singleFileType.startsWith('image/')) {
         return (
           <div className="mb-6">
             <div className="text-xs text-gray-500 font-bold mb-2">Pré-visualização</div>
             <div className="border rounded-lg overflow-hidden">
-              {isValidUrl(fileUrl) ? (
+              {isValidUrl(publicUrl) ? (
                 <Image 
-                  src={fileUrl as string} 
+                  src={publicUrl} 
                   alt={post.title}
                   className="max-w-full h-auto max-h-96 object-contain mx-auto"
                   width={600}
@@ -708,7 +742,6 @@ export default function DetalhesConteudo() {
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
-                    // Mostrar informações de erro
                     const parent = target.parentElement;
                     if (parent) {
                       parent.innerHTML = `
@@ -717,23 +750,126 @@ export default function DetalhesConteudo() {
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                           </svg>
                           <p class="text-sm font-medium mb-2">Erro ao carregar imagem</p>
-                          <p class="text-xs text-gray-400 mb-4">A imagem pode estar temporariamente indisponível</p>
-                          <div class="space-y-2">
-                            <a href="${fileUrl}" target="_blank" class="text-blue-600 text-xs hover:underline block">Tentar abrir em nova aba</a>
-                            <button onclick="window.location.reload()" class="text-blue-600 text-xs hover:underline block">Recarregar página</button>
-                          </div>
+                          <p class="text-xs text-gray-400">A imagem pode estar temporariamente indisponível</p>
                         </div>
                       `;
                     }
                   }}
-                  onLoad={() => {
-                    console.log('✅ Imagem carregada com sucesso:', fileUrl);
+                />
+              ) : (
+                <div className="p-8 text-center text-gray-500">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-sm font-medium mb-2">URL da imagem inválida</p>
+                  <p className="text-xs text-gray-400">Não foi possível carregar a imagem</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+      
+      // Vídeo único
+      if (singleFileType.startsWith('video/')) {
+        return (
+          <div className="mb-6">
+            <div className="text-xs text-gray-500 font-bold mb-2">Vídeo</div>
+            <div className="border rounded-lg overflow-hidden">
+              {isValidUrl(publicUrl) ? (
+                <video 
+                  controls 
+                  className="w-full max-h-96"
+                  preload="metadata"
+                >
+                  <source src={publicUrl} type={singleFileType} />
+                  Seu navegador não suporta reprodução de vídeo.
+                </video>
+              ) : (
+                <div className="p-8 text-center text-gray-500">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-sm font-medium mb-2">Vídeo não disponível</p>
+                  <p className="text-xs text-gray-400">URL do vídeo inválida</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+      
+      // Outros tipos de arquivo (PDF, áudio, etc.)
+      return (
+        <div className="mb-6">
+          <div className="text-xs text-gray-500 font-bold mb-2">Arquivo</div>
+          <div className="border rounded-lg p-4 bg-gray-50">
+            <div className="flex items-center gap-3">
+              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <div>
+                <div className="font-medium text-gray-900">{singleFileName}</div>
+                <div className="text-sm text-gray-500">{singleFileType}</div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <a 
+                href={publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 inline-block"
+              >
+                Download / Ver arquivo
+              </a>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ⚠️ COMPATIBILIDADE: Se tem arquivo no formato antigo (campo único)
+    if (hasOldFormat) {
+      const publicUrl = getFileUrl(post.file_path!);
+      const fileType = post.file_type!.toLowerCase();
+      
+      // Imagens
+      if (fileType.startsWith('image/')) {
+        return (
+          <div className="mb-6">
+            <div className="text-xs text-gray-500 font-bold mb-2">Pré-visualização</div>
+            <div className="border rounded-lg overflow-hidden">
+              {isValidUrl(publicUrl) ? (
+                <Image 
+                  src={publicUrl} 
+                  alt={post.title}
+                  className="max-w-full h-auto max-h-96 object-contain mx-auto"
+                  width={600}
+                  height={400}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.innerHTML = `
+                        <div class="p-8 text-center text-gray-500">
+                          <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                          </svg>
+                          <p class="text-sm font-medium mb-2">Erro ao carregar imagem</p>
+                          <p class="text-xs text-gray-400">A imagem pode estar temporariamente indisponível</p>
+                        </div>
+                      `;
+                    }
                   }}
                 />
               ) : (
-                <div className="p-6 text-center text-gray-500">
-                  <div className="font-medium">Thumbnail inválida</div>
-                  <div className="text-xs mt-1">A URL do ficheiro não é válida para pré-visualização.</div>
+                <div className="p-8 text-center text-gray-500">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-sm font-medium mb-2">URL da imagem inválida</p>
+                  <p className="text-xs text-gray-400">Não foi possível carregar a imagem</p>
                 </div>
               )}
             </div>
@@ -745,67 +881,32 @@ export default function DetalhesConteudo() {
       if (fileType.startsWith('video/')) {
         return (
           <div className="mb-6">
-            <div className="text-xs text-gray-500 font-bold mb-2">Reprodução de Vídeo</div>
+            <div className="text-xs text-gray-500 font-bold mb-2">Vídeo</div>
             <div className="border rounded-lg overflow-hidden">
-              <video 
-                controls 
-                className="max-w-full h-auto max-h-96 mx-auto"
-                preload="metadata"
-              >
-                <source src={fileUrl} type={fileType} />
-                Seu navegador não suporta reprodução de vídeo.
-              </video>
+              {isValidUrl(publicUrl) ? (
+                <video 
+                  controls 
+                  className="w-full max-h-96"
+                  preload="metadata"
+                >
+                  <source src={publicUrl} type={fileType} />
+                  Seu navegador não suporta reprodução de vídeo.
+                </video>
+              ) : (
+                <div className="p-8 text-center text-gray-500">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-sm font-medium mb-2">Vídeo não disponível</p>
+                  <p className="text-xs text-gray-400">URL do vídeo inválida</p>
+                </div>
+              )}
             </div>
           </div>
         );
       }
 
-      // Áudios
-      if (fileType.startsWith('audio/')) {
-        return (
-          <div className="mb-6">
-            <div className="text-xs text-gray-500 font-bold mb-2">Reprodução de Áudio</div>
-            <div className="border rounded-lg p-4">
-              <audio 
-                controls 
-                className="w-full"
-                preload="metadata"
-              >
-                <source src={fileUrl} type={fileType} />
-                Seu navegador não suporta reprodução de áudio.
-              </audio>
-            </div>
-          </div>
-        );
-      }
-
-      // PDFs
-      if (fileType === 'application/pdf') {
-        return (
-          <div className="mb-6">
-            <div className="text-xs text-gray-500 font-bold mb-2">Documento PDF</div>
-            <div className="border rounded-lg overflow-hidden">
-              <iframe
-                src={fileUrl}
-                className="w-full h-96"
-                title={`PDF: ${post.title}`}
-              />
-            </div>
-            <div className="mt-2">
-              <a 
-                href={fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 underline text-sm"
-              >
-                Abrir PDF em nova aba
-              </a>
-            </div>
-          </div>
-        );
-      }
-
-      // Outros tipos de arquivo
+      // Outros tipos de arquivo (PDF, áudio, etc.)
       return (
         <div className="mb-6">
           <div className="text-xs text-gray-500 font-bold mb-2">Arquivo</div>
@@ -816,12 +917,12 @@ export default function DetalhesConteudo() {
               </svg>
               <div>
                 <div className="font-medium text-gray-900">{post.file_name}</div>
-                <div className="text-sm text-gray-500">{post.file_type} • {formatFileSize(post.file_size)}</div>
+                <div className="text-sm text-gray-500">{post.file_type}</div>
               </div>
             </div>
             <div className="mt-3">
               <a 
-                href={fileUrl}
+                href={publicUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 inline-block"
