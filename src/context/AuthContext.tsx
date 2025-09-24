@@ -61,8 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const {
     saveSessionData: savePersistentData,
     clearSessionData,
-    updateSessionActivity: updatePersistentActivity,
-    isSessionValid
+    updateSessionActivity: updatePersistentActivity
   } = useSessionPersistence({
     onSessionRestore: (data: CachedAuthData) => {
       console.log('🔄 AuthContext - Restaurando dados da sessão...');
@@ -497,52 +496,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [clearCache, refreshAuth]); // Incluir dependências necessárias
 
-  // UseRef para controlar logs sem causar re-renders
-  const lastLogKeyRef = useRef<string>('');
-
   // Computed values com logs de debug mais específicos
   const computedValues = useMemo(() => {
     const isAuthenticated = !!user;
     const isAuthorized = profile?.authorized === true;
     const isCMSUser = profile?.user_role === 'cms';
     const canAccessCMS = isAuthenticated && isCMSUser && isAuthorized && (authInfo?.success === true);
-
-    // Debug logs detalhados - mas somente quando há mudanças significativas
-    const logKey = `${isAuthenticated}-${isCMSUser}-${isAuthorized}-${authInfo?.success}`;
     
-    if (logKey !== lastLogKeyRef.current) {
-      console.log('🔍 AuthContext Estado Computado MUDOU:', {
-        timestamp: new Date().toISOString(),
-        logKey,
-        lastLogKey: lastLogKeyRef.current,
-        isAuthenticated,
-        isCMSUser,
-        isAuthorized,
-        authInfoSuccess: authInfo?.success,
-        canAccessCMS,
-        sessionPersistent: sessionPersistentRef.current,
-        sessionValid: isSessionValid(),
-        hasValidSessionData: hasValidSessionData(),
-        detalhes: {
-          userExists: !!user,
-          userEmail: user?.email,
-          profileExists: !!profile,
-          profileRole: profile?.user_role,
-          profileAuthorized: profile?.authorized,
-          authInfoExists: !!authInfo,
-          authInfoData: authInfo
-        }
-      });
-      lastLogKeyRef.current = logKey;
-    }
-
     return {
       isAuthenticated,
       isAuthorized,
       isCMSUser,
       canAccessCMS
     };
-  }, [user, profile, authInfo, isSessionValid]);
+  }, [user, profile, authInfo]);
 
   const contextValue: AuthContextType = {
     user,
