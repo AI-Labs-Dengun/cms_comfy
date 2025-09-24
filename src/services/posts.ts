@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { uploadFile, getMediaDuration } from './storage'
 
-// Tipos para validação de arquivos
+// Types for file validation
 export interface FileValidation {
   valid: boolean;
   is_carousel: boolean;
@@ -13,23 +13,19 @@ export interface FileValidation {
   type: 'carousel' | 'single_image' | 'single_video' | 'unknown';
 }
 
-// Tipos para os posts (ATUALIZADO para suportar arrays)
+// Types for posts (UPDATED to support arrays)
 export interface CreatePostData {
   title: string
   description: string
   category: 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura'
   content?: string 
   content_url?: string
-  // ✅ CAMPOS UNIFICADOS: suportam 1 ou múltiplos arquivos
+  // ✅ UNIFIED FIELDS: support one or multiple files
   file_paths?: string[]
   file_names?: string[]
   file_types?: string[]
   file_sizes?: number[]
-  // ⚠️ CAMPOS ANTIGOS: mantidos para compatibilidade (serão removidos na Fase 5)
-  file_path?: string
-  file_name?: string
-  file_type?: string
-  file_size?: number
+  // (old fields removed - use arrays above)
   duration?: number 
   thumbnail_url?: string | null 
   min_age?: number 
@@ -45,16 +41,12 @@ export interface Post {
   category: string
   content?: string
   content_url?: string
-  // ✅ CAMPOS UNIFICADOS: suportam 1 ou múltiplos arquivos
+  // ✅ UNIFIED FIELDS: support one or multiple files
   file_paths?: string[]
   file_names?: string[]
   file_sizes?: number[]
   file_types?: string[]
-  // ⚠️ CAMPOS ANTIGOS: mantidos para compatibilidade (serão removidos na Fase 5)
-  file_path?: string
-  file_name?: string
-  file_size?: number
-  file_type?: string
+  // (old fields removed - use arrays above)
   duration?: number
   thumbnail_url?: string | null
   min_age?: number
@@ -78,9 +70,9 @@ export interface ApiResponse<T = unknown> {
   data?: T
 }
 
-// ✅ FUNÇÕES DE VALIDAÇÃO CLIENT-SIDE (espelham backend)
+// ✅ CLIENT-SIDE VALIDATION FUNCTIONS (mirror backend)
 
-// Validação client-side que espelha validate_post_files() do backend
+// Client-side validation that mirrors validate_post_files() from the backend
 export function validatePostFiles(files: File[], category: string): FileValidation {
   const filesCount = files.length;
   
@@ -97,7 +89,7 @@ export function validatePostFiles(files: File[], category: string): FileValidati
     };
   }
   
-  // Analisar tipos de arquivo
+  // Analyze file types
   const imageFiles = files.filter(f => f.type.startsWith('image/'));
   const videoFiles = files.filter(f => f.type.startsWith('video/'));
   const audioFiles = files.filter(f => f.type.startsWith('audio/'));
@@ -109,7 +101,7 @@ export function validatePostFiles(files: File[], category: string): FileValidati
                      (videoFiles.length > 0 ? 1 : 0) + 
                      (audioFiles.length > 0 ? 1 : 0) > 1;
 
-  // REGRA GLOBAL: Nunca misturar tipos de arquivo
+  // GLOBAL RULE: Never mix file types
   if (mixedTypes) {
     return {
       valid: false,
@@ -123,9 +115,9 @@ export function validatePostFiles(files: File[], category: string): FileValidati
     };
   }
 
-  // REGRA ESPECÍFICA PARA SHORTS
+  // RULE SPECIFIC TO SHORTS
   if (category === 'Shorts') {
-    // Vídeo único para Shorts
+  // Single video for Shorts
     if (allVideos && filesCount > 1) {
       return {
         valid: false,
@@ -139,7 +131,7 @@ export function validatePostFiles(files: File[], category: string): FileValidati
       };
     }
     
-    // Múltiplas imagens para Shorts (máximo 5)
+  // Multiple images for Shorts (max 5)
     if (allImages && filesCount > 5) {
       return {
         valid: false,
@@ -153,7 +145,7 @@ export function validatePostFiles(files: File[], category: string): FileValidati
       };
     }
     
-    // Múltiplos arquivos devem ser todas imagens
+  // Multiple files must all be images
     if (filesCount > 1 && !allImages) {
       return {
         valid: false,
@@ -167,7 +159,7 @@ export function validatePostFiles(files: File[], category: string): FileValidati
       };
     }
 
-    // Áudio não é suportado para Shorts
+  // Audio is not supported for Shorts
     if (allAudios) {
       return {
         valid: false,
@@ -181,7 +173,7 @@ export function validatePostFiles(files: File[], category: string): FileValidati
       };
     }
   } else {
-    // REGRA PARA OUTRAS CATEGORIAS: apenas arquivo único
+  // RULE FOR OTHER CATEGORIES: single file only
     if (filesCount > 1) {
       return {
         valid: false,
@@ -196,7 +188,7 @@ export function validatePostFiles(files: File[], category: string): FileValidati
     }
   }
 
-  // VALIDAÇÃO GERAL: arquivo deve ser imagem, vídeo ou áudio
+  // GENERAL VALIDATION: file must be image, video or audio
   if (!allImages && !allVideos && !allAudios) {
     return {
       valid: false,
@@ -210,7 +202,7 @@ export function validatePostFiles(files: File[], category: string): FileValidati
     };
   }
 
-  // Se chegou até aqui, está válido
+  // If we reached here, it's valid
   const isCarousel = filesCount > 1 && allImages && category === 'Shorts';
   const isSingleVideo = filesCount === 1 && allVideos;
   const isSingleImage = filesCount === 1 && allImages;
@@ -226,8 +218,8 @@ export function validatePostFiles(files: File[], category: string): FileValidati
   };
 }
 
-// Upload unificado: suporta 1 ou múltiplos arquivos
-export async function uploadPostFiles(files: File[]): Promise<{
+// Unified upload: supports one or multiple files
+export async function uploadPostFiles(files: File[], category?: string): Promise<{
   success: boolean;
   data?: {
     file_paths: string[];
@@ -252,9 +244,9 @@ export async function uploadPostFiles(files: File[]): Promise<{
     const file_sizes: number[] = [];
     const durations: number[] = [];
 
-    // Upload de cada arquivo
+  // Upload each file
     for (const file of files) {
-      const uploadResult = await uploadFile(file);
+      const uploadResult = await uploadFile(file, category);
       
       if (!uploadResult.success || !uploadResult.path) {
         return {
@@ -268,10 +260,10 @@ export async function uploadPostFiles(files: File[]): Promise<{
       file_types.push(uploadResult.file_type || file.type);
       file_sizes.push(uploadResult.file_size || file.size);
 
-      // Para vídeos/áudios, tentar obter duração
+  // For videos/audios, try to get duration
       if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
         try {
-          // Usar URL temporária para obter duração
+          // Use temporary URL to get duration
           if (uploadResult.url) {
             const durationResult = await getMediaDuration(uploadResult.url);
             if (durationResult.success && durationResult.duration) {
@@ -304,10 +296,10 @@ export async function uploadPostFiles(files: File[]): Promise<{
   }
 }
 
-// Função para criar um post
+// Function to create a post
 export async function createPost(postData: CreatePostData): Promise<ApiResponse<Post>> {
   try {
-    // Verificar se o usuário está autenticado
+  // Check if the user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
@@ -317,7 +309,24 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       }
     }
 
-    // Validar dados obrigatórios
+  // ✅ CHECK USER_ROLE CMS - This is the main fix!
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_role, authorized')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile || profile.user_role !== 'cms' || !profile.authorized) {
+      console.error('❌ Acesso negado para criar post:', { profile, profileError });
+      return {
+        success: false,
+        error: 'Acesso negado. Apenas usuários CMS autorizados podem criar posts.'
+      }
+    }
+
+    console.log('✅ Usuário CMS autorizado para criar post:', { userId: user.id, userRole: profile.user_role });
+
+  // Validate required data
     if (!postData.title || !postData.description || !postData.category) {
       return {
         success: false,
@@ -325,19 +334,18 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       }
     }
 
-    // Validar conteúdo (URL ou arquivos)
+  // Validate content (URL or files)
     const hasContentUrl = postData.content_url && postData.content_url.trim();
     const hasFiles = postData.file_paths && postData.file_paths.length > 0;
-    const hasOldFile = postData.file_path; // Compatibilidade com formato antigo
     
-    if (!hasContentUrl && !hasFiles && !hasOldFile) {
+    if (!hasContentUrl && !hasFiles) {
       return {
         success: false,
         error: 'É necessário fornecer uma URL ou fazer upload de arquivo(s)'
       }
     }
 
-    // Obter duração para posts de vídeo e áudio
+  // Get duration for video and audio posts
     let duration = postData.duration;
     if ((postData.category === 'Vídeo' || postData.category === 'Podcast' || postData.category === 'Áudio') && !duration) {
       try {
@@ -349,11 +357,11 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
         }
       } catch (error) {
         console.warn('Erro ao obter duração da URL:', error);
-        // Não falhar se não conseguir obter a duração
+  // Do not fail if unable to get duration
       }
     }
 
-    // Chamar a função do banco de dados com campos unificados
+  // Call the database function with unified fields
     const { data, error } = await supabase.rpc('create_post', {
       author_id_param: user.id,
       title_param: postData.title,
@@ -363,11 +371,11 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       content_url_param: postData.content_url || null,
       tags_param: postData.tags || [],
       emotion_tags_param: postData.emotion_tags || [],
-      // ✅ CAMPOS UNIFICADOS: suportam 1 ou múltiplos arquivos
-      file_paths_param: postData.file_paths || (postData.file_path ? [postData.file_path] : null),
-      file_names_param: postData.file_names || (postData.file_name ? [postData.file_name] : null),
-      file_sizes_param: postData.file_sizes || (postData.file_size ? [postData.file_size] : null),
-      file_types_param: postData.file_types || (postData.file_type ? [postData.file_type] : null),
+  // ✅ UNIFIED FIELDS: support one or multiple files
+      file_paths_param: postData.file_paths || null,
+      file_names_param: postData.file_names || null,
+      file_sizes_param: postData.file_sizes || null,
+      file_types_param: postData.file_types || null,
       duration_param: duration || null, 
       thumbnail_url_param: postData.thumbnail_url || null, 
       min_age_param: postData.min_age || 12 
@@ -381,7 +389,7 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       }
     }
 
-    // Verificar resposta da função
+  // Check the function response
     if (!data.success) {
       return {
         success: false,
@@ -407,7 +415,7 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
   }
 }
 
-// Função para buscar todos os posts (CMS)
+// Function to fetch all posts (CMS)
 export async function getAllPosts(): Promise<ApiResponse<Post[]>> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -419,7 +427,7 @@ export async function getAllPosts(): Promise<ApiResponse<Post[]>> {
       }
     }
 
-    // Buscar todos os posts (sem filtrar por autor)
+  // Fetch all posts (without filtering by author)
     const { data, error } = await supabase
       .from('posts')
       .select('*')
@@ -433,7 +441,7 @@ export async function getAllPosts(): Promise<ApiResponse<Post[]>> {
       }
     }
 
-    // Log para verificar se o campo categoria_leitura está presente
+  // Log to verify if the categoria_leitura field is present
     if (data && data.length > 0) {
       console.log('📊 Posts carregados:', data.length);
       const readingPosts = data.filter(post => post.category === 'Leitura');
@@ -463,12 +471,12 @@ export async function getAllPosts(): Promise<ApiResponse<Post[]>> {
   }
 }
 
-// Função para buscar posts do usuário (CMS) - mantida para compatibilidade
+// Function to fetch user posts (CMS) - kept for compatibility
 export async function getUserPosts(): Promise<ApiResponse<Post[]>> {
   return getAllPosts();
 }
 
-// Função para atualizar um post
+// Function to update a post
 export async function updatePost(postId: string, postData: Partial<CreatePostData>): Promise<ApiResponse<Post>> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -480,23 +488,40 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       }
     }
 
-    // Lógica para respeitar o constraint posts_content_check
-    let contentUrl = null
-    let filePath = null
-    let fileName = null
-    let fileType = null
+  // ✅ CHECK USER_ROLE CMS
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_role, authorized')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile || profile.user_role !== 'cms' || !profile.authorized) {
+      console.error('❌ Acesso negado para atualizar post:', { profile, profileError });
+      return {
+        success: false,
+        error: 'Acesso negado. Apenas usuários CMS autorizados podem atualizar posts.'
+      }
+    }
+
+  // Logic to respect the posts_content_check constraint
+    let contentUrl: string | null = null
+    let filePaths: string[] | null = null
+    let fileNames: string[] | null = null
+    let fileTypes: string[] | null = null
+    let fileSizes: number[] | null = null
     let thumbnailUrl = postData.thumbnail_url || null 
     let category = postData.category
     let duration = postData.duration
 
     if (postData.content_url && postData.content_url.trim() !== '') {
-      // Se tem URL, limpar campos de arquivo
+  // If there's a URL, clear file fields
       contentUrl = postData.content_url
-      filePath = null
-      fileName = null
-      fileType = null
-      
-      // Obter duração para posts de vídeo e áudio com URL
+      filePaths = null
+      fileNames = null
+      fileTypes = null
+      fileSizes = null
+
+  // Get duration for video/audio posts with URL
       if ((category === 'Vídeo' || category === 'Podcast' || category === 'Áudio') && !duration) {
         try {
           const durationResult = await getMediaDuration(postData.content_url);
@@ -507,28 +532,31 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
           console.warn('Erro ao obter duração da URL:', error);
         }
       }
-    } else if (postData.file_path && postData.file_path.trim() !== '') {
-      // Se tem arquivo, limpar campo de URL
+    } else if (postData.file_paths && postData.file_paths.length > 0) {
+  // If we have new arrays of files provided
       contentUrl = null
-      filePath = postData.file_path
-      fileName = postData.file_name || null
-      fileType = postData.file_type || null
+      filePaths = postData.file_paths
+      fileNames = postData.file_names || null
+      fileTypes = postData.file_types || null
+      fileSizes = postData.file_sizes || null
     } else {
+  // Fetch current post data preserving arrays
       const { data: currentPost } = await supabase
         .from('posts')
-        .select('content_url, file_path, file_name, file_type, thumbnail_url, category, duration') 
+        .select('content_url, file_paths, file_names, file_types, file_sizes, thumbnail_url, category, duration') 
         .eq('id', postId)
         .single()
       
       if (currentPost) {
         contentUrl = currentPost.content_url
-        filePath = currentPost.file_path
-        fileName = currentPost.file_name
-        fileType = currentPost.file_type
+        filePaths = currentPost.file_paths || null
+        fileNames = currentPost.file_names || null
+        fileTypes = currentPost.file_types || null
+        fileSizes = currentPost.file_sizes || null
         if (!thumbnailUrl) {
           thumbnailUrl = currentPost.thumbnail_url
         }
-        // Se a categoria não foi fornecida, preservar a existente
+  // If the category wasn't provided, preserve the existing one
         if (!category) {
           category = currentPost.category
         }
@@ -538,12 +566,12 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       }
     }
 
-    // Se ainda não temos categoria definida, usar 'Vídeo' como padrão apenas neste caso
+  // If we still don't have a category, use 'Vídeo' as the default in this case only
     if (!category) {
       category = 'Vídeo'
     }
 
-    // Chamar a função do banco de dados
+  // Call the database function (use unified fields)
     const { data, error } = await supabase.rpc('update_post', {
       post_id_param: postId,
       author_id_param: user.id,
@@ -555,9 +583,10 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       thumbnail_url_param: thumbnailUrl, 
       tags_param: postData.tags || [],
       emotion_tags_param: postData.emotion_tags || [],
-      file_path_param: filePath,
-      file_name_param: fileName,
-      file_type_param: fileType,
+      file_paths_param: filePaths,
+      file_names_param: fileNames,
+      file_types_param: fileTypes,
+      file_sizes_param: fileSizes,
       duration_param: duration || null, 
       min_age_param: postData.min_age || 12 
     })
@@ -591,7 +620,7 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
   }
 }
 
-// Função para publicar/despublicar um post
+// Function to publish/unpublish a post
 export async function togglePostPublication(postId: string, publish: boolean): Promise<ApiResponse> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -600,6 +629,21 @@ export async function togglePostPublication(postId: string, publish: boolean): P
       return {
         success: false,
         error: 'Usuário não autenticado'
+      }
+    }
+
+  // ✅ CHECK USER_ROLE CMS
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_role, authorized')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile || profile.user_role !== 'cms' || !profile.authorized) {
+      console.error('❌ Acesso negado para publicar/despublicar post:', { profile, profileError });
+      return {
+        success: false,
+        error: 'Acesso negado. Apenas usuários CMS autorizados podem publicar/despublicar posts.'
       }
     }
 
@@ -638,10 +682,11 @@ export async function togglePostPublication(postId: string, publish: boolean): P
   }
 }
 
-// Função para upload de arquivo usando Supabase Storage
-export async function uploadFileForPost(file: File): Promise<ApiResponse<{ path: string; url: string; file_name: string; file_size: number; file_type: string; duration?: number }>> {
+// Function to upload a file using Supabase Storage
+export async function uploadFileForPost(file: File, category?: string): Promise<ApiResponse<{ path: string; url: string; file_name: string; file_size: number; file_type: string; duration?: number }>> {
   try {
-    const result = await uploadFile(file)
+  // Attempt to infer category from file type? Keep optional for now.
+    const result = await uploadFile(file, category)
     
     if (!result.success) {
       return {
@@ -650,7 +695,7 @@ export async function uploadFileForPost(file: File): Promise<ApiResponse<{ path:
       }
     }
 
-    // Obter duração para arquivos de mídia
+  // Get duration for media files
     let duration: number | undefined;
     if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
       try {
@@ -660,7 +705,7 @@ export async function uploadFileForPost(file: File): Promise<ApiResponse<{ path:
         }
       } catch (error) {
         console.warn('Erro ao obter duração do arquivo:', error);
-        // Não falhar se não conseguir obter a duração
+  // Do not fail if unable to get duration
       }
     }
 
@@ -684,7 +729,7 @@ export async function uploadFileForPost(file: File): Promise<ApiResponse<{ path:
   }
 }
 
-// Função para deletar um post
+// Function to delete a post
 export async function deletePost(postId: string): Promise<ApiResponse> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -696,7 +741,22 @@ export async function deletePost(postId: string): Promise<ApiResponse> {
       }
     }
 
-    // Chamar a função do banco de dados
+  // ✅ CHECK USER_ROLE CMS
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_role, authorized')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile || profile.user_role !== 'cms' || !profile.authorized) {
+      console.error('❌ Acesso negado para deletar post:', { profile, profileError });
+      return {
+        success: false,
+        error: 'Acesso negado. Apenas usuários CMS autorizados podem deletar posts.'
+      }
+    }
+
+  // Call the database function
     const { data, error } = await supabase.rpc('delete_post', {
       post_id_param: postId,
       author_id_param: user.id
@@ -731,7 +791,7 @@ export async function deletePost(postId: string): Promise<ApiResponse> {
   }
 }
 
-// Função para buscar um post específico
+// Function to fetch a specific post
 export async function getPost(postId: string): Promise<ApiResponse<Post>> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -743,7 +803,7 @@ export async function getPost(postId: string): Promise<ApiResponse<Post>> {
       }
     }
 
-    // Buscar post específico (sem filtrar por autor)
+  // Fetch specific post (without filtering by author)
     const { data, error } = await supabase
       .from('posts')
       .select('*')
@@ -775,7 +835,7 @@ export async function getPost(postId: string): Promise<ApiResponse<Post>> {
   }
 } 
 
-// Funções para tags de leitura
+// Functions for reading tags
 export async function getAllReadingTags() {
   const { data, error } = await supabase.rpc('get_all_reading_tags');
   if (error) throw new Error(error.message);
@@ -821,13 +881,13 @@ export async function getTagsForPost(postId: string) {
     
     console.log('📊 Dados retornados da função get_tags_for_post:', data);
     
-    // Verificar se data existe e tem a estrutura esperada
+  // Check if data exists and has expected structure
     if (!data) {
       console.log('⚠️ Nenhum dado retornado da função get_tags_for_post');
       return [];
     }
     
-    // Verificar se data.tags existe, senão usar data diretamente
+  // Check if data.tags exists, otherwise use data directly
     const tags = data.tags || data || [];
     console.log('🏷️ Tags processadas:', tags);
     
