@@ -17,7 +17,7 @@ import { toast } from 'react-hot-toast';
 
 import { EMOTIONS } from '@/lib/emotions';
 
-// Modal para criar nova categoria de leitura
+// Modal to create a new reading category
 const CreateReadingTagModal = ({ 
   isOpen, 
   onClose, 
@@ -180,7 +180,7 @@ export default function CreateContent() {
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [content, setContent] = useState(""); // Novo campo para conteúdo textual
+  const [content, setContent] = useState(""); // New field for textual content
   const [category, setCategory] = useState<"Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura">("Vídeo");
   // Removido readingCategory pois não é mais necessário
   const [contentUrl, setContentUrl] = useState("");
@@ -196,7 +196,7 @@ export default function CreateContent() {
   const [minAge, setMinAge] = useState<12 | 16>(12); // ✅ ADICIONANDO ESTADO PARA IDADE MÍNIMA
   const [mediaMode, setMediaMode] = useState<'url' | 'file'>('url'); // Modo de mídia: URL ou Upload de ficheiro
   
-  // ✅ NOVOS ESTADOS PARA ARQUIVOS MÚLTIPLOS
+  // ✅ NEW STATE FOR MULTIPLE FILES
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileValidation, setFileValidation] = useState<FileValidation | null>(null);
   const [uploadedFilesData, setUploadedFilesData] = useState<{
@@ -207,7 +207,7 @@ export default function CreateContent() {
     durations?: number[];
   } | null>(null);
 
-  // Função para recarregar as categorias de leitura
+  // Function to reload reading categories
   const reloadReadingTags = async () => {
     if (category === 'Leitura') {
       try {
@@ -230,13 +230,13 @@ export default function CreateContent() {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       
-      // Validar se é uma imagem
+  // Validate that it's an image
       if (!selectedFile.type.startsWith('image/')) {
         setError("Por favor, selecione apenas arquivos de imagem para a thumbnail");
         return;
       }
       
-      // Validar tamanho (máximo 5MB)
+  // Validate size (max 5MB)
       if (selectedFile.size > 5 * 1024 * 1024) {
         setError("A thumbnail deve ter no máximo 5MB");
         return;
@@ -244,7 +244,7 @@ export default function CreateContent() {
       
       setThumbnailFile(selectedFile);
       
-      // Criar preview da imagem
+  // Create image preview
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
@@ -264,16 +264,16 @@ export default function CreateContent() {
 
   const handleMediaModeChange = (mode: 'url' | 'file') => {
     setMediaMode(mode);
-    // Limpar o campo que não está sendo usado
+  // Clear the field that's not being used
     if (mode === 'url') {
-      // Limpar arquivos (tanto sistema antigo quanto novo)
+  // Clear files (both old and new systems)
       setFile(null);
       setSelectedFiles([]);
       setFileValidation(null);
       setUploadedFilesData(null);
       setError(null); // Limpar erros de validação
     } else {
-      // Limpar URL
+  // Clear URL
       setContentUrl('');
       setError(null); // Limpar erros de validação
     }
@@ -469,8 +469,31 @@ export default function CreateContent() {
         }, 200);
 
         try {
+          // Validação extra específica para Shorts (reafirmar regra 1-5 imagens OU 1 vídeo)
+          if (category === 'Shorts' && fileValidation) {
+            const count = fileValidation.file_count;
+            if (!fileValidation.is_carousel && !fileValidation.is_single_video) {
+              setError('Para Shorts envie de 1 a 5 imagens (carousel) ou 1 vídeo único');
+              toast.error('Para Shorts envie de 1 a 5 imagens (carousel) ou 1 vídeo único');
+              clearInterval(progressInterval);
+              return;
+            }
+            if (fileValidation.is_carousel && (count < 1 || count > 5)) {
+              setError('Máximo 5 imagens permitidas para Shorts');
+              toast.error('Máximo 5 imagens permitidas para Shorts');
+              clearInterval(progressInterval);
+              return;
+            }
+            if (fileValidation.is_single_video && count !== 1) {
+              setError('Apenas 1 vídeo permitido para Shorts');
+              toast.error('Apenas 1 vídeo permitido para Shorts');
+              clearInterval(progressInterval);
+              return;
+            }
+          }
+
           const { uploadPostFiles } = await import('@/services/posts');
-          const uploadResult = await uploadPostFiles(selectedFiles);
+          const uploadResult = await uploadPostFiles(selectedFiles, category);
           
           if (uploadResult.success && uploadResult.data) {
             postData.file_paths = uploadResult.data.file_paths;
@@ -601,11 +624,11 @@ export default function CreateContent() {
         hasDescription: !!postData.description,
         hasContent: !!postData.content,
         hasContentUrl: !!postData.content_url,
-        hasFilePath: !!postData.file_path,
+        hasFiles: !!postData.file_paths && postData.file_paths.length > 0,
         hasThumbnailUrl: !!postData.thumbnail_url,
-        file_path: postData.file_path,
-        file_name: postData.file_name,
-        file_type: postData.file_type,
+        file_paths: postData.file_paths,
+        file_names: postData.file_names,
+        file_types: postData.file_types,
         thumbnail_url: postData.thumbnail_url
       });
       
@@ -681,7 +704,7 @@ export default function CreateContent() {
     }
   };
 
-  // Função para adicionar tag
+  // Function to add a tag
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && tagInput.trim() !== "") {
       e.preventDefault();
@@ -696,7 +719,7 @@ export default function CreateContent() {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
-  // Função para detectar tipo de conteúdo baseado na URL
+  // Function to detect content type based on URL
   const detectContentType = (url: string) => {
     if (!url.trim()) return null;
     
@@ -723,7 +746,7 @@ export default function CreateContent() {
     return 'external';
   };
 
-  // Função para renderizar prévia do conteúdo
+  // Function to render content preview
   const renderContentPreview = () => {
     if (!contentUrl.trim() || category !== 'Shorts') return null;
     
@@ -780,7 +803,7 @@ export default function CreateContent() {
     );
   };
 
-  // Verificar carregamento de autenticação
+  // Check authentication loading
   if (authLoading) {
     return (
       <CMSLayout currentPage="create">
@@ -794,7 +817,7 @@ export default function CreateContent() {
     );
   }
 
-  // Verificar se o usuário tem permissão para acessar o CMS
+  // Check if the user has permission to access the CMS
   if (!canAccessCMS) {
     return (
       <CMSLayout currentPage="create">
@@ -836,7 +859,7 @@ export default function CreateContent() {
             </div>
           </div>
           
-          {/* Mensagens de feedback */}
+          {/* Feedback messages */}
           <div className="max-w-6xl mx-auto mb-6">
             {error && (
               <div className="bg-red-50 border-l-4 border-red-400 text-red-700 px-4 py-3 rounded-md shadow-sm">
@@ -849,7 +872,7 @@ export default function CreateContent() {
               </div>
             )}
             
-            {/* Aviso para categoria de leitura sem categorias selecionadas */}
+            {/* Warning for reading category without selected categories */}
             {category === 'Leitura' && selectedReadingTags.length === 0 && readingTags.length > 0 && (
               <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700 px-4 py-3 rounded-md shadow-sm">
                 <div className="flex">
@@ -864,12 +887,12 @@ export default function CreateContent() {
             )}
           </div>
 
-          {/* Formulário Principal */}
+          {/* Main Form */}
           <div className="max-w-8xl mx-auto">
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
               <form onSubmit={handleSubmit} className="space-y-6">
                 
-                {/* Seção 1: Configurações Básicas */}
+                {/* Section 1: Basic Settings */}
                 <div className="px-6 py-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
                   <div className="flex items-center mb-4">
                     <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium mr-3">
@@ -947,7 +970,7 @@ export default function CreateContent() {
                   </div>
                 </div>
 
-                {/* Seção 2: Conteúdo Principal */}
+                {/* Section 2: Main Content */}
                 <div className="px-8 py-6 border-b border-gray-200">
                   <div className="flex items-center mb-6">
                     <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-medium mr-3">
@@ -1029,7 +1052,7 @@ export default function CreateContent() {
                   </div>
                 </div>
 
-                {/* Seção 3: Upload de Arquivos */}
+                {/* Section 3: File Uploads */}
                 <div className="px-8 py-6 border-b border-gray-200">
                   <div className="flex items-center mb-6">
                     <div className="w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-medium mr-3">
@@ -1096,7 +1119,7 @@ export default function CreateContent() {
                           </button>
                         </div>
                         
-                        {/* Status visual do que está ativo */}
+                        {/* Visual status of what's active */}
                         <div className="mt-2 text-xs">
                           {mediaMode === 'url' && contentUrl.trim() && (
                             <div className="text-green-600 font-medium">
@@ -1116,7 +1139,7 @@ export default function CreateContent() {
                         </div>
                       </div>
 
-                      {/* Campo de URL */}
+                      {/* URL Field */}
                       {mediaMode === 'url' && (
                         <div>
                           <label className="block text-sm font-medium mb-2 text-gray-700">
@@ -1143,7 +1166,7 @@ export default function CreateContent() {
                         </div>
                       )}
 
-                      {/* ✅ NOVO COMPONENTE UNIFICADO DE UPLOAD */}
+                      {/* ✅ NEW UNIFIED UPLOAD COMPONENT */}
                       {mediaMode === 'file' && (
                         <div>
                           <label className="block text-sm font-medium mb-2 text-gray-700">
@@ -1160,11 +1183,11 @@ export default function CreateContent() {
                         </div>
                       )}
                       
-                      {/* Prévia do conteúdo para Shorts */}
+                      {/* Content preview for Shorts */}
                       {renderContentPreview()}
                     </div>
 
-                    {/* Upload de Thumbnail (para Podcast e Artigo) */}
+                    {/* Thumbnail upload (for Podcast and Article) */}
                     {(category === "Podcast" || category === "Artigo") && (
                       <div>
                         <label className="block text-sm font-medium mb-3 text-gray-700">
@@ -1237,7 +1260,7 @@ export default function CreateContent() {
                   </div>
                 </div>
 
-            {/* Live preview da Descrição */}
+            {/* Live preview of Description */}
             {description.trim() && (
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-900">
@@ -1258,7 +1281,7 @@ export default function CreateContent() {
               </div>
             )}
 
-            {/* Live preview do Conteúdo Textual */}
+            {/* Live preview of Textual Content */}
             {category !== "Shorts" && content.trim() && (
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-900">
@@ -1278,7 +1301,7 @@ export default function CreateContent() {
                 </div>
               </div>
             )}
-            {/* Categorias de Leitura (apenas para categoria Leitura) */}
+            {/* Reading Categories (only for Reading category) */}
             {category === 'Leitura' && (
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700">
