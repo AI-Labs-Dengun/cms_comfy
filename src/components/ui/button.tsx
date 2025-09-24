@@ -27,19 +27,25 @@ export interface ButtonProps
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "default", size = "default", asChild = false, ...props }, ref) => {
     if (asChild) {
-      // Para simplificação, retornamos o button normal por enquanto
-      return (
-        <button
-          className={cn(
-            "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-            buttonVariants[variant],
-            buttonSizes[size],
-            className
-          )}
-          ref={ref}
-          {...props}
-        />
+      const child = React.Children.only(props.children) as React.ReactElement<Record<string, unknown>>
+      const childProps = (child.props || {}) as { className?: string; [key: string]: unknown }
+
+      const mergedClassName = cn(
+        "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        buttonVariants[variant],
+        buttonSizes[size],
+        childProps.className,
+        className
       )
+
+      const mergedProps = {
+        ...childProps,
+        className: mergedClassName,
+        ref,
+        ...props,
+      }
+
+      return React.cloneElement(child, mergedProps)
     }
 
     return (
