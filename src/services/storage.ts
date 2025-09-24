@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 
-// Tipos para o storage
+// Types for storage
 export interface UploadResult {
   success: boolean
   path?: string
@@ -9,6 +9,8 @@ export interface UploadResult {
   file_name?: string
   file_size?: number
   file_type?: string
+  offline?: boolean
+  offlineId?: string
 }
 
 export interface FileInfo {
@@ -20,7 +22,7 @@ export interface FileInfo {
   updated_at: string
 }
 
-// Configurações do bucket
+// Bucket configuration
 const BUCKET_NAME = 'posts'
 const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
 const ALLOWED_TYPES = [
@@ -33,9 +35,20 @@ const ALLOWED_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 ]
 
-// Função para validar arquivo
+// Mapping of categories to folders inside the bucket
+const CATEGORY_FOLDERS: Record<string, string> = {
+  'Shorts': 'shorts',
+  'Vídeo': 'video',
+  'Podcast': 'podcast',
+  'Artigo': 'artigo',
+  'Livro': 'livro',
+  'Áudio': 'audio',
+  'Leitura': 'leitura'
+}
+
+// Function to validate a file
 function validateFile(file: File): { valid: boolean; error?: string } {
-  // Verificar tamanho
+  // Check size
   if (file.size > MAX_FILE_SIZE) {
     return {
       valid: false,
@@ -43,7 +56,7 @@ function validateFile(file: File): { valid: boolean; error?: string } {
     }
   }
 
-  // Verificar tipo
+  // Check type
   const isAllowedType = ALLOWED_TYPES.some(type => 
     file.type.startsWith(type) || file.type === type
   )
@@ -58,13 +71,13 @@ function validateFile(file: File): { valid: boolean; error?: string } {
   return { valid: true }
 }
 
-// Função para gerar nome único do arquivo
-async function generateUniqueFileName(originalName: string, userId: string): Promise<string> {
+// Function to generate a unique file name
+async function generateUniqueFileName(originalName: string, userId: string, categoryFolder?: string): Promise<string> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
   const extension = originalName.includes('.') ? originalName.split('.').pop() : ''
   const baseName = originalName.includes('.') ? originalName.split('.').slice(0, -1).join('.') : originalName
   
-  // Limpar nome do arquivo (remover caracteres especiais)
+  // Clean the file name (remove special characters)
   const cleanBaseName = baseName.replace(/[^a-zA-Z0-9-_]/g, '_')
   
   let fileName = `${cleanBaseName}_${timestamp}_${userId}`
@@ -72,15 +85,17 @@ async function generateUniqueFileName(originalName: string, userId: string): Pro
     fileName += `.${extension}`
   }
 
-  // Verificar se o arquivo já existe
+  // Check if the file already exists
+  // List inside the user's folder + category when possible to avoid collisions
+  const listPath = categoryFolder ? `${categoryFolder}/${userId}` : userId
   const { data: existingFiles } = await supabase.storage
     .from(BUCKET_NAME)
-    .list('', {
+    .list(listPath, {
       search: fileName
     })
 
   if (existingFiles && existingFiles.length > 0) {
-    // Adicionar número único se necessário
+  // Add a unique number if necessary
     let counter = 1
     let newFileName = fileName
     while (existingFiles.some(f => f.name === newFileName)) {
@@ -95,52 +110,68 @@ async function generateUniqueFileName(originalName: string, userId: string): Pro
   return fileName
 }
 
-// Função principal para upload de arquivo
-export async function uploadFile(file: File): Promise<UploadResult> {
+// Main function for file upload
+// Now optionally accepts a category to organize the file inside the bucket
+export async function uploadFile(file: File, category?: string): Promise<UploadResult> {
   try {
-    // Verificar se o usuário está autenticado
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const hasAnonKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    console.debug("[storage] config check", { supabaseUrl, hasAnonKey, bucketName: BUCKET_NAME });
+
+  // 🔑 Check if the user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return {
-        success: false,
-        error: 'Usuário não autenticado'
-      }
+      return { success: false, error: "Usuário não autenticado" };
     }
 
-    // Validar arquivo
-    const validation = validateFile(file)
+  // 🔑 Validate role in CMS
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, user_role, authorized")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile || profile.user_role !== "cms" || !profile.authorized) {
+      console.error("❌ Acesso negado para upload:", { profile, profileError });
+      return { success: false, error: "Acesso negado. Apenas usuários CMS autorizados podem fazer upload." };
+    }
+
+    console.log("✅ Usuário CMS autorizado para upload:", { userId: user.id, userRole: profile.user_role });
+
+  // 🔍 Validate file
+    const validation = validateFile(file);
     if (!validation.valid) {
-      return {
-        success: false,
-        error: validation.error
-      }
+      return { success: false, error: validation.error };
     }
 
-    // Gerar nome único
-    const fileName = await generateUniqueFileName(file.name, user.id)
-    const filePath = `${user.id}/${fileName}`
+  // 📂 Build final path
+    const categoryFolder = category && CATEGORY_FOLDERS[category] ? CATEGORY_FOLDERS[category] : undefined;
+    const fileName = await generateUniqueFileName(file.name, user.id, categoryFolder);
+    const filePath = `${user.id}/${fileName}`;
 
-    // Fazer upload
-    const { error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      })
+  // 🔄 Upload with simple retry
+    let uploadRes;
+    try {
+      console.debug("[storage] upload attempt", { filePath, fileName, bucketName: BUCKET_NAME });
 
-    if (error) {
-      console.error('Erro no upload:', error)
-      return {
-        success: false,
-        error: 'Erro ao fazer upload do arquivo: ' + error.message
+      uploadRes = await supabase.storage
+        .from(BUCKET_NAME)
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadRes.error) {
+        console.error("❌ Upload error:", uploadRes.error);
+        return { success: false, error: `Erro no upload: ${uploadRes.error.message}` };
       }
+    } catch (err) {
+      console.error("❌ Upload exception:", err);
+      return { success: false, error: err instanceof Error ? err.message : "Erro desconhecido no upload" };
     }
 
-    // Gerar URL pública
-    const { data: urlData } = supabase.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(filePath)
+  // 🌐 Generate public URL
+    const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
 
     return {
       success: true,
@@ -148,19 +179,15 @@ export async function uploadFile(file: File): Promise<UploadResult> {
       url: urlData.publicUrl,
       file_name: file.name,
       file_size: file.size,
-      file_type: file.type
-    }
-
+      file_type: file.type,
+    };
   } catch (error) {
-    console.error('Erro inesperado no upload:', error)
-    return {
-      success: false,
-      error: 'Erro inesperado ao fazer upload'
-    }
+    console.error("❌ Erro inesperado no upload:", error);
+    return { success: false, error: "Erro inesperado ao fazer upload" };
   }
 }
 
-// Função para deletar arquivo
+// Function to delete a file
 export async function deleteFile(filePath: string): Promise<{ success: boolean; error?: string }> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -195,7 +222,7 @@ export async function deleteFile(filePath: string): Promise<{ success: boolean; 
   }
 }
 
-// Função para listar arquivos do usuário
+// Function to list user's files
 export async function listUserFiles(): Promise<{ success: boolean; files?: FileInfo[]; error?: string }> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -245,7 +272,7 @@ export async function listUserFiles(): Promise<{ success: boolean; files?: FileI
   }
 }
 
-// Função para obter URL de download
+// Function to get a public/download URL
 export function getFileUrl(filePath: string): string {
   const { data } = supabase.storage
     .from(BUCKET_NAME)
@@ -254,7 +281,42 @@ export function getFileUrl(filePath: string): string {
   return data.publicUrl
 }
 
-// Função para obter URL assinada (para arquivos privados)
+// Type to represent an offline upload stored locally
+export interface OfflineUpload {
+  id?: string
+  path?: string
+  name?: string
+  size?: number
+  type?: string
+  status?: 'pending' | 'uploaded' | 'failed'
+  progress?: number
+  category?: string
+  timestamp?: number
+  [key: string]: unknown
+}
+
+// Function to get offline uploads (stored locally)
+// This function is safe to import in SSR — it checks if `window` exists
+// and returns an empty array on the server. The expected format stored in
+// localStorage is a JSON-stringified array of objects compatible with
+// the OfflineUpload type.
+export function getOfflineUploads(): OfflineUpload[] {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return []
+    const raw = window.localStorage.getItem('offline_uploads')
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+  // Map and ensure each item is a plain object
+    return parsed.map((item) => (typeof item === 'object' && item !== null ? item as OfflineUpload : {}))
+  } catch (error) {
+    console.warn('Erro ao ler uploads offline do localStorage:', error)
+    return []
+  }
+}
+
+
+// Function to get a signed URL (for private files)
 export async function getSignedUrl(filePath: string, expiresIn: number = 3600): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
     const { data, error } = await supabase.storage
@@ -282,15 +344,15 @@ export async function getSignedUrl(filePath: string, expiresIn: number = 3600): 
   }
 }
 
-// Função para obter duração de arquivos de mídia
+// Function to get duration of media files
 export async function getMediaDuration(file: File | string): Promise<{ success: boolean; duration?: number; error?: string }> {
   try {
-    // Se for uma string (URL), tratar como URL
+  // If it's a string (URL), treat as URL
     if (typeof file === 'string') {
       return await getMediaDurationFromUrl(file);
     }
     
-    // Se for um File, tratar como arquivo local
+  // If it's a File, treat as a local file
     return await getMediaDurationFromFile(file);
   } catch (error) {
     console.error('Erro ao obter duração da mídia:', error);
@@ -301,10 +363,10 @@ export async function getMediaDuration(file: File | string): Promise<{ success: 
   }
 }
 
-// Função para obter duração de arquivo local
+// Function to get duration from a local file
 async function getMediaDurationFromFile(file: File): Promise<{ success: boolean; duration?: number; error?: string }> {
   return new Promise((resolve) => {
-    // Verificar se é um arquivo de mídia
+  // Check if it's a media file
     if (!file.type.startsWith('video/') && !file.type.startsWith('audio/')) {
       resolve({
         success: false,
@@ -334,21 +396,21 @@ async function getMediaDurationFromFile(file: File): Promise<{ success: boolean;
       });
     };
     
-    // Criar URL do arquivo
+  // Create object URL for the file
     const url = URL.createObjectURL(file);
     mediaElement.src = url;
     
-    // Limpar URL após um tempo
+  // Revoke URL after some time
     setTimeout(() => {
       URL.revokeObjectURL(url);
     }, 10000);
   });
 }
 
-// Função para obter duração de URL de mídia
+// Function to get duration from a media URL
 async function getMediaDurationFromUrl(url: string): Promise<{ success: boolean; duration?: number; error?: string }> {
   return new Promise((resolve) => {
-    // Verificar se é uma URL de mídia válida
+  // Check if it's a valid media URL
     const mediaExtensions = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.mp3', '.wav', '.ogg', '.aac', '.flac'];
     const isMediaUrl = mediaExtensions.some(ext => url.toLowerCase().includes(ext)) || 
                       url.includes('youtube.com') || 
@@ -364,7 +426,7 @@ async function getMediaDurationFromUrl(url: string): Promise<{ success: boolean;
       return;
     }
 
-    // Para URLs do YouTube, tentar extrair duração via API (se disponível)
+  // For YouTube URLs, attempt to extract duration via API (if available)
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
       resolve({
         success: false,
@@ -373,11 +435,11 @@ async function getMediaDurationFromUrl(url: string): Promise<{ success: boolean;
       return;
     }
 
-    // Para outras URLs, tentar carregar como elemento de mídia
+  // For other URLs, try loading as a media element
     const video = document.createElement('video');
     const audio = document.createElement('audio');
     
-    // Tentar primeiro como vídeo
+  // Try first as video
     video.preload = 'metadata';
     video.crossOrigin = 'anonymous';
     
@@ -390,7 +452,7 @@ async function getMediaDurationFromUrl(url: string): Promise<{ success: boolean;
     };
     
     video.onerror = () => {
-      // Se falhar como vídeo, tentar como áudio
+  // If it fails as video, try as audio
       audio.preload = 'metadata';
       audio.crossOrigin = 'anonymous';
       
@@ -416,7 +478,7 @@ async function getMediaDurationFromUrl(url: string): Promise<{ success: boolean;
   });
 }
 
-// Função para detectar tipo de conteúdo baseado na URL
+// Function to detect content type based on URL
 export function detectContentType(url: string): string | null {
   if (!url.trim()) return null;
   
@@ -450,11 +512,11 @@ export function detectContentType(url: string): string | null {
     return 'soundcloud';
   }
   
-  // Arquivos de mídia diretos
+  // Direct media files
   const mediaExtensions = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.mp3', '.wav', '.ogg', '.aac', '.flac'];
   if (mediaExtensions.some(ext => url.toLowerCase().includes(ext))) {
     return 'direct-media';
   }
   
   return 'external';
-} 
+}

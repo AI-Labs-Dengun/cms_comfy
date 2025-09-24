@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Upload, X, Image, Video, FileText, AlertCircle, CheckCircle } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Video, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import { validatePostFiles, uploadPostFiles, type FileValidation } from '@/services/posts';
 
 interface PostFileUploaderProps {
@@ -126,7 +126,7 @@ export default function PostFileUploader({
     }, 200);
 
     try {
-      const uploadResult = await uploadPostFiles(files);
+  const uploadResult = await uploadPostFiles(files, category);
       
       if (uploadResult.success && uploadResult.data) {
         setUploadProgress(100);
@@ -155,7 +155,7 @@ export default function PostFileUploader({
 
   // Ícone baseado no tipo de arquivo
   const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith('image/')) return <Image className="w-4 h-4" aria-hidden="true" />;
+  if (fileType.startsWith('image/')) return <ImageIcon className="w-4 h-4" aria-hidden="true" />;
     if (fileType.startsWith('video/')) return <Video className="w-4 h-4" aria-hidden="true" />;
     return <FileText className="w-4 h-4" aria-hidden="true" />;
   };
