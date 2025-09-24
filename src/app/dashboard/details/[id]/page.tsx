@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import FlexibleRenderer from "@/components/FlexibleRenderer";
@@ -28,164 +28,20 @@ const isValidUrl = (src?: string | null) => {
   }
 };
 
-// Componente para embed do TikTok
-const TikTokEmbed = ({ url, videoId }: { url: string; videoId: string }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-  const [embedMethod, setEmbedMethod] = useState<'official' | 'iframe' | 'fallback'>('official');
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    console.log('🎵 TikTokEmbed iniciado:', { url, videoId });
-    
-    const loadTikTokEmbed = async () => {
-      try {
-        // Método 1: Embed oficial do TikTok
-        console.log('🔗 Tentando embed oficial do TikTok...');
-        
-        // Carregar script do TikTok se ainda não estiver carregado
-        if (!document.querySelector('script[src="https://www.tiktok.com/embed.js"]')) {
-          const script = document.createElement('script');
-          script.src = 'https://www.tiktok.com/embed.js';
-          script.async = true;
-          document.head.appendChild(script);
-          console.log('📜 Script do TikTok carregado');
-        }
-
-        // Aguardar um pouco para o script carregar
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        // Criar o embed usando o método oficial do TikTok
-        if (containerRef.current) {
-          // Limpar container
-          containerRef.current.innerHTML = '';
-          
-          // Criar blockquote com a estrutura oficial do TikTok
-          const blockquote = document.createElement('blockquote');
-          blockquote.className = 'tiktok-embed';
-          blockquote.setAttribute('cite', url);
-          blockquote.setAttribute('data-video-id', videoId);
-          
-          // Definir estilos para o embed
-          blockquote.style.maxWidth = '325px';
-          blockquote.style.minWidth = '325px';
-          blockquote.style.width = '100%';
-          
-          // Criar seção interna
-          const section = document.createElement('section');
-          const link = document.createElement('a');
-          link.target = '_blank';
-          link.href = url;
-          section.appendChild(link);
-          blockquote.appendChild(section);
-          
-          // Adicionar ao container
-          containerRef.current.appendChild(blockquote);
-          
-          console.log('✅ Embed oficial do TikTok criado com sucesso');
-          setEmbedMethod('official');
-          setIsLoading(false);
-          return;
-        }
-      } catch (error) {
-        console.error('❌ Embed oficial falhou, tentando iframe:', error);
-        
-        // Método 2: Iframe direto
-        try {
-          console.log('🔗 Tentando iframe direto...');
-          setEmbedMethod('iframe');
-          setIsLoading(false);
-          return;
-        } catch (iframeError) {
-          console.error('❌ Iframe também falhou:', iframeError);
-          setEmbedMethod('fallback');
-          setHasError(true);
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadTikTokEmbed();
-  }, [url, videoId]);
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-96 bg-gray-100 rounded-lg">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-sm text-gray-600">Carregando TikTok...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (hasError || embedMethod === 'fallback') {
-    return (
-      <div className="bg-black rounded-lg p-4 text-white">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-blue-500 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-lg">♪</span>
-          </div>
-          <div>
-            <div className="font-semibold">TikTok</div>
-            <div className="text-sm text-gray-300">Vídeo #{videoId}</div>
-          </div>
-        </div>
-        
-        <div className="bg-gray-900 rounded-lg p-4 mb-4">
-          <div className="flex items-center justify-center h-32 bg-gradient-to-br from-pink-500/20 to-blue-500/20 rounded-lg">
-            <div className="text-center">
-              <div className="text-4xl mb-2">🎵</div>
-              <div className="text-sm text-gray-300">Clique para ver no TikTok</div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-gray-300">
-            <span>♪</span>
-            <span>TikTok Video</span>
-          </div>
-          <a 
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-200 transition-colors"
-          >
-            Ver no TikTok
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  // Método 2: Iframe direto
-  if (embedMethod === 'iframe') {
-    return (
+// Simple TikTok embed helper - keeps component lightweight and predictable
+const TikTokEmbed = ({ videoId }: { videoId: string }) => {
+  // Use a simple iframe for embeds; some TikTok embeds require scripts but iframe works for many cases
+  return (
+    <div className="w-full flex justify-center">
       <iframe
         src={`https://www.tiktok.com/embed/${videoId}`}
         className="w-full h-full min-h-[600px]"
-        title="TikTok Video"
+        title={`TikTok ${videoId}`}
         frameBorder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
-        onLoad={() => console.log('✅ TikTok iframe carregado com sucesso')}
-        onError={() => {
-          console.error('❌ Erro no TikTok iframe');
-          setHasError(true);
-          setEmbedMethod('fallback');
-        }}
       />
-    );
-  }
-
-  // Método 1: Embed oficial (container)
-  return (
-    <div 
-      ref={containerRef}
-      className="w-full flex justify-center"
-      style={{ minHeight: '600px' }}
-    />
+    </div>
   );
 };
 
@@ -243,9 +99,10 @@ export default function DetalhesConteudo() {
         setPost(response.data);
         // Inicializar valores de edição
         initializeEditValues(response.data);
-        // Carregar URL do arquivo se existir
-        if (response.data.file_path) {
-          loadFileUrl(response.data.file_path);
+        // Carregar URL do arquivo se existir (usar file_paths[0] se disponível)
+        const firstPath = response.data.file_paths && response.data.file_paths.length > 0 ? response.data.file_paths[0] : null;
+        if (firstPath) {
+          loadFileUrl(firstPath);
         }
       } else {
         setError(response.error || 'Post não encontrado');
@@ -643,8 +500,7 @@ export default function DetalhesConteudo() {
     if (!post) return null;
 
     // ✅ VERIFICAR FORMATO NOVO (arrays) E ANTIGO (campos únicos)
-    const hasNewFormat = post.file_paths && post.file_paths.length > 0;
-    const hasOldFormat = post.file_path && post.file_type;
+  const hasNewFormat = post.file_paths && post.file_paths.length > 0;
     
     // Se tem arquivos no formato novo (array)
     if (hasNewFormat) {
@@ -828,112 +684,7 @@ export default function DetalhesConteudo() {
       );
     }
 
-    // ⚠️ COMPATIBILIDADE: Se tem arquivo no formato antigo (campo único)
-    if (hasOldFormat) {
-      const publicUrl = getFileUrl(post.file_path!);
-      const fileType = post.file_type!.toLowerCase();
-      
-      // Imagens
-      if (fileType.startsWith('image/')) {
-        return (
-          <div className="mb-6">
-            <div className="text-xs text-gray-500 font-bold mb-2">Pré-visualização</div>
-            <div className="border rounded-lg overflow-hidden">
-              {isValidUrl(publicUrl) ? (
-                <Image 
-                  src={publicUrl} 
-                  alt={post.title}
-                  className="max-w-full h-auto max-h-96 object-contain mx-auto"
-                  width={600}
-                  height={400}
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const parent = target.parentElement;
-                    if (parent) {
-                      parent.innerHTML = `
-                        <div class="p-8 text-center text-gray-500">
-                          <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                          </svg>
-                          <p class="text-sm font-medium mb-2">Erro ao carregar imagem</p>
-                          <p class="text-xs text-gray-400">A imagem pode estar temporariamente indisponível</p>
-                        </div>
-                      `;
-                    }
-                  }}
-                />
-              ) : (
-                <div className="p-8 text-center text-gray-500">
-                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <p className="text-sm font-medium mb-2">URL da imagem inválida</p>
-                  <p className="text-xs text-gray-400">Não foi possível carregar a imagem</p>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      }
-
-      // Vídeos
-      if (fileType.startsWith('video/')) {
-        return (
-          <div className="mb-6">
-            <div className="text-xs text-gray-500 font-bold mb-2">Vídeo</div>
-            <div className="border rounded-lg overflow-hidden">
-              {isValidUrl(publicUrl) ? (
-                <video 
-                  controls 
-                  className="w-full max-h-96"
-                  preload="metadata"
-                >
-                  <source src={publicUrl} type={fileType} />
-                  Seu navegador não suporta reprodução de vídeo.
-                </video>
-              ) : (
-                <div className="p-8 text-center text-gray-500">
-                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  <p className="text-sm font-medium mb-2">Vídeo não disponível</p>
-                  <p className="text-xs text-gray-400">URL do vídeo inválida</p>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      }
-
-      // Outros tipos de arquivo (PDF, áudio, etc.)
-      return (
-        <div className="mb-6">
-          <div className="text-xs text-gray-500 font-bold mb-2">Arquivo</div>
-          <div className="border rounded-lg p-4 bg-gray-50">
-            <div className="flex items-center gap-3">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <div>
-                <div className="font-medium text-gray-900">{post.file_name}</div>
-                <div className="text-sm text-gray-500">{post.file_type}</div>
-              </div>
-            </div>
-            <div className="mt-3">
-              <a 
-                href={publicUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 inline-block"
-              >
-                Download / Ver arquivo
-              </a>
-            </div>
-          </div>
-        </div>
-      );
-    }
+  // Legacy single-file format removed. All posts now use arrays (file_paths, file_names, file_types, file_sizes).
 
     // Se tem URL externa
     if (post.content_url) {
@@ -1019,7 +770,7 @@ export default function DetalhesConteudo() {
           <div className="mb-6">
             <div className="text-xs text-gray-500 font-bold mb-2">TikTok</div>
             <div className="border rounded-lg overflow-hidden aspect-[9/16] max-w-md mx-auto">
-              <TikTokEmbed url={url} videoId={videoId} />
+              <TikTokEmbed videoId={videoId} />
             </div>
             <div className="text-center mt-2">
               <a 
@@ -1417,11 +1168,11 @@ export default function DetalhesConteudo() {
                         type="url"
                         value={editContentUrl}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditContentUrl(e.target.value)}
-                        className={`w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium ${post?.file_path ? 'bg-gray-100 opacity-50' : ''}`}
-                        placeholder={post?.file_path ? "Este post tem ficheiro anexado" : "https://exemplo.com/conteudo"}
-                        disabled={!!post?.file_path}
+                        className={`w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium ${post?.file_paths && post.file_paths.length > 0 ? 'bg-gray-100 opacity-50' : ''}`}
+                        placeholder={post?.file_paths && post.file_paths.length > 0 ? "Este post tem ficheiro anexado" : "https://exemplo.com/conteudo"}
+                        disabled={!!(post?.file_paths && post.file_paths.length > 0)}
                       />
-                      {post?.file_path && (
+                      {(post?.file_paths && post.file_paths.length > 0) && (
                         <div className="mt-1 text-xs text-gray-500">
                           ⚠️ Este post tem um ficheiro anexado. Não é possível adicionar URL externa.
                         </div>
@@ -1430,7 +1181,7 @@ export default function DetalhesConteudo() {
                   </div>
 
                   {/* ✅ CAMPO PARA EDITAR THUMBNAIL URL (Podcasts e Artigos) */}
-                  {((post.category === "Podcast" && post.content_url && !post.file_path) || (post.category === "Artigo" && !post.file_path)) && (
+                  {((post.category === "Podcast" && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && !(post.file_paths && post.file_paths.length > 0))) && (
                     <div className="mb-6">
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-3">
@@ -1653,7 +1404,7 @@ export default function DetalhesConteudo() {
               <div className="my-6 border-b border-gray-200" />
 
               {/* Thumbnail - exibir para Podcasts e Artigos quando houver thumbnail */}
-              {((post.category === "Podcast" && post.thumbnail_url && post.content_url && !post.file_path) || (post.category === "Artigo" && post.thumbnail_url && !post.file_path)) && (
+              {((post.category === "Podcast" && post.thumbnail_url && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0))) && (
                 <div className="mb-6">
                   <div className="text-xs text-gray-500 font-bold mb-2">Thumbnail do Podcast</div>
                   <div className="border rounded-lg overflow-hidden max-w-md">
@@ -1703,7 +1454,7 @@ export default function DetalhesConteudo() {
                     Imagem representativa do podcast
                   </div>
                                 {/* Thumbnail Info - apenas para podcasts criados via link (não mostrar a URL bruta) */}
-              {((post.category === "Podcast" && post.thumbnail_url && post.content_url && !post.file_path) || (post.category === "Artigo" && post.thumbnail_url && !post.file_path)) && (
+              {((post.category === "Podcast" && post.thumbnail_url && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0))) && (
                 <div className="mb-4">
                   <div className="text-xs text-gray-500 font-bold">{post.category === 'Podcast' ? 'Thumbnail do Podcast' : 'Thumbnail do Artigo'}</div>
                   <div className="mt-1">
@@ -1805,26 +1556,26 @@ export default function DetalhesConteudo() {
                 </div>
               )}
 
-              {/* File Info - apenas informações técnicas */}
-              {post.file_name && (
+              {/* File Info - apenas informações técnicas (usar arrays de arquivos) */}
+              {(post.file_names && post.file_names.length > 0) && (
                 <>
                   <div className="flex flex-row gap-8 mb-4 flex-wrap">
                     <div>
                       <div className="text-xs text-gray-500 font-bold">Nome do Arquivo</div>
-                      <div className="text-gray-900 font-medium">{post.file_name}</div>
+                      <div className="text-gray-900 font-medium">{post.file_names[0]}</div>
                     </div>
                     
-                    {post.file_size && (
+                    {(post.file_sizes && post.file_sizes.length > 0) && (
                       <div>
                         <div className="text-xs text-gray-500 font-bold">Tamanho do Arquivo</div>
-                        <div className="text-gray-900 font-medium">{formatFileSize(post.file_size)}</div>
+                        <div className="text-gray-900 font-medium">{formatFileSize(post.file_sizes[0])}</div>
                       </div>
                     )}
 
-                    {post.file_type && (
+                    {(post.file_types && post.file_types.length > 0) && (
                       <div>
                         <div className="text-xs text-gray-500 font-bold">Tipo de Arquivo</div>
-                        <div className="text-gray-900 font-medium">{post.file_type}</div>
+                        <div className="text-gray-900 font-medium">{post.file_types[0]}</div>
                       </div>
                     )}
                   </div>
@@ -1963,7 +1714,7 @@ export default function DetalhesConteudo() {
               )}
 
               {/* Informação sobre Storage */}
-              {post.file_path && !fileUrl && !loadingFile && (
+              {(post.file_paths && post.file_paths.length > 0) && !fileUrl && !loadingFile && (
                 <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-md">
                   <h4 className="text-sm font-medium text-blue-800 mb-2">💡 Informação sobre Storage</h4>
                   <p className="text-xs text-blue-700 mb-2">
