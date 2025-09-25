@@ -396,10 +396,9 @@ export default function CreateContent() {
         title: title.trim(),
         description: description.trim(),
         category,
-        tags: tags, // ✅ TODAS AS CATEGORIAS AGORA TÊM TAGS
+        tags: tags, 
         emotion_tags: emotions,
-        min_age: minAge, // ✅ ADICIONANDO IDADE MÍNIMA
-        // categoria_leitura será preenchida automaticamente pelo trigger quando as tags forem associadas
+        min_age: minAge,
       };
 
       // Adicionar conteúdo textual se fornecido (exceto para Shorts)
@@ -472,21 +471,34 @@ export default function CreateContent() {
           // Validação extra específica para Shorts (reafirmar regra 1-5 imagens OU 1 vídeo)
           if (category === 'Shorts' && fileValidation) {
             const count = fileValidation.file_count;
-            if (!fileValidation.is_carousel && !fileValidation.is_single_video) {
+            // Accept: carousel (1-5 images), single image, or single video
+            if (!fileValidation.is_carousel && !fileValidation.is_single_video && !fileValidation.is_single_image) {
               setError('Para Shorts envie de 1 a 5 imagens (carousel) ou 1 vídeo único');
               toast.error('Para Shorts envie de 1 a 5 imagens (carousel) ou 1 vídeo único');
               clearInterval(progressInterval);
               return;
             }
+
+            // If it's a carousel, ensure between 1 and 5 images (allowing 1 as valid)
             if (fileValidation.is_carousel && (count < 1 || count > 5)) {
-              setError('Máximo 5 imagens permitidas para Shorts');
-              toast.error('Máximo 5 imagens permitidas para Shorts');
+              setError('Para Shorts envie de 1 a 5 imagens (carousel)');
+              toast.error('Para Shorts envie de 1 a 5 imagens (carousel)');
               clearInterval(progressInterval);
               return;
             }
+
+            // If it's a single video, ensure exactly 1 file
             if (fileValidation.is_single_video && count !== 1) {
               setError('Apenas 1 vídeo permitido para Shorts');
               toast.error('Apenas 1 vídeo permitido para Shorts');
+              clearInterval(progressInterval);
+              return;
+            }
+
+            // If it's a single image, ensure exactly 1 file
+            if (fileValidation.is_single_image && count !== 1) {
+              setError('Apenas 1 imagem deve ser enviada como imagem única para Shorts');
+              toast.error('Apenas 1 imagem deve ser enviada como imagem única para Shorts');
               clearInterval(progressInterval);
               return;
             }
