@@ -16,16 +16,23 @@ import { EMOTIONS } from '@/lib/emotions';
 import TipTapEditor from '@/components/TipTapEditor';
 // import MarkdownEditor from '@/components/MarkdownEditor';
 
-// Valida se uma string é uma URL absoluta válida
+// Valida se uma string é uma URL válida (absoluta ou relativa do Supabase)
 const isValidUrl = (src?: string | null) => {
   if (!src) return false;
-  try {
-    // new URL() lança se não for uma URL válida
-    new URL(src);
-    return true;
-  } catch {
-    return false;
+  
+  // Se começa com http ou https, tenta validar como URL absoluta
+  if (src.startsWith('http://') || src.startsWith('https://')) {
+    try {
+      new URL(src);
+      return true;
+    } catch {
+      return false;
+    }
   }
+  
+  // Para URLs do Supabase que podem começar com / ou serem relativas
+  // Considera válida se não for uma string vazia e parecer um caminho
+  return src.trim().length > 0 && !src.includes(' ');
 };
 
 // Simple TikTok embed helper - keeps component lightweight and predictable
@@ -582,6 +589,15 @@ export default function DetalhesConteudo() {
       const singleFileName = fileNames[0] || 'Arquivo';
       const publicUrl = getFileUrl(singleFilePath);
       
+      // Debug logs
+      console.log('🎥 Debug Video URL:', {
+        singleFilePath,
+        singleFileType,
+        singleFileName,
+        publicUrl,
+        isValidUrl: isValidUrl(publicUrl)
+      });
+      
       // Imagem única
       if (singleFileType.startsWith('image/')) {
         return (
@@ -628,26 +644,77 @@ export default function DetalhesConteudo() {
       
       // Vídeo único
       if (singleFileType.startsWith('video/')) {
+        console.log('🎬 Renderizando vídeo:', {
+          publicUrl,
+          isValid: isValidUrl(publicUrl),
+          fileType: singleFileType
+        });
+        
+  // Verificar se é um formato suportado pelo navegador
+  const isSupportedFormat = ['video/mp4', 'video/webm', 'video/ogg'].includes(singleFileType);
+  const isQuickTime = singleFileType === 'video/quicktime';
+        
         return (
           <div className="mb-6">
             <div className="text-xs text-gray-500 font-bold mb-2">Vídeo</div>
             <div className="border rounded-lg overflow-hidden">
               {isValidUrl(publicUrl) ? (
-                <video 
-                  controls 
-                  className="w-full max-h-96"
-                  preload="metadata"
-                >
-                  <source src={publicUrl} type={singleFileType} />
-                  Seu navegador não suporta reprodução de vídeo.
-                </video>
+                <div>
+                  {isQuickTime && (
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm text-yellow-700">
+                            <strong>Formato QuickTime (.mov):</strong> Este formato pode não ser reproduzido em todos os navegadores. 
+                            Recomendamos usar MP4 para melhor compatibilidade.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <video 
+                    controls 
+                    className="w-full max-h-96"
+                    preload="metadata"
+                    onError={(e) => {
+                      console.error('❌ Erro ao carregar vídeo:', e);
+                      console.error('URL problemática:', publicUrl);
+                      console.error('Tipo do arquivo:', singleFileType);
+                    }}
+                    onLoadStart={() => {
+                      console.log('✅ Iniciando carregamento do vídeo:', publicUrl);
+                    }}
+                    onCanPlay={() => {
+                      console.log('✅ Vídeo pode ser reproduzido:', publicUrl);
+                    }}
+                  >
+                    <source src={publicUrl} type={singleFileType} />
+                    {/* Fallback para QuickTime */}
+                    {isQuickTime && (
+                      <source src={publicUrl} type="video/mp4" />
+                    )}
+                    Seu navegador não suporta reprodução de vídeo.
+                  </video>
+                                  
+                  {/* Mostrar suporte/formato usando isSupportedFormat para evitar variável não usada */}
+                  <div className="text-xs text-gray-500 mt-2">
+                    Formato suportado pelo navegador: {isSupportedFormat ? 'Sim' : 'Provavelmente não'}
+                  </div>
+
+                </div>
               ) : (
                 <div className="p-8 text-center text-gray-500">
                   <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
                   <p className="text-sm font-medium mb-2">Vídeo não disponível</p>
-                  <p className="text-xs text-gray-400">URL do vídeo inválida</p>
+                  <p className="text-xs text-gray-400">URL do vídeo inválida: {publicUrl}</p>
                 </div>
               )}
             </div>
