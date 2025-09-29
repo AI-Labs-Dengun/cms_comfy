@@ -5,7 +5,6 @@ import { CloudUpload, X } from "lucide-react";
 import { Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 import CMSLayout from "@/components/CMSLayout";
-import FlexibleRenderer from '@/components/FlexibleRenderer';
 import TipTapEditor from "@/components/TipTapEditor";
 import { createPost, CreatePostData, uploadFileForPost, getAllReadingTags, associateTagWithPost, createReadingTag, type FileValidation } from "@/services/posts";
 import { getMediaDuration } from "@/services/storage";
@@ -1272,48 +1271,7 @@ export default function CreateContent() {
                   </div>
                 </div>
 
-            {/* Live preview of Description */}
-            {description.trim() && (
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-900">
-                  Pré-visualização da Descrição
-                </label>
-                <p className="text-xs text-gray-500 mt-1 mb-4">
-                  A pré-visualização atualiza automaticamente enquanto você digita na descrição.
-                </p>
 
-                <div className="mt-2">
-                  <div className="mt-4 p-4 bg-gray-50 rounded-md border">
-                    <div className="text-xs text-gray-500 font-bold mb-2">Prévia da descrição:</div>
-                    <div className="bg-white p-3 rounded border">
-                      <p className="text-gray-900 whitespace-pre-wrap">{description}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Live preview of Textual Content */}
-            {category !== "Shorts" && content.trim() && (
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-900">
-                  Pré-visualização do Conteúdo
-                </label>
-                <p className="text-xs text-gray-500 mt-1 mb-4">
-                  A pré-visualização atualiza automaticamente enquanto você digita o conteúdo.
-                </p>
-
-                <div className="mt-2">
-                  <div className="mt-4 p-4 bg-gray-50 rounded-md border">
-                    <div className="text-xs text-gray-500 font-bold mb-2">Prévia do conteúdo:</div>
-                    <div className="bg-white p-3 rounded border max-h-96 overflow-y-auto">
-                      <FlexibleRenderer content={content} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {/* Reading Categories (only for Reading category) */}
             {category === 'Leitura' && (
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700">
