@@ -7,131 +7,68 @@ import { AuthService } from "@/services/auth";
 import { useAuth } from "@/context/AuthContext";
 import Image from 'next/image';
 import LoadingSpinner from "@/components/LoadingSpinner";
+import type { AuthResponse } from "@/types/auth";
 
 export default function LoginPage() {
   const router = useRouter();
   const { 
     refreshAuth, 
     loading: authLoading, 
-    isAuthenticated, 
-    canAccessCMS, 
     user, 
-    profile,
-    authInfo 
+    profile
   } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Mutex to prevent multiple submissions
   const [error, setError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
   // successMessage was only being set but never read which caused a build-time ESLint error.
   // Use a ref to keep the same behavior (loggable state) without triggering the unused-vars rule.
   const successMessageRef = useRef<string>("");
   
-  // UseRef para controlar se já tentou redirecionar
+  // useRef to track whether we've already attempted to redirect
   const hasRedirected = useRef(false);
-  const loginSuccessRef = useRef(false);
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Monitorar estado de autenticação e redirecionar quando apropriado
-  useEffect(() => {
-    // Se já redirecionou uma vez, não fazer nada
-    if (hasRedirected.current) {
-      return;
+  // Retry configuration constants
+  const MAX_RETRY_ATTEMPTS = 2;
+  const RETRY_DELAYS = [1000, 2000]; // 1s, 2s
+
+  // Function to determine whether an error is recoverable (network error)
+  const isNetworkError = (error: unknown, code?: string): boolean => {
+    const networkCodes = ['PERMISSION_CHECK_ERROR', 'SERVER_ERROR'];
+    const networkMessages = ['erro de conexão', 'network', 'timeout', 'fetch'];
+    
+    if (code && networkCodes.includes(code)) return true;
+    if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+      const message = error.message.toLowerCase();
+      return networkMessages.some(keyword => message.includes(keyword));
     }
-
-    // Se ainda está carregando, aguardar
-    if (authLoading) {
-      return;
-    }
-
-    // Só verificar redirecionamento se o login foi bem-sucedido
-    if (!loginSuccessRef.current) {
-      return;
-    }
-
-    // Verificar se deve redirecionar baseado no role
-    const shouldRedirectCMS = isAuthenticated && 
-                             canAccessCMS && 
-                             user && 
-                             profile && 
-                             profile.user_role === 'cms' && 
-                             profile.authorized === true &&
-                             authInfo?.success === true;
-
-    const shouldRedirectPsicologo = isAuthenticated &&
-                                   user &&
-                                   profile &&
-                                   profile.user_role === 'psicologo' &&
-                                   profile.authorized === true;
-
-    console.log('🔍 LoginPage - Verificando redirecionamento:', {
-      shouldRedirectCMS,
-      shouldRedirectPsicologo,
-      isAuthenticated,
-      canAccessCMS,
-      hasUser: !!user,
-      hasProfile: !!profile,
-      userRole: profile?.user_role,
-      isAuthorized: profile?.authorized === true,
-      authSuccess: authInfo?.success === true,
-      loginSuccess: loginSuccessRef.current
-    });
-
-    if (shouldRedirectCMS) {
-      console.log('✅ LoginPage - Redirecionando para dashboard CMS...');
-      hasRedirected.current = true;
-  successMessageRef.current = 'Acesso autorizado! Redirecionando para CMS...';
-      
-      // Limpar timeout anterior se existir
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current);
-      }
-      
-      // Redirecionamento direto sem delay
-      router.replace('/dashboard/create');
-      
-      // Fallback de segurança usando window.location
-      redirectTimeoutRef.current = setTimeout(() => {
-        if (window.location.pathname === '/login') {
-          console.log('🔄 LoginPage - Usando fallback window.location para CMS...');
-          window.location.href = '/dashboard/create';
-        }
-      }, 1500);
-    } else if (shouldRedirectPsicologo) {
-      console.log('✅ LoginPage - Redirecionando para painel de psicólogos...');
-      hasRedirected.current = true;
-  successMessageRef.current = 'Acesso autorizado! Redirecionando para painel de psicólogos...';
-      
-      // Limpar timeout anterior se existir
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current);
-      }
-      
-      // Redirecionamento direto sem delay
-      router.replace('/psicologos');
-      
-      // Fallback de segurança usando window.location
-      redirectTimeoutRef.current = setTimeout(() => {
-        if (window.location.pathname === '/login') {
-          console.log('🔄 LoginPage - Usando fallback window.location para psicólogos...');
-          window.location.href = '/psicologos';
-        }
-      }, 1500);
-    }
-  }, [authLoading, isAuthenticated, canAccessCMS, user, profile, authInfo, router]);
+    return false;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('🚀 LoginPage - Iniciando processo de login...');
     
-  setIsLoading(true);
-  setError("");
-  successMessageRef.current = "";
-    hasRedirected.current = false; // Reset do flag ao tentar novo login
-    loginSuccessRef.current = false; // Reset do flag de sucesso
+    // MUTEX: Prevent multiple submissions
+    if (isSubmitting) {
+      console.log('⚠️ LoginPage - Login já em andamento, ignorando nova submissão...');
+      return;
+    }
     
-    // Limpar timeout anterior se existir
+    setIsSubmitting(true);
+    setIsLoading(true);
+    setError("");
+    setRetryCount(0); // Reset retry count
+    setIsRetrying(false); // Reset retry state
+    successMessageRef.current = "";
+    hasRedirected.current = false; // Reset flag when attempting new login
+
+    // Clear previous timeout if it exists
     if (redirectTimeoutRef.current) {
       clearTimeout(redirectTimeoutRef.current);
       redirectTimeoutRef.current = null;
@@ -144,16 +81,65 @@ export default function LoginPage() {
         setError(msg);
         toast.error(msg);
         setIsLoading(false);
+        setIsSubmitting(false); // Clear mutex in case of validation error
+        setRetryCount(0); // Reset retry count in case of validation error
+        setIsRetrying(false); // Reset retry state
         return;
       }
-      // Primeiro tentar CMS, depois psicólogo
-      console.log('🔑 LoginPage - Tentando login com role CMS...');
-      let result = await AuthService.loginWithRole(email, password, 'cms');
+
+      // Function to attempt login with retries
+      const attemptLogin = async (attempt: number = 0): Promise<AuthResponse | null> => {
+        console.log(`🔑 LoginPage - Tentativa ${attempt + 1}/${MAX_RETRY_ATTEMPTS + 1} de login...`);
+        
+        if (attempt > 0) {
+          setIsRetrying(true);
+          setRetryCount(attempt);
+          successMessageRef.current = `Tentativa ${attempt + 1}/${MAX_RETRY_ATTEMPTS + 1}...`;
+          
+              // Wait the configured delay before retrying
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[attempt - 1] || 2000));
+        }
+        
+        try {
+          // Firtst try CMS role
+          console.log('🔑 LoginPage - Tentando login com role CMS...');
+          let result = await AuthService.loginWithRole(email, password, 'cms');
+          
+          // If failed, try psychologist role
+          if (!result.success) {
+            console.log('🔑 LoginPage - CMS falhou, tentando login com role psicólogo...');
+            result = await AuthService.loginWithRole(email, password, 'psicologo');
+          }
+          
+          return result;
+        } catch (error) {
+          console.error(`❌ LoginPage - Erro na tentativa ${attempt + 1}:`, error);
+          
+          // Check if should retry
+          if (attempt < MAX_RETRY_ATTEMPTS && isNetworkError(error)) {
+            console.log(`🔄 LoginPage - Erro de rede detectado, tentando novamente em ${RETRY_DELAYS[attempt] / 1000}s...`);
+            return attemptLogin(attempt + 1);
+          }
+          
+          throw error;
+        }
+      };
       
-      // Se falhou no CMS, tentar psicólogo
-      if (!result.success) {
-        console.log('🔑 LoginPage - CMS falhou, tentando login com role psicólogo...');
-        result = await AuthService.loginWithRole(email, password, 'psicologo');
+  // Execute login with automatic retry
+      const result = await attemptLogin();
+      
+  // Ensure a result was returned and handle it appropriately
+      if (!result) {
+        console.log('❌ LoginPage - Nenhum resultado retornado do attemptLogin');
+        toast.error('Erro inesperado durante login');
+        setError('Erro inesperado durante login');
+        return;
+      }
+      
+  // Check if the result indicates a network/AuthService error (retry at AuthService level)
+      if (!result.success && (result.code === 'PERMISSION_CHECK_ERROR' || result.code === 'SERVER_ERROR') && retryCount < MAX_RETRY_ATTEMPTS) {
+        console.log(`🔄 LoginPage - Erro de AuthService detectado (${result.code}), tentando retry...`);
+        return attemptLogin(retryCount + 1);
       }
 
       console.log('📝 LoginPage - Resultado do login:', result);
@@ -169,42 +155,39 @@ export default function LoginPage() {
 
       if (result.success) {
         setError('');
-  successMessageRef.current = 'Login bem-sucedido! Verificando permissões...';
-  toast.success('Login bem-sucedido! Verificando permissões...');
-        loginSuccessRef.current = true; // Marcar que o login foi bem-sucedido
+        successMessageRef.current = 'Login bem-sucedido! Verificando permissões...';
+        toast.success('Login bem-sucedido! Verificando permissões...');
         
         console.log('✅ LoginPage - Login bem-sucedido, atualizando contexto...');
         console.log('📊 LoginPage - User role:', result.user_role);
         
-        // Forçar atualização do contexto de autenticação (forceRefresh = true)
+  // Force update of the authentication context (forceRefresh = true)
         await refreshAuth(true);
         
-        // Aguardar um pouco para sincronização
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Redirecionamento baseado no role
+        // Redirect based on role with safety timeout
         if (!hasRedirected.current) {
-          console.log('🔄 LoginPage - Redirecionamento baseado no role...');
+          console.log('🔄 LoginPage - Redirecionamento imediato baseado no role...');
           hasRedirected.current = true;
           successMessageRef.current = 'Redirecionando...';
           
-          // Definir rota baseada no role
+            // Set the route based on the user's role
           const redirectPath = result.user_role === 'psicologo' ? '/psicologos' : '/dashboard/create';
           console.log('🎯 LoginPage - Redirecionando para:', redirectPath);
-          
+
+          // Redirect using router
           router.replace(redirectPath);
           
-          // Fallback adicional
+          // Safety fallback
           redirectTimeoutRef.current = setTimeout(() => {
             if (window.location.pathname === '/login') {
-              console.log('🔄 LoginPage - Fallback do redirecionamento manual...');
+              console.log('🔄 LoginPage - Usando fallback window.location...');
               window.location.href = redirectPath;
             }
           }, 1500);
         }
         
       } else {
-        // LOGIN FALHOU - Mostrar erro específico baseado no código
+          // LOGIN FAILED - show a specific error based on the returned code
         console.log('❌ LoginPage - Login falhou:', result);
         let errorMessage = result.error || 'Erro no login';
         
@@ -230,19 +213,36 @@ export default function LoginPage() {
         }
         
         setError(errorMessage);
-        // Mostrar toast de erro para falhas de login
+        // Show error toast for login failures
         toast.error(errorMessage);
       }
     } catch (error) {
       console.error('❌ LoginPage - Erro inesperado no login:', error);
-      setError('Erro de conexão. Verifique sua internet e tente novamente.');
-      toast.error('Erro de conexão. Verifique sua internet e tente novamente.');
+      
+      let errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
+      
+      // Improving feedback based on retry attempts
+      if (retryCount > 0) {
+        errorMessage = `Falha após ${retryCount + 1} tentativas. Verifique sua conexão e tente novamente.`;
+        console.log(`🔄 LoginPage - Falha após ${retryCount + 1} tentativas de retry`);
+      }
+      
+      // Check if it was a network error to suggest a manual retry
+      if (isNetworkError(error)) {
+        errorMessage += ' (Erro de rede detectado)';
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
+      setIsSubmitting(false); // Clean up mutex always at the end
+      setIsRetrying(false); // Clear retry state
+      // Do not reset retryCount here to keep information for next manual attempt
     }
   };
 
-  // Cleanup ao desmontar componente
+  // Cleanup on component unmount
   useEffect(() => {
     return () => {
       if (redirectTimeoutRef.current) {
@@ -251,7 +251,7 @@ export default function LoginPage() {
     };
   }, []);
 
-  // Se está carregando inicialmente
+  // If the app is initially loading
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-4">
@@ -264,7 +264,7 @@ export default function LoginPage() {
     );
   }
 
-  // Se está redirecionando
+  // If redirecting
   if (hasRedirected.current) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-4">
@@ -327,7 +327,7 @@ export default function LoginPage() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
-              disabled={isLoading}
+              disabled={isLoading || isSubmitting}
               autoComplete="email"
             />
           </div>
@@ -345,18 +345,38 @@ export default function LoginPage() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              disabled={isLoading}
+              disabled={isLoading || isSubmitting}
               autoComplete="current-password"
             />
           </div>
+
+          {/* Retry Indicator */}
+          {isRetrying && retryCount > 0 && (
+            <div className="w-full mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                <p className="text-blue-700 text-sm">
+                  Problema de conexão detectado. Tentativa {retryCount + 1} de {MAX_RETRY_ATTEMPTS + 1}...
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Submit Button */}
           <button
             type="submit"
             className="w-full bg-black text-white py-3 sm:py-3.5 rounded-lg font-medium hover:bg-gray-900 transition-colors disabled:opacity-60 disabled:cursor-not-allowed text-base sm:text-lg"
-            disabled={isLoading}
+            disabled={isLoading || isSubmitting}
           >
-            {isLoading ? "A iniciar sessão..." : "Iniciar Sessão"}
+            {(() => {
+              if (isRetrying && retryCount > 0) {
+                return `Tentativa ${retryCount + 1}/${MAX_RETRY_ATTEMPTS + 1}...`;
+              }
+              if (isLoading || isSubmitting) {
+                return "A iniciar sessão...";
+              }
+              return "Iniciar Sessão";
+            })()}
           </button>
           
           {/* Footer Links */}
