@@ -23,6 +23,10 @@ export default function AuthGuard({
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [verificationAttempts, setVerificationAttempts] = useState(0);
   
+  // Constantes de configuração
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 1000;
+  
   const { 
     authInfo, 
     loading, 
@@ -31,26 +35,32 @@ export default function AuthGuard({
     canAccessCMS,
     checkRoleAccess,
     user,
-    profile
+    profile,
+    isLoggingOut
   } = useAuth();
 
   useEffect(() => {
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
     let retryTimeoutId: NodeJS.Timeout;
-    const maxRetries = 1; // Reduzido para 1 tentativa apenas
-    const retryDelay = 500; // 500ms entre tentativas
 
     const handleAuthCheck = async () => {
       console.log('🛡️ AuthGuard - Iniciando verificação de acesso...', {
         attempt: verificationAttempts + 1,
-        maxRetries,
+        maxRetries: MAX_RETRIES,
         isAuthenticated,
         canAccessCMS,
         loading,
         hasUser: !!user,
-        hasProfile: !!profile
+        hasProfile: !!profile,
+        isLoggingOut
       });
+      
+      // PRIORIDADE MÁXIMA: Se está fazendo logout, não interferir
+      if (isLoggingOut) {
+        console.log('🚪 AuthGuard - Logout em andamento, não verificando acesso...');
+        return; // Permitir que o logout aconteça sem interferência
+      }
       
       // OTIMIZAÇÃO: Se já está autenticado e autorizado, PASSAR DIRETO
       if (isAuthenticated && canAccessCMS && user && profile) {
@@ -73,10 +83,10 @@ export default function AuthGuard({
         setInitialLoadComplete(true);
       }
 
-      // Timeout de segurança reduzido para 3 segundos em produção
+      // Timeout de segurança aumentado para dar tempo após login
       timeoutId = setTimeout(() => {
         if (mounted && isChecking) {
-          console.warn('⚠️ AuthGuard - Timeout na verificação após 3 segundos...');
+          console.warn('⚠️ AuthGuard - Timeout na verificação após 8 segundos...');
           
           // Em produção, ser mais permissivo com timeouts
           if (process.env.NODE_ENV === 'production' && isAuthenticated) {
@@ -90,7 +100,7 @@ export default function AuthGuard({
           setErrorMessage('Verificação de acesso demorou muito. Redirecionando...');
           setTimeout(() => router.push(redirectTo), 1000);
         }
-      }, 1500);
+      }, 8000); // Aumentado de 1.5s para 8s
 
       try {
         // Verificar autenticação básica
@@ -98,15 +108,15 @@ export default function AuthGuard({
           console.log('❌ AuthGuard - Usuário não autenticado');
           
           // Se não está autenticado mas ainda não tentamos o suficiente, aguardar
-          if (verificationAttempts < maxRetries) {
-            console.log(`⏳ AuthGuard - Aguardando autenticação... (tentativa ${verificationAttempts + 1}/${maxRetries})`);
+          if (verificationAttempts < MAX_RETRIES) {
+            console.log(`⏳ AuthGuard - Aguardando autenticação... (tentativa ${verificationAttempts + 1}/${MAX_RETRIES + 1})`);
             
             retryTimeoutId = setTimeout(() => {
               if (mounted) {
                 setVerificationAttempts(prev => prev + 1);
                 handleAuthCheck();
               }
-            }, retryDelay);
+            }, RETRY_DELAY);
             return;
           }
           
@@ -124,17 +134,26 @@ export default function AuthGuard({
           console.log('🔍 AuthGuard - Verificando acesso CMS...');
           
           // Se ainda não temos informações completas mas o usuário está autenticado,
-          // aguardar mais tempo antes de negar acesso
-          if (!canAccessCMS && verificationAttempts < maxRetries) {
-            console.log(`⏳ AuthGuard - Aguardando dados completos... (tentativa ${verificationAttempts + 1}/${maxRetries})`);
+          // ser mais permissivo e aguardar mais tempo
+          if (!canAccessCMS && isAuthenticated && verificationAttempts < MAX_RETRIES) {
+            console.log(`⏳ AuthGuard - Usuário autenticado mas aguardando dados CMS completos... (tentativa ${verificationAttempts + 1}/${MAX_RETRIES + 1})`);
             
-            // Aguardar mais um pouco e tentar novamente
+            // Aguardar mais tempo para dados completos
             retryTimeoutId = setTimeout(() => {
               if (mounted) {
                 setVerificationAttempts(prev => prev + 1);
                 handleAuthCheck();
               }
-            }, retryDelay);
+            }, RETRY_DELAY);
+            return;
+          }
+          
+          // OTIMIZAÇÃO: Se usuário está autenticado mas não temos canAccessCMS após todas tentativas,
+          // ainda assim permitir acesso se temos dados básicos válidos (user + profile)
+          if (!canAccessCMS && isAuthenticated && user && profile && profile.authorized === true && profile.user_role === 'cms') {
+            console.log('✅ AuthGuard - Permitindo acesso baseado em dados básicos válidos (fallback)');
+            setIsChecking(false);
+            clearTimeout(timeoutId);
             return;
           }
           
@@ -220,7 +239,7 @@ export default function AuthGuard({
       if (timeoutId) clearTimeout(timeoutId);
       if (retryTimeoutId) clearTimeout(retryTimeoutId);
     };
-  }, [loading, isAuthenticated, canAccessCMS, requiredRole, authInfo, checkRoleAccess, router, redirectTo, verificationAttempts, initialLoadComplete, user, profile, isChecking]);
+  }, [loading, isAuthenticated, canAccessCMS, requiredRole, authInfo, checkRoleAccess, router, redirectTo, verificationAttempts, initialLoadComplete, user, profile, isChecking, isLoggingOut]);
 
   // Estado de carregamento - melhorado para evitar flash de "acesso negado"
   if (loading || (isChecking && !accessDenied)) {
@@ -228,7 +247,7 @@ export default function AuthGuard({
       <div className="min-h-screen flex items-center justify-center bg-white">
         <LoadingSpinner 
           size="lg" 
-          text={verificationAttempts > 0 ? `Verificando acesso... (${verificationAttempts}/1)` : "Verificando acesso..."}
+          text={verificationAttempts > 0 ? `Verificando acesso... (${verificationAttempts}/${MAX_RETRIES + 1})` : "Verificando acesso..."}
           color="black"
         />
       </div>
