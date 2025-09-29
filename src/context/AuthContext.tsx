@@ -29,6 +29,7 @@ interface AuthContextType {
   isAuthorized: boolean;
   isCMSUser: boolean;
   canAccessCMS: boolean;
+  isLoggingOut: boolean;
   signOut: () => Promise<{ success: boolean; error?: string }>;
   refreshAuth: (forceRefresh?: boolean) => Promise<void>;
   checkRoleAccess: (requiredRole: 'cms' | 'app' | 'psicologo') => Promise<boolean>;
@@ -49,15 +50,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authInfo, setAuthInfo] = useState<AuthResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Usar useRef para evitar re-renders desnecessários
-  const initializingRef = useRef(false);
   const initializedRef = useRef(false);
   const lastAuthCheckRef = useRef<number>(0);
   const authStateChangeRef = useRef<boolean>(false);
   const sessionPersistentRef = useRef<boolean>(false);
+  const refreshAuthMutex = useRef<boolean>(false); // Mutex para refreshAuth
+  const profileCacheRef = useRef<{[key: string]: {profile: UserProfile, timestamp: number}}>({});
+  const cmsAccessCacheRef = useRef<{[key: string]: {authInfo: AuthResponse, timestamp: number}}>({});
+  
+  // Function for automatic cleanup of expired cache
+  const cleanupExpiredCache = useCallback(() => {
+    const now = Date.now();
+    const PROFILE_TTL = 5 * 60 * 1000; // 5 minutos
+    const CMS_TTL = 10 * 60 * 1000; // 10 minutos
+    
+    // Limpar cache de perfis expirados
+    Object.keys(profileCacheRef.current).forEach(key => {
+      if (now - profileCacheRef.current[key].timestamp > PROFILE_TTL) {
+        delete profileCacheRef.current[key];
+      }
+    });
+    
+    // Limpar cache CMS expirado
+    Object.keys(cmsAccessCacheRef.current).forEach(key => {
+      if (now - cmsAccessCacheRef.current[key].timestamp > CMS_TTL) {
+        delete cmsAccessCacheRef.current[key];
+      }
+    });
+  }, []);
 
-  // Hook de persistência de sessão
+  // Session persistence hook
   const {
     saveSessionData: savePersistentData,
     clearSessionData,
@@ -80,31 +105,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthInfo(null);
       sessionPersistentRef.current = false;
     },
-    maxSessionAge: 8 * 60 * 60 * 1000 // 8 horas
+    maxSessionAge: 8 * 60 * 60 * 1000 // 8 hours
   });
 
-  // Hook de visibilidade da página - APENAS atualizar atividade
+  // Page visibility hook - ONLY update session activity
   usePageVisibility({
     onVisible: () => {
       console.log('👁️ AuthContext - Página visível, atualizando apenas atividade da sessão');
-      // APENAS atualizar atividade da sessão - ZERO verificações
+      // Just update session activity
       updateSessionActivity();
       updatePersistentActivity();
     },
     onHidden: () => {
       console.log('👁️ AuthContext - Página oculta');
     },
-    disableAutoRefresh: true, // SEMPRE desabilitado
+    disableAutoRefresh: true,
     minHiddenTime: 30000
   });
 
-  // Função para salvar no sessionStorage
+  // Function to save to sessionStorage
   const saveToCache = useCallback((data: CachedAuthData) => {
     try {
-      // Usar utilitários de sessão
+      // Use session utilities
       saveSessionData(data);
-      
-      // Salvar também usando o hook de persistência
+
+      // Also save using the persistence hook
       savePersistentData(data);
       
       console.log('📦 AuthContext - Dados salvos no sessionStorage');
@@ -113,14 +138,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [savePersistentData]);
 
-  // Função para atualizar apenas campos do profile no contexto
+  // Function to update only profile fields in the context
   const updateProfile = useCallback((patch: Partial<UserProfile>) => {
     setProfile(prev => {
       if (!prev) return prev;
       const updated = { ...prev, ...patch } as UserProfile;
 
       try {
-        // Atualizar cache de sessão com o profile atualizado
+        // Update session cache with the updated profile
         if (user && (authInfo !== undefined)) {
           const cacheData: CachedAuthData = {
             user,
@@ -138,17 +163,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [saveToCache, user, authInfo]);
 
-  // Função para limpar cache
+  // Function to clear cache
   const clearCache = useCallback(() => {
     clearAllSessionData();
     clearSessionData();
-    console.log('🗑️ AuthContext - Cache limpo');
-  }, [clearSessionData]);
+    profileCacheRef.current = {}; // Clear profile cache
+    cmsAccessCacheRef.current = {}; // Clear CMS access cache
+    cleanupExpiredCache(); // Run additional cleanup
+    console.log('🗑️ AuthContext - Cache completo limpo');
+  }, [clearSessionData, cleanupExpiredCache]);
 
-  // Função para carregar perfil do usuário - SEM cache
-  const loadUserProfile = useCallback(async (currentUser: User): Promise<UserProfile | null> => {
+  // Function to load the user profile - WITH SMART CACHE
+  const loadUserProfile = useCallback(async (currentUser: User, forceRefresh: boolean = false): Promise<UserProfile | null> => {
     try {
       console.log('👤 AuthContext - Carregando perfil do usuário:', currentUser.id);
+
+      // Check cache (valid for 5 minutes)
+      const cached = profileCacheRef.current[currentUser.id];
+      const now = Date.now();
+      const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+      if (!forceRefresh && cached && (now - cached.timestamp) < CACHE_TTL) {
+        console.log('📦 AuthContext - Usando perfil do cache (válido por mais', Math.round((CACHE_TTL - (now - cached.timestamp)) / 1000), 'segundos)');
+        return cached.profile;
+      }
 
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -161,7 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       }
 
-      // Se for psicólogo, definir como online automaticamente
+      // If psychologist, set as online automatically
       if (profile.user_role === 'psicologo' && profile.authorized === true) {
         try {
           console.log('🔄 AuthContext - Definindo psicólogo como online...');
@@ -172,7 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.warn('⚠️ AuthContext - Erro ao definir status online:', statusError);
           } else {
             console.log('✅ AuthContext - Status online definido com sucesso');
-            // Atualizar o perfil com o status online
+            // update local profile status
             profile.is_online = true;
           }
         } catch (statusError) {
@@ -187,14 +225,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         is_online: profile.is_online
       });
       
-      return profile as UserProfile;
+      const userProfile = profile as UserProfile;
+
+      // Save to cache
+      profileCacheRef.current[currentUser.id] = {
+        profile: userProfile,
+        timestamp: Date.now()
+      };
+      console.log('💾 AuthContext - Perfil salvo no cache');
+      
+      return userProfile;
     } catch (error) {
       console.error('❌ AuthContext - Erro inesperado ao carregar perfil:', error);
       return null;
     }
   }, []);
 
-  // Função simplificada para verificar acesso por role - SEM cache para login
+  // Simplified function to check access by role - NO cache for login
   const checkRoleAccess = useCallback(async (requiredRole: 'cms' | 'app' | 'psicologo'): Promise<boolean> => {
     if (!user?.email) {
       console.log('❌ AuthContext - Sem email do usuário para verificar role');
@@ -213,12 +260,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.email]);
 
-  // Função para fazer logout
+  // Function to perform logout
   const signOut = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     try {
       console.log('🚪 AuthContext - Fazendo logout...');
       
-      // Se for psicólogo, definir como offline antes do logout
+      // Set logging out flag to avoid "Access Denied" flashes
+      setIsLoggingOut(true);
+
+      // Redirect FIRST to avoid "Access Denied" flash
+      console.log('🔄 AuthContext - Redirecionando para login ANTES de limpar estado...');
+      window.location.href = '/login';
+
+      // If psychologist, set as offline before logout
       if (profile?.user_role === 'psicologo' && profile?.id) {
         try {
           console.log('🔄 AuthContext - Definindo psicólogo como offline...');
@@ -234,83 +288,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.warn('⚠️ AuthContext - Erro ao definir status offline:', statusError);
         }
       }
-      
-      // Primeiro, encerrar sessão no Supabase
+
+      // First, sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('❌ AuthContext - Erro ao fazer logout no Supabase:', error);
         return { success: false, error: error.message };
       }
-      
-      // Limpar cache e estado local
+
+      // Clear cache and local state
       clearCache();
       setUser(null);
       setProfile(null);
       setAuthInfo(null);
       setError(null);
       sessionPersistentRef.current = false;
-      
-      // Limpar cache de queries do Supabase se disponível
+
+      // Clear Supabase query cache if available
       try {
         const { clearQueryCache } = await import('@/lib/supabase');
         clearQueryCache();
       } catch {
-        // Ignorar erro se função não estiver disponível
+        // Ignore error if function is not available
       }
       
       console.log('✅ AuthContext - Logout realizado com sucesso');
       
-      // Redirecionar para login após logout bem-sucedido
-      setTimeout(() => {
-        console.log('🔄 AuthContext - Redirecionando para login após logout...');
-        window.location.href = '/login'; // Usar window.location para garantir limpeza completa
-      }, 100);
-      
       return { success: true };
     } catch (error) {
       console.error('❌ AuthContext - Erro inesperado ao fazer logout:', error);
+      setIsLoggingOut(false);
       return { success: false, error: 'Erro de conexão ao fazer logout' };
     }
   }, [clearCache, profile]);
 
-  // Função principal para atualizar autenticação - OTIMIZADA
+  // Main function to refresh authentication - OPTIMIZED WITH MUTEX
   const refreshAuth = useCallback(async (forceRefresh: boolean = false): Promise<void> => {
-    if (initializingRef.current) {
-      console.log('⏳ AuthContext - refreshAuth já está executando, ignorando...');
+    // MUTEX: Only allow one execution of refreshAuth at a time
+    if (refreshAuthMutex.current) {
+      console.log('🔒 AuthContext - refreshAuth já está executando (mutex), ignorando nova chamada...');
       return;
     }
 
-    // OTIMIZAÇÃO PRINCIPAL: Se usuário já está autenticado, NUNCA fazer verificações
+    // MAIN OPTIMIZATION: If user is fully authenticated, NEVER perform checks
     if (!forceRefresh && user && profile && authInfo?.success) {
       console.log('✅ AuthContext - Usuário COMPLETAMENTE autenticado, ZERO verificações necessárias');
       return;
     }
 
-    // Se não é refresh forçado E temos dados básicos, pular também
-    if (!forceRefresh && user && profile) {
-      console.log('✅ AuthContext - Dados básicos válidos, pulando verificação');
+    // If not a forced refresh AND we have valid basic data, skip as well
+    if (!forceRefresh && user && profile && profile.authorized === true) {
+      console.log('✅ AuthContext - Dados básicos válidos e autorizados, pulando verificação');
       return;
     }
 
-    // Verificar se já fizemos uma verificação recente (apenas para refreshes forçados)
+  // Check if we already did a very recent check (just to avoid spam)
     const now = Date.now();
     const timeSinceLastCheck = now - lastAuthCheckRef.current;
     
-    if (timeSinceLastCheck < 5000) { // 5 segundos para qualquer verificação
+    if (!forceRefresh && timeSinceLastCheck < 3000) { // 3 segundos apenas para não-forçado
       console.log('⏭️ AuthContext - Verificação muito recente, pulando... (há', Math.round(timeSinceLastCheck / 1000), 'segundos)');
       return;
     }
     
     console.log('🔄 AuthContext - Iniciando refreshAuth...', { forceRefresh, timeSinceLastCheck });
     
-    // TIMEOUT FORÇADO DE 5 SEGUNDOS PARA EVITAR TRAVAMENTO EM PRODUÇÃO
+  // Activate mutex
+    refreshAuthMutex.current = true;
+    
+    // OPTIMIZED TIMEOUT TO AVOID HANGING
     const forceTimeout = setTimeout(() => {
-      if (initializingRef.current) {
-        console.warn('⏰ AuthContext - TIMEOUT FORÇADO! Parando verificação após 5 segundos...');
-        initializingRef.current = false;
+      if (refreshAuthMutex.current) {
+        console.warn('⏰ AuthContext - TIMEOUT! Parando verificação após 6 segundos...');
+        refreshAuthMutex.current = false;
         setLoading(false);
-        
-        // Se tem dados de sessão válidos, usar eles como fallback
+
+        // If there are valid session data, use them as fallback
         const sessionData = getSessionData();
         if (sessionData && sessionData.user && sessionData.profile) {
           console.log('🔄 AuthContext - Usando dados de sessão válidos como fallback');
@@ -319,19 +372,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setAuthInfo(sessionData.authInfo as AuthResponse);
         }
       }
-    }, 5000); // 5 segundos
+    }, 6000); 
     
-    // Só colocar em loading se for uma verificação forçada (login) ou se não temos dados ainda
+    // Only set loading if it is a forced check (login) or if we don't have data yet
     if (forceRefresh || !user || !profile) {
       setLoading(true);
     }
     
     setError(null);
-    initializingRef.current = true;
     lastAuthCheckRef.current = now;
     
     try {
-      // Verificar usuário atual
+      // Check current user
       const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
       
       if (userError || !currentUser) {
@@ -341,14 +393,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
         setAuthInfo(null);
         setLoading(false);
-        initializingRef.current = false;
+        refreshAuthMutex.current = false;
         return;
       }
 
       console.log('👤 AuthContext - Usuário autenticado encontrado:', currentUser.email);
 
-      // Carregar perfil sempre atualizado
-      const userProfile = await loadUserProfile(currentUser);
+      // Load user profile (use cache if not forced)
+      const userProfile = await loadUserProfile(currentUser, forceRefresh);
       
       if (!userProfile) {
         console.log('❌ AuthContext - Perfil não encontrado');
@@ -357,34 +409,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
         setAuthInfo(null);
         setLoading(false);
-        initializingRef.current = false;
+        refreshAuthMutex.current = false; // Clear mutex
         return;
       }
 
-      // Verificar acesso CMS se for usuário CMS - sempre atualizado
+      // Check CMS access if user is CMS - WITH CACHE
       let cmsAuthInfo: AuthResponse | null = null;
       if (userProfile.user_role === 'cms') {
         console.log('🔍 AuthContext - Verificando acesso CMS para usuário...');
-        try {
-          const hasAccess = await AuthService.canUserLoginWithRole(currentUser.email!, 'cms');
-          cmsAuthInfo = hasAccess;
-          console.log('✅ AuthContext - Verificação CMS concluída:', hasAccess);
-        } catch (error) {
-          console.error('❌ AuthContext - Erro ao verificar acesso CMS:', error);
-          cmsAuthInfo = {
-            success: false,
-            error: 'Erro ao verificar permissões CMS',
-            code: 'PERMISSION_CHECK_ERROR'
-          };
+
+        // Check CMS cache (valid for 10 minutes)
+        const cmsCache = cmsAccessCacheRef.current[currentUser.email!];
+        const now = Date.now();
+        const CMS_CACHE_TTL = 10 * 60 * 1000; // 10 minutos
+        
+        if (!forceRefresh && cmsCache && (now - cmsCache.timestamp) < CMS_CACHE_TTL) {
+          console.log('📦 AuthContext - Usando verificação CMS do cache');
+          cmsAuthInfo = cmsCache.authInfo;
+        } else {
+          try {
+            const hasAccess = await AuthService.canUserLoginWithRole(currentUser.email!, 'cms');
+            cmsAuthInfo = hasAccess;
+
+            // Save to cache only if successful
+            if (hasAccess.success) {
+              cmsAccessCacheRef.current[currentUser.email!] = {
+                authInfo: hasAccess,
+                timestamp: now
+              };
+              console.log('💾 AuthContext - Verificação CMS salva no cache');
+            }
+            
+            console.log('✅ AuthContext - Verificação CMS concluída:', hasAccess);
+          } catch (error) {
+            console.error('❌ AuthContext - Erro ao verificar acesso CMS:', error);
+            cmsAuthInfo = {
+              success: false,
+              error: 'Erro ao verificar permissões CMS',
+              code: 'PERMISSION_CHECK_ERROR'
+            };
+          }
         }
       }
 
-      // Atualizar estado
+      // Update state
       setUser(currentUser);
       setProfile(userProfile);
       setAuthInfo(cmsAuthInfo);
-      
-      // Salvar no sessionStorage apenas se tudo deu certo
+
+      // Save to sessionStorage only if everything went well
       const cacheData: CachedAuthData = {
         user: currentUser,
         profile: userProfile,
@@ -392,8 +465,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         timestamp: Date.now()
       };
       saveToCache(cacheData);
-      
-      // Marcar sessão como persistente
+
+      // Mark session as persistent
       sessionPersistentRef.current = true;
       
       console.log('✅ AuthContext - refreshAuth concluído com sucesso');
@@ -402,19 +475,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('❌ AuthContext - Erro ao atualizar autenticação:', error);
       setError('Erro de conexão ao verificar autenticação');
       
-      // Limpar estado em caso de erro
+      // Clear state in case of error
       setUser(null);
       setProfile(null);
       setAuthInfo(null);
       clearCache();
     } finally {
       setLoading(false);
-      initializingRef.current = false;
+      refreshAuthMutex.current = false; // Limpar mutex sempre
       clearTimeout(forceTimeout);
     }
   }, [loadUserProfile, saveToCache, clearCache, user, profile, authInfo]);
 
-  // Inicialização otimizada
+  // Optimized initialization
   useEffect(() => {
     if (initializedRef.current) return;
     
@@ -426,15 +499,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       console.log('🚀 AuthContext - Inicializando autenticação...');
       
-      // Limpar dados de sessão corrompidos
-      cleanupSessionData();
-      
-      // Verificar se há dados persistentes válidos
+  // Clear corrupted session data
+  cleanupSessionData();
+
+      // Check if there are valid persistent data
       if (hasValidSessionData()) {
         console.log('📦 AuthContext - Dados persistentes válidos encontrados');
         sessionPersistentRef.current = true;
         
-        // Tentar restaurar dados da sessão PRIMEIRO
+        // Try to restore session data FIRST 
         const sessionData = getSessionData();
         if (sessionData && sessionData.user && sessionData.profile) {
           console.log('🔄 AuthContext - Restaurando dados da sessão - PARANDO todas as verificações');
@@ -442,26 +515,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(sessionData.profile as UserProfile);
           setAuthInfo(sessionData.authInfo as AuthResponse);
           setLoading(false);
-          // PARAR COMPLETAMENTE - não fazer refreshAuth
           console.log('✅ AuthContext - Inicialização concluída com dados de sessão - SEM verificações adicionais');
           return;
         }
       }
       
-      // Verificação direta sem depender muito de cache
-      await refreshAuth(true);
+  // Direct verification without relying heavily on cache
+  await refreshAuth(true);
     };
 
     initAuth();
 
-    // Listener para mudanças de autenticação - OTIMIZADO
+  // Listener for authentication changes - OPTIMIZED
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       
       console.log('🔔 AuthContext - Auth state change:', event, !!session);
       
-      // Marcar que houve mudança de estado
-      authStateChangeRef.current = true;
+  // Mark that there was a state change
+  authStateChangeRef.current = true;
       
       if (event === 'SIGNED_OUT' || !session) {
         console.log('🚪 AuthContext - Usuário deslogado, limpando estado...');
@@ -473,7 +545,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         sessionPersistentRef.current = false;
         
-        // Redirecionar para login se não estiver já na página de login/signup/home
+        // Redirect to login if not already there
         const currentPath = window.location.pathname;
         const authPaths = ['/login', '/signup', '/'];
         
@@ -483,9 +555,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             window.location.href = '/login';
           }, 100);
         }
-      } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && !initializingRef.current) {
+      } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && !refreshAuthMutex.current) {
         console.log('🔑 AuthContext - Usuário logado/token atualizado, atualizando auth...');
-        // Forçar refresh para mudanças de estado
+        // Force refresh on sign in or token refresh
         await refreshAuth(true);
       }
     });
@@ -494,9 +566,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [clearCache, refreshAuth]); // Incluir dependências necessárias
+  }, [clearCache, refreshAuth]); // Include necessary dependencies
 
-  // Computed values com logs de debug mais específicos
+  // Computed values with more specific debug logs
   const computedValues = useMemo(() => {
     const isAuthenticated = !!user;
     const isAuthorized = profile?.authorized === true;
@@ -514,10 +586,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const contextValue: AuthContextType = {
     user,
     profile,
-  updateProfile,
+    updateProfile,
     authInfo,
     loading,
     error,
+    isLoggingOut,
     ...computedValues,
     signOut,
     refreshAuth,
