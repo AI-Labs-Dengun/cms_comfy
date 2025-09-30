@@ -600,8 +600,8 @@ export default function CreateContent() {
         }
       }
 
-      // Upload de thumbnail se fornecida (para Podcast e Artigo)
-      if ((category === "Podcast" || category === "Artigo") && thumbnailFile) {
+  // Upload de thumbnail se fornecida (para Podcast, Artigo, Leitura e Vídeo)
+  if ((category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo") && thumbnailFile) {
         console.log(`🖼️ Fazendo upload de thumbnail para categoria ${category}:`, {
           fileName: thumbnailFile.name,
           fileSize: thumbnailFile.size,
@@ -1199,7 +1199,7 @@ export default function CreateContent() {
                     </div>
 
                     {/* Thumbnail upload (for Podcast and Article) */}
-                    {(category === "Podcast" || category === "Artigo") && (
+                    {(category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo") && (
                       <div>
                         <label className="block text-sm font-medium mb-3 text-gray-700">
                           <span className="flex items-center">
@@ -1273,7 +1273,7 @@ export default function CreateContent() {
 
 
             {category === 'Leitura' && (
-              <div>
+              <div className="px-8 py-6 border-b border-gray-200">
                 <label className="block text-sm font-medium mb-2 text-gray-700">
                   <span className="flex items-center">
                     <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
