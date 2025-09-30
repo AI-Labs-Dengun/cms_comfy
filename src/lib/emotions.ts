@@ -8,5 +8,6 @@ export const EMOTIONS = [
   'Tristeza',
   'Vergonha',
   'Ansiedade',
+  'Tedio',
 ];
 
