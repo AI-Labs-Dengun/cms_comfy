@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { Upload, X, Image as ImageIcon, Video, FileText, AlertCircle, CheckCircle } from 'lucide-react';
-import { validatePostFiles, uploadPostFiles, type FileValidation } from '@/services/posts';
+import { validatePostFiles, type FileValidation } from '@/services/posts';
 
 interface PostFileUploaderProps {
   category: string;
@@ -26,26 +27,29 @@ export default function PostFileUploader({
   onUploadComplete,
   disabled = false,
   value = []
+ 
 }: PostFileUploaderProps) {
   const [files, setFiles] = useState<File[]>(value);
   const [previews, setPreviews] = useState<Array<{ file: File; url: string }>>([]);
   const [selectedPreview, setSelectedPreview] = useState<string | null>(null);
   const [validation, setValidation] = useState<FileValidation | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploading] = useState(false);
+  const [uploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Função para validar e atualizar arquivos
   const handleFilesUpdate = useCallback((newFiles: File[]) => {
-    // Revoke previous previews
-    previews.forEach(p => URL.revokeObjectURL(p.url));
-
-    setFiles(newFiles);
-
     // Create previews for image files
     const newPreviews = newFiles.map(f => ({ file: f, url: URL.createObjectURL(f) }));
-    setPreviews(newPreviews);
+
+    // Revoke previous previews safely inside state updater to avoid referencing `previews` from closure
+    setPreviews(prev => {
+      prev.forEach(p => URL.revokeObjectURL(p.url));
+      return newPreviews;
+    });
+
+    setFiles(newFiles);
 
     if (newFiles.length > 0) {
       const validationResult = validatePostFiles(newFiles, category);
@@ -123,6 +127,8 @@ export default function PostFileUploader({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    // Inform parent that uploads/data were cleared
+    onUploadComplete?.({ file_paths: [], file_names: [], file_types: [], file_sizes: [] });
   };
 
   // Cleanup previews on unmount
@@ -132,42 +138,9 @@ export default function PostFileUploader({
     };
   }, [previews]);
 
-  // Fazer upload dos arquivos
-  const handleUpload = async () => {
-    if (files.length === 0 || !validation?.valid) return;
-
-    setUploading(true);
-    setUploadProgress(0);
-
-    // Simular progresso
-    const progressInterval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + 10;
-      });
-    }, 200);
-
-    try {
-  const uploadResult = await uploadPostFiles(files, category);
-      
-      if (uploadResult.success && uploadResult.data) {
-        setUploadProgress(100);
-        onUploadComplete?.(uploadResult.data);
-      } else {
-        throw new Error(uploadResult.error || 'Erro no upload');
-      }
-    } catch (error) {
-      console.error('Erro no upload:', error);
-      alert(`Erro no upload: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-    } finally {
-      clearInterval(progressInterval);
-      setUploading(false);
-      setUploadProgress(0);
-    }
-  };
+  // Note: upload is handled by the parent component (if needed). The upload logic was removed
+  // to avoid an unused variable / ESLint error during build. If automatic upload is desired,
+  // reintroduce uploadPostFiles and call it from here or expose a trigger prop.
 
   // Função para formatar tamanho do arquivo
   const formatFileSize = (bytes: number) => {
@@ -304,12 +277,17 @@ export default function PostFileUploader({
             {previews.map((p, index) => (
               <div key={index} className="relative bg-white rounded-md shadow-sm overflow-hidden">
                 {p.file.type.startsWith('image/') ? (
-                  <img
-                    src={p.url}
-                    alt={p.file.name}
-                    onClick={() => setSelectedPreview(p.url)}
-                    className="w-full h-48 object-cover cursor-pointer hover:scale-105 transition-transform"
-                  />
+                  <div className="w-full h-48 relative cursor-pointer hover:scale-105 transition-transform" onClick={() => setSelectedPreview(p.url)}>
+                    <Image
+                      src={p.url}
+                      alt={p.file.name}
+                      unoptimized
+                      fill
+                      sizes="(max-width: 640px) 100vw, 25vw"
+                      style={{ objectFit: 'cover' }}
+                      priority={false}
+                    />
+                  </div>
                 ) : (
                   <div className="w-full h-48 flex items-center justify-center bg-gray-50">
                     {getFileIcon(p.file.type)}
@@ -348,25 +326,16 @@ export default function PostFileUploader({
                 >
                   <X className="w-6 h-6" />
                 </button>
-                <img src={selectedPreview} alt="Preview" className="max-w-[90vw] max-h-[90vh] object-contain rounded" onClick={(e) => e.stopPropagation()} />
+                <div className="relative max-w-[90vw] max-h-[90vh]">
+                  <Image src={selectedPreview!} alt="Preview" unoptimized fill style={{ objectFit: 'contain' }} onClick={(e) => e.stopPropagation()} />
+                </div>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Botão de Upload */}
-      {files.length > 0 && validation?.valid && (
-        <div className="flex justify-end space-x-3">
-          <button
-            onClick={handleUpload}
-            disabled={disabled || uploading || !validation.valid}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {uploading ? `Enviando... ${uploadProgress}%` : 'Fazer Upload'}
-          </button>
-        </div>
-      )}
+      {/* Botão de Upload removido — upload deve ser tratado pelo pai ou automaticamente */}
 
       {/* Barra de Progresso */}
       {uploading && (

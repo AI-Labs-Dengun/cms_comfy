@@ -327,10 +327,21 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
     console.log('✅ Usuário CMS autorizado para criar post:', { userId: user.id, userRole: profile.user_role });
 
   // Validate required data
-    if (!postData.title || !postData.description || !postData.category) {
+    // Category is always required. Title and description are required for
+    // most categories but intentionally optional for 'Shorts'. The UI
+    // already enforces this, but keep a server-side check to avoid
+    // accidental empty category.
+    if (!postData.category) {
       return {
         success: false,
-        error: 'Título, descrição e categoria são obrigatórios'
+        error: 'Categoria é obrigatória'
+      }
+    }
+
+    if (postData.category !== 'Shorts' && (!postData.title || !postData.description)) {
+      return {
+        success: false,
+        error: 'Título e descrição são obrigatórios'
       }
     }
 
