@@ -33,6 +33,8 @@ interface AuthContextType {
   signOut: () => Promise<{ success: boolean; error?: string }>;
   refreshAuth: (forceRefresh?: boolean) => Promise<void>;
   checkRoleAccess: (requiredRole: 'cms' | 'app' | 'psicologo') => Promise<boolean>;
+  updatePsicologoStatus?: (isOnline: boolean) => void;
+  syncPsicologoStatus?: () => Promise<boolean | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshAuthMutex = useRef<boolean>(false); // Mutex para refreshAuth
   const profileCacheRef = useRef<{[key: string]: {profile: UserProfile, timestamp: number}}>({});
   const cmsAccessCacheRef = useRef<{[key: string]: {authInfo: AuthResponse, timestamp: number}}>({});
+  const lastStatusUpdateRef = useRef<{[key: string]: {status: boolean, timestamp: number}}>({});
   
   // Function for automatic cleanup of expired cache
   const cleanupExpiredCache = useCallback(() => {
@@ -82,6 +85,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Utility function to update psychologist status with database-first approach
+  const updatePsicologoStatus = useCallback((psicologoId: string, isOnline: boolean) => {
+    const now = Date.now();
+    const lastUpdate = lastStatusUpdateRef.current[psicologoId];
+    
+    // Avoid duplicate calls if status hasn't changed or was updated very recently
+    if (lastUpdate && lastUpdate.status === isOnline && (now - lastUpdate.timestamp) < 1000) {
+      console.log(`⏭️ AuthContext - Status já atualizado recentemente para ${isOnline ? 'online' : 'offline'}`);
+      return;
+    }
+    
+    // Update cache immediately
+    lastStatusUpdateRef.current[psicologoId] = { status: isOnline, timestamp: now };
+    
+    // Show loading state immediately for better UX
+    setProfile(prev => prev ? { ...prev, is_online: isOnline } : prev);
+    
+    // Update database FIRST, then sync local state based on result
+    queueMicrotask(async () => {
+      try {
+        // Method 1: Use RPC function for primary update (ensures all business logic)
+        const rpcFunction = isOnline ? 'handle_psicologo_login' : 'handle_psicologo_logout';
+        const { error: rpcError } = await supabase.rpc(rpcFunction, { psicologo_id: psicologoId });
+        
+        if (rpcError) {
+          console.warn(`⚠️ AuthContext - Erro na função RPC:`, rpcError);
+          // Revert UI state if RPC failed
+          setProfile(prev => prev ? { ...prev, is_online: !isOnline } : prev);
+          delete lastStatusUpdateRef.current[psicologoId];
+          return;
+        }
+        
+        console.log(`✅ AuthContext - Status ${isOnline ? 'online' : 'offline'} atualizado com sucesso via RPC`);
+        
+        // Method 2: Verify the actual status from database to ensure sync
+        const { data: currentProfile, error: fetchError } = await supabase
+          .from('profiles')
+          .select('is_online')
+          .eq('id', psicologoId)
+          .single();
+        
+        if (!fetchError && currentProfile) {
+          // Sync local state with actual database state
+          const actualStatus = currentProfile.is_online;
+          setProfile(prev => prev ? { ...prev, is_online: actualStatus } : prev);
+          
+          // Update cache with actual status
+          lastStatusUpdateRef.current[psicologoId] = { status: actualStatus, timestamp: now };
+          
+          console.log(`🔄 AuthContext - Estado local sincronizado com database: ${actualStatus ? 'online' : 'offline'}`);
+          
+          if (actualStatus !== isOnline) {
+            console.warn(`⚠️ AuthContext - Discrepância detectada! Esperado: ${isOnline}, Atual: ${actualStatus}`);
+          }
+        } else {
+          console.warn('⚠️ AuthContext - Erro ao verificar status atual:', fetchError);
+        }
+        
+      } catch (error) {
+        console.warn(`⚠️ AuthContext - Erro ao definir psicólogo como ${isOnline ? 'online' : 'offline'}:`, error);
+        // Revert UI state if request failed
+        setProfile(prev => prev ? { ...prev, is_online: !isOnline } : prev);
+        // Remove from cache on failure
+        delete lastStatusUpdateRef.current[psicologoId];
+      }
+    });
+  }, []);
+
   // Session persistence hook
   const {
     saveSessionData: savePersistentData,
@@ -94,7 +165,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         setProfile(data.profile);
         setAuthInfo(data.authInfo);
-        sessionPersistentRef.current = true;
+        // Only mark as persistent if the restored profile is NOT a psychologist
+        sessionPersistentRef.current = data.profile.user_role !== 'psicologo';
         console.log('✅ AuthContext - Dados da sessão restaurados com sucesso');
       }
     },
@@ -123,20 +195,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     minHiddenTime: 30000
   });
 
+
+
   // Function to save to sessionStorage
   const saveToCache = useCallback((data: CachedAuthData) => {
     try {
+      // If the user is a psychologist, DO NOT persist the session across tabs/windows
+      // Psychologists should not have persistent sessions by design
+      const role = data?.profile?.user_role;
+      if (role === 'psicologo') {
+        console.log('⚠️ AuthContext - Psicólogo detectado; não persistindo sessão (limpando qualquer dado existente)');
+        // Clear any previously saved persistent data to avoid leaking sessions
+        try {
+          clearAllSessionData();
+        } catch {
+          // ignore
+        }
+        // Also clear the persistence hook storage if available
+        try {
+          clearSessionData();
+        } catch {
+          // ignore
+        }
+        sessionPersistentRef.current = false;
+        return;
+      }
+
+      // Non-psychologist users: persist the session (CMS/app users)
       // Use session utilities
       saveSessionData(data);
 
       // Also save using the persistence hook
       savePersistentData(data);
-      
+
+      // Mark session as persistent
+      sessionPersistentRef.current = true;
+
       console.log('📦 AuthContext - Dados salvos no sessionStorage');
     } catch (error) {
       console.error('❌ AuthContext - Erro ao salvar cache:', error);
     }
-  }, [savePersistentData]);
+  }, [savePersistentData, clearSessionData]);
 
   // Function to update only profile fields in the context
   const updateProfile = useCallback((patch: Partial<UserProfile>) => {
@@ -155,8 +254,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           };
           saveToCache(cacheData);
         }
-      } catch (err) {
-        console.warn('⚠️ AuthContext - Falha ao salvar profile atualizado no cache:', err);
+      } catch (error) {
+        console.warn('⚠️ AuthContext - Falha ao salvar profile atualizado no cache:', error);
       }
 
       return updated;
@@ -172,6 +271,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     cleanupExpiredCache(); // Run additional cleanup
     console.log('🗑️ AuthContext - Cache completo limpo');
   }, [clearSessionData, cleanupExpiredCache]);
+
+  // Force logout for psychologists when tab/window is closed
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // If current user is a psychologist, clear data before closing
+      if (profile?.user_role === 'psicologo' && profile?.id) {
+        console.log('🚪 AuthContext - Psicólogo fechando aba, limpando dados...');
+        try {
+          // Clear all session data immediately
+          clearAllSessionData();
+          
+          // Clear any remaining Supabase storage synchronously
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('sb-') && key.includes('-auth-token')) {
+              localStorage.removeItem(key);
+            }
+          });
+          sessionStorage.clear();
+          
+          // Use sendBeacon for async operation that can survive page unload
+          // This is more reliable than regular async calls in beforeunload
+          if (navigator.sendBeacon) {
+            try {
+              // Use sendBeacon to send logout request
+              const logoutData = new FormData();
+              logoutData.append('psicologo_id', profile.id);
+              
+              // Create a simple endpoint call (you'll need to handle this on your server)
+              navigator.sendBeacon('/api/psicologo-logout', logoutData);
+              console.log('📡 AuthContext - Enviado beacon para logout do psicólogo');
+            } catch (error) {
+              console.warn('⚠️ AuthContext - Erro ao enviar beacon:', error);
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ AuthContext - Erro ao limpar dados na saída:', error);
+        }
+      }
+    };
+
+    // Also handle page visibility change for more reliable offline status
+    const handleVisibilityChange = () => {
+      if (document.hidden && profile?.user_role === 'psicologo' && profile?.id) {
+        // Page is being hidden, set psychologist as offline
+        updatePsicologoStatus(profile.id, false);
+        console.log('👁️ AuthContext - Página oculta, definindo psicólogo como offline');
+      } else if (!document.hidden && profile?.user_role === 'psicologo' && profile?.id && !profile.is_online) {
+        // Page is becoming visible and psychologist was offline, set as online
+        updatePsicologoStatus(profile.id, true);
+        console.log('👁️ AuthContext - Página visível, definindo psicólogo como online');
+      }
+    };
+
+    // Add both listeners
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [profile?.user_role, profile?.id, profile?.is_online, clearCache, updatePsicologoStatus]);
+
+
 
   // Function to load the user profile - WITH SMART CACHE
   const loadUserProfile = useCallback(async (currentUser: User, forceRefresh: boolean = false): Promise<UserProfile | null> => {
@@ -201,21 +364,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // If psychologist, set as online automatically
       if (profile.user_role === 'psicologo' && profile.authorized === true) {
-        try {
-          console.log('🔄 AuthContext - Definindo psicólogo como online...');
-          const { error: statusError } = await supabase
-            .rpc('handle_psicologo_login', { psicologo_id: profile.id });
-          
-          if (statusError) {
-            console.warn('⚠️ AuthContext - Erro ao definir status online:', statusError);
-          } else {
-            console.log('✅ AuthContext - Status online definido com sucesso');
-            // update local profile status
-            profile.is_online = true;
-          }
-        } catch (statusError) {
-          console.warn('⚠️ AuthContext - Erro ao definir status online:', statusError);
-        }
+        console.log('🔄 AuthContext - Definindo psicólogo como online...');
+        
+        // Update database first, then sync local state
+        supabase
+          .rpc('handle_psicologo_login', { psicologo_id: profile.id })
+          .then(({ error: statusError }) => {
+            if (statusError) {
+              console.warn('⚠️ AuthContext - Erro ao definir status online:', statusError);
+              // Keep profile offline if database update failed
+              profile.is_online = false;
+            } else {
+              console.log('✅ AuthContext - Status online definido com sucesso no database');
+              // Sync local state with database success
+              profile.is_online = true;
+              // Also update the React state to trigger re-renders
+              setProfile(prev => prev ? { ...prev, is_online: true } : prev);
+            }
+          });
       }
 
       console.log('✅ AuthContext - Perfil carregado:', { 
@@ -268,25 +434,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Set logging out flag to avoid "Access Denied" flashes
       setIsLoggingOut(true);
 
-      // Redirect FIRST to avoid "Access Denied" flash
-      console.log('🔄 AuthContext - Redirecionando para login ANTES de limpar estado...');
-      window.location.href = '/login';
-
       // If psychologist, set as offline before logout
       if (profile?.user_role === 'psicologo' && profile?.id) {
-        try {
-          console.log('🔄 AuthContext - Definindo psicólogo como offline...');
-          const { error: statusError } = await supabase
-            .rpc('handle_psicologo_logout', { psicologo_id: profile.id });
-          
-          if (statusError) {
-            console.warn('⚠️ AuthContext - Erro ao definir status offline:', statusError);
-          } else {
-            console.log('✅ AuthContext - Status offline definido com sucesso');
-          }
-        } catch (statusError) {
-          console.warn('⚠️ AuthContext - Erro ao definir status offline:', statusError);
-        }
+        // Use optimized status update function (fire and forget)
+        updatePsicologoStatus(profile.id, false);
+        console.log('🔄 AuthContext - Definindo psicólogo como offline...');
       }
 
       // First, sign out from Supabase
@@ -313,7 +465,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       console.log('✅ AuthContext - Logout realizado com sucesso');
-      
+      // Redirect to login after cleanup to avoid leaving stale session data
+      setTimeout(() => {
+        try {
+          window.location.href = '/login';
+        } catch {
+          // ignore
+        }
+      }, 100);
+
       return { success: true };
     } catch (error) {
       console.error('❌ AuthContext - Erro inesperado ao fazer logout:', error);
@@ -499,8 +659,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       console.log('🚀 AuthContext - Inicializando autenticação...');
       
-  // Clear corrupted session data
-  cleanupSessionData();
+      // Clear corrupted session data
+      cleanupSessionData();
+
+      // CRITICAL: Check if there's an active Supabase session and if it belongs to a psychologist
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          // Check if this user is a psychologist by querying the profile
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('user_role, id')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (profileData?.user_role === 'psicologo') {
+            console.log('⚠️ AuthContext - Sessão ativa de psicólogo detectada na inicialização - FAZENDO LOGOUT COMPLETO');
+            
+            // Clear state immediately for instant UI feedback
+            setUser(null);
+            setProfile(null);
+            setAuthInfo(null);
+            setLoading(false);
+            sessionPersistentRef.current = false;
+            
+            // Clear all session data
+            clearAllSessionData();
+            
+            // Clear any remaining Supabase local storage
+            Object.keys(localStorage).forEach(key => {
+              if (key.startsWith('sb-') && key.includes('-auth-token')) {
+                localStorage.removeItem(key);
+              }
+            });
+            
+            // Do cleanup operations in parallel (non-blocking)
+            Promise.all([
+              // Set psychologist as offline
+              profileData.id ? supabase.rpc('handle_psicologo_logout', { psicologo_id: profileData.id }) : Promise.resolve(),
+              // Force sign out from Supabase
+              supabase.auth.signOut()
+            ]).then(([logoutResult, signOutResult]) => {
+              if (logoutResult?.error) {
+                console.warn('⚠️ AuthContext - Erro ao definir psicólogo como offline:', logoutResult.error);
+              } else {
+                console.log('✅ AuthContext - Status do psicólogo definido como offline');
+              }
+              
+              if (signOutResult?.error) {
+                console.warn('⚠️ AuthContext - Erro ao fazer signOut:', signOutResult.error);
+              } else {
+                console.log('✅ AuthContext - SignOut concluído');
+              }
+            }).catch((error) => {
+              console.warn('⚠️ AuthContext - Erro nas operações de limpeza:', error);
+            });
+            
+            console.log('✅ AuthContext - Psicólogo deslogado (limpeza em paralelo), estado limpo');
+            return; // Don't continue with normal auth flow
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ AuthContext - Erro ao verificar sessão de psicólogo:', error);
+      }
 
       // Check if there are valid persistent data
       if (hasValidSessionData()) {
@@ -510,21 +731,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Try to restore session data FIRST 
         const sessionData = getSessionData();
         if (sessionData && sessionData.user && sessionData.profile) {
-          console.log('🔄 AuthContext - Restaurando dados da sessão - PARANDO todas as verificações');
-          setUser(sessionData.user as User);
-          setProfile(sessionData.profile as UserProfile);
-          setAuthInfo(sessionData.authInfo as AuthResponse);
-          setLoading(false);
-          console.log('✅ AuthContext - Inicialização concluída com dados de sessão - SEM verificações adicionais');
-          return;
+          // Don't restore persistence for psychologists
+          if ((sessionData.profile as UserProfile).user_role === 'psicologo') {
+            console.log('⚠️ AuthContext - Dados de sessão pertencem a psicólogo; ignorando restauração');
+            // Clear any leftover persistent session data to be safe
+            clearAllSessionData();
+          } else {
+            console.log('🔄 AuthContext - Restaurando dados da sessão - PARANDO todas as verificações');
+            setUser(sessionData.user as User);
+            setProfile(sessionData.profile as UserProfile);
+            setAuthInfo(sessionData.authInfo as AuthResponse);
+            sessionPersistentRef.current = true;
+            setLoading(false);
+            console.log('✅ AuthContext - Inicialização concluída com dados de sessão - SEM verificações adicionais');
+            return;
+          }
         }
       }
       
-  // Direct verification without relying heavily on cache
-  await refreshAuth(true);
-    };
-
-    initAuth();
+      // Direct verification without relying heavily on cache
+      await refreshAuth(true);
+    };    initAuth();
 
   // Listener for authentication changes - OPTIMIZED
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -583,6 +810,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user, profile, authInfo]);
 
+  // Function to sync current status with database
+  const syncPsicologoStatus = useCallback(async () => {
+    if (profile?.user_role === 'psicologo' && profile?.id) {
+      try {
+        console.log('🔄 AuthContext - Sincronizando status do psicólogo com database...');
+        
+        const { data: currentProfile, error } = await supabase
+          .from('profiles')
+          .select('is_online')
+          .eq('id', profile.id)
+          .single();
+        
+        if (!error && currentProfile) {
+          const databaseStatus = currentProfile.is_online;
+          const localStatus = profile.is_online;
+          
+          if (databaseStatus !== localStatus) {
+            console.log(`🔄 AuthContext - Sincronizando status: Database=${databaseStatus}, Local=${localStatus}`);
+            setProfile(prev => prev ? { ...prev, is_online: databaseStatus } : prev);
+          } else {
+            console.log('✅ AuthContext - Status já está sincronizado');
+          }
+          
+          return databaseStatus;
+        } else {
+          console.warn('⚠️ AuthContext - Erro ao buscar status atual:', error);
+          return null;
+        }
+      } catch (error) {
+        console.warn('⚠️ AuthContext - Erro ao sincronizar status:', error);
+        return null;
+      }
+    }
+    return null;
+  }, [profile?.id, profile?.user_role, profile?.is_online]);
+
+  // Expose status update function for current user
+  const updateCurrentUserStatus = useCallback((isOnline: boolean) => {
+    if (profile?.user_role === 'psicologo' && profile?.id) {
+      updatePsicologoStatus(profile.id, isOnline);
+    }
+  }, [profile?.id, profile?.user_role, updatePsicologoStatus]);
+
+  // Auto-sync psychologist status when profile loads
+  useEffect(() => {
+    if (profile?.user_role === 'psicologo' && profile?.id && profile.authorized) {
+      // Small delay to ensure profile is fully loaded
+      const syncTimer = setTimeout(() => {
+        syncPsicologoStatus();
+      }, 500);
+      
+      return () => clearTimeout(syncTimer);
+    }
+  }, [profile?.id, profile?.user_role, profile?.authorized, syncPsicologoStatus]);
+
   const contextValue: AuthContextType = {
     user,
     profile,
@@ -595,6 +877,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     refreshAuth,
     checkRoleAccess,
+    updatePsicologoStatus: updateCurrentUserStatus,
+    syncPsicologoStatus,
   };
 
   return (
