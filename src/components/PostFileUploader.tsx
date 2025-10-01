@@ -28,6 +28,8 @@ export default function PostFileUploader({
   value = []
 }: PostFileUploaderProps) {
   const [files, setFiles] = useState<File[]>(value);
+  const [previews, setPreviews] = useState<Array<{ file: File; url: string }>>([]);
+  const [selectedPreview, setSelectedPreview] = useState<string | null>(null);
   const [validation, setValidation] = useState<FileValidation | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -36,8 +38,15 @@ export default function PostFileUploader({
 
   // Função para validar e atualizar arquivos
   const handleFilesUpdate = useCallback((newFiles: File[]) => {
+    // Revoke previous previews
+    previews.forEach(p => URL.revokeObjectURL(p.url));
+
     setFiles(newFiles);
-    
+
+    // Create previews for image files
+    const newPreviews = newFiles.map(f => ({ file: f, url: URL.createObjectURL(f) }));
+    setPreviews(newPreviews);
+
     if (newFiles.length > 0) {
       const validationResult = validatePostFiles(newFiles, category);
       setValidation(validationResult);
@@ -46,7 +55,7 @@ export default function PostFileUploader({
       setValidation(null);
       onValidationChange(null);
     }
-    
+
     onFilesChange(newFiles);
   }, [category, onFilesChange, onValidationChange]);
 
@@ -96,16 +105,32 @@ export default function PostFileUploader({
   // Remover arquivo específico
   const removeFile = (index: number) => {
     const newFiles = files.filter((_, i) => i !== index);
+    // Revoke the preview URL for this file
+    const preview = previews[index];
+    if (preview) URL.revokeObjectURL(preview.url);
+    const newPreviews = previews.filter((_, i) => i !== index);
+    setPreviews(newPreviews);
     handleFilesUpdate(newFiles);
   };
 
   // Limpar todos os arquivos
   const clearFiles = () => {
+    // Revoke all previews
+    previews.forEach(p => URL.revokeObjectURL(p.url));
+    setPreviews([]);
+    setSelectedPreview(null);
     handleFilesUpdate([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
+
+  // Cleanup previews on unmount
+  React.useEffect(() => {
+    return () => {
+      previews.forEach(p => URL.revokeObjectURL(p.url));
+    };
+  }, [previews]);
 
   // Fazer upload dos arquivos
   const handleUpload = async () => {
@@ -275,31 +300,58 @@ export default function PostFileUploader({
             </button>
           </div>
 
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {files.map((file, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                <div className="flex items-center space-x-3">
-                  {getFileIcon(file.type)}
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 truncate max-w-xs">
-                      {file.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatFileSize(file.size)} • {file.type}
-                    </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-80 overflow-y-auto">
+            {previews.map((p, index) => (
+              <div key={index} className="relative bg-white rounded-md shadow-sm overflow-hidden">
+                {p.file.type.startsWith('image/') ? (
+                  <img
+                    src={p.url}
+                    alt={p.file.name}
+                    onClick={() => setSelectedPreview(p.url)}
+                    className="w-full h-48 object-cover cursor-pointer hover:scale-105 transition-transform"
+                  />
+                ) : (
+                  <div className="w-full h-48 flex items-center justify-center bg-gray-50">
+                    {getFileIcon(p.file.type)}
                   </div>
+                )}
+
+                <div className="p-3 flex items-center justify-between">
+                  <div className="flex-1 pr-2">
+                    <p className="text-sm font-medium text-gray-700 truncate">{p.file.name}</p>
+                    <p className="text-xs text-gray-500">{formatFileSize(p.file.size)}</p>
+                  </div>
+                  <button
+                    onClick={() => removeFile(index)}
+                    disabled={disabled || uploading}
+                    className="text-red-500 hover:text-red-700 p-1 disabled:opacity-50"
+                    title="Remover arquivo"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => removeFile(index)}
-                  disabled={disabled || uploading}
-                  className="text-red-500 hover:text-red-700 p-1 disabled:opacity-50"
-                  title="Remover arquivo"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
             ))}
           </div>
+
+          {/* Lightbox modal for larger preview */}
+          {selectedPreview && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-80"
+              onClick={() => setSelectedPreview(null)}
+            >
+              <div className="relative max-w-[90vw] max-h-[90vh]">
+                <button
+                  className="absolute top-2 right-2 text-white bg-black bg-opacity-30 rounded-full p-1"
+                  onClick={(e) => { e.stopPropagation(); setSelectedPreview(null); }}
+                  aria-label="Fechar"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+                <img src={selectedPreview} alt="Preview" className="max-w-[90vw] max-h-[90vh] object-contain rounded" onClick={(e) => e.stopPropagation()} />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
