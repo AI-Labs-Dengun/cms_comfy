@@ -293,16 +293,19 @@ export default function CreateContent() {
 
     try {
       // Validar dados obrigatórios
-      if (!title.trim()) {
-        setError("Título é obrigatório");
-        toast.error("Título é obrigatório");
-        return;
-      }
+      // Title and description are optional for Shorts
+      if (category !== "Shorts") {
+        if (!title.trim()) {
+          setError("Título é obrigatório");
+          toast.error("Título é obrigatório");
+          return;
+        }
 
-      if (!description.trim()) {
+        if (!description.trim()) {
           setError("Descrição é obrigatória");
           toast.error("Descrição é obrigatória");
-        return;
+          return;
+        }
       }
 
       // Validar conteúdo textual (obrigatório para todas as categorias exceto Shorts)
@@ -999,7 +1002,9 @@ export default function CreateContent() {
                             <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                           </svg>
                           Título
-                          <span className="text-red-500 ml-1">*</span>
+                          {category !== 'Shorts' && (
+                            <span className="text-red-500 ml-1">*</span>
+                          )}
                         </span>
                       </label>
                       <input
@@ -1008,7 +1013,7 @@ export default function CreateContent() {
                         placeholder="Escreva um título atrativo para o seu conteúdo..."
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        required
+                        required={category !== "Shorts"}
                       />
                     </div>
 
@@ -1020,7 +1025,9 @@ export default function CreateContent() {
                             <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
                           </svg>
                           Descrição
-                          <span className="text-red-500 ml-1">*</span>
+                          {category !== 'Shorts' && (
+                            <span className="text-red-500 ml-1">*</span>
+                          )}
                         </span>
                       </label>
                       <p className="text-xs text-gray-500 mb-3">
@@ -1032,7 +1039,7 @@ export default function CreateContent() {
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={3}
-                        required
+                        required={category !== "Shorts"}
                       />
                     </div>
 
@@ -1497,8 +1504,8 @@ export default function CreateContent() {
                       
                       return (
                         isUploading || 
-                        !title.trim() ||
-                        !description.trim() ||
+                        (category !== "Shorts" && !title.trim()) ||
+                        (category !== "Shorts" && !description.trim()) ||
                         (category !== "Shorts" && !content.trim()) ||
                         (!hasContentUrl && !hasOldFile && !hasUploadedFiles && !hasSelectedFiles) ||
                         tags.length === 0 ||
@@ -1528,8 +1535,8 @@ export default function CreateContent() {
                           const hasUploadedFiles = uploadedFilesData && uploadedFilesData.file_paths.length > 0;
                           const hasSelectedFiles = selectedFiles.length > 0 && fileValidation?.valid;
                           
-                          if (!title.trim()) return "Adicione um título";
-                          if (!description.trim()) return "Adicione uma descrição";
+                          if (category !== "Shorts" && !title.trim()) return "Adicione um título";
+                          if (category !== "Shorts" && !description.trim()) return "Adicione uma descrição";
                           if (category !== "Shorts" && !content.trim()) return "Adicione conteúdo textual";
                           if (!hasContentUrl && !hasOldFile && !hasUploadedFiles && !hasSelectedFiles) return "Adicione URL ou arquivo";
                           if (tags.length === 0) return "Adicione pelo menos uma tag";
