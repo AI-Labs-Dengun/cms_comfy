@@ -397,11 +397,15 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       }
     }
 
+    // The RPC returns a JSONB like { success: true, data: { id: <uuid>, ... } }
+    // Ensure we extract the nested id (fallback to data.post_id for older versions)
+    const newPostId = (data && (data.data ? data.data.id : (data.post_id || null))) as string | null;
+
     return {
       success: true,
       message: 'Post criado com sucesso!',
       data: {
-        id: data.post_id,
+        id: newPostId,
         ...postData
       } as Post
     }
