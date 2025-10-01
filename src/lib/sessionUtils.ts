@@ -93,6 +93,12 @@ export function getSessionData(): SessionData | null {
  */
 export function saveSessionData(data: SessionData): void {
   try {
+    // SECURITY: Never save psychologist session data
+    if (data.profile && typeof data.profile === 'object' && 'user_role' in data.profile && data.profile.user_role === 'psicologo') {
+      console.log('⚠️ sessionUtils - Tentativa de salvar dados de psicólogo bloqueada');
+      return;
+    }
+    
     sessionStorage.setItem(SESSION_KEYS.AUTH_DATA, JSON.stringify(data));
     sessionStorage.setItem(SESSION_KEYS.LAST_CHECK, Date.now().toString());
     sessionStorage.setItem(SESSION_KEYS.SESSION_PERSISTENCE, 'true');

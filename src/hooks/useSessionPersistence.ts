@@ -63,6 +63,12 @@ export function useSessionPersistence(options: SessionPersistenceOptions = {}) {
   // Salvar dados da sessão
   const saveSessionData = useCallback((data: SessionData) => {
     try {
+      // SECURITY: Never save psychologist session data
+      if (data.profile && typeof data.profile === 'object' && 'user_role' in data.profile && data.profile.user_role === 'psicologo') {
+        console.log('⚠️ useSessionPersistence - Tentativa de salvar dados de psicólogo bloqueada');
+        return;
+      }
+      
       const sessionData = {
         data,
         timestamp: Date.now(),
