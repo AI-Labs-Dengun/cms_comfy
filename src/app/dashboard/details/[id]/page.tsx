@@ -332,18 +332,43 @@ export default function DetalhesConteudo() {
         return;
       }
 
-    const updateData: Partial<CreatePostData> = {
-        title: editTitle.trim(),
-        description: editDescription.trim(),
-        content: editContent.trim(), 
+    // For Shorts we want to explicitly clear title/description when the user
+    // erased them. Sending null signals the backend to remove the value. For
+    // other categories we keep previous behavior (send trimmed strings or
+    // undefined to not change).
+    type UpdateData = Omit<Partial<CreatePostData>, 'title' | 'description' | 'thumbnail_url'> & {
+      title?: string | null;
+      description?: string | null;
+      thumbnail_url?: string | null;
+    };
+
+    const updateData: UpdateData = {
+        title:
+          post.category === 'Shorts'
+            ? (editTitle.trim() === '' ? null : editTitle.trim())
+            : (editTitle.trim() || undefined),
+        description:
+          post.category === 'Shorts'
+            ? (editDescription.trim() === '' ? null : editDescription.trim())
+            : (editDescription.trim() || undefined),
+        // Shorts must not have textual content; sending undefined means no change
+        content: post.category === 'Shorts' ? undefined : (editContent.trim() || undefined),
         content_url: editContentUrl.trim() || undefined,
-        thumbnail_url: requestRemoveThumbnail ? null : (editThumbnailUrl.trim() || undefined), 
+        thumbnail_url: requestRemoveThumbnail ? null : (editThumbnailUrl.trim() || undefined),
         tags: editTags,
         emotion_tags: editEmotionTags,
-        min_age: editMinAge, 
-        category: post.category as 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura', 
+        min_age: editMinAge,
+        category: post.category as 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura',
       };
-  const response = await updatePost(post.id, updateData);
+  // Convert to the service's expected type: CreatePostData.title/description
+  // do not pass null (service expects string | undefined). Map null -> '' to signal removal.
+  const payload: Partial<CreatePostData> = {
+    ...updateData as Partial<CreatePostData>,
+    title: updateData.title === null ? '' : (updateData.title ?? undefined),
+    description: updateData.description === null ? '' : (updateData.description ?? undefined),
+  };
+
+  const response = await updatePost(post.id, payload);
 
       if (response.success) {
         if (post.category === 'Leitura') {
@@ -378,12 +403,13 @@ export default function DetalhesConteudo() {
           }
         }
 
-        // Atualizar o estado local (usar valores anteriores como fallback quando undefined)
+        // Atualizar o estado local aplicando explicitamente nulls para limpar
+        // título/descrição quando o backend foi instruído a removê-los.
         setPost((prev: Post | null) => prev ? {
           ...prev,
-          title: updateData.title ?? prev.title,
-          description: updateData.description ?? prev.description,
-          content: updateData.content ?? prev.content, 
+          title: updateData.title === null ? '' : (updateData.title ?? prev.title),
+          description: updateData.description === null ? '' : (updateData.description ?? prev.description),
+          content: updateData.content === undefined ? prev.content : (updateData.content ?? ''), 
           content_url: updateData.content_url ?? prev.content_url,
           thumbnail_url: updateData.thumbnail_url === null ? undefined : (updateData.thumbnail_url ?? prev.thumbnail_url),
           tags: updateData.tags ?? prev.tags,
@@ -1031,7 +1057,12 @@ export default function DetalhesConteudo() {
                     
                     <button 
                       onClick={handleSaveEdit}
-                      disabled={saving || !editTitle.trim() || !editDescription.trim() || (editMinAge !== 12 && editMinAge !== 16)}
+                      // For Shorts we allow empty title/description; only enforce min age.
+                      disabled={
+                        saving ||
+                        (post.category !== 'Shorts' && (!editTitle.trim() || !editDescription.trim())) ||
+                        (editMinAge !== 12 && editMinAge !== 16)
+                      }
                       className="bg-green-600 text-white px-4 py-2 rounded-md font-medium hover:bg-green-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       title="Salvar alterações"
                     >
