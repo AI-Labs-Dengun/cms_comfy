@@ -7,7 +7,8 @@ import { useAuth } from "@/context/AuthContext";
 import { getAllContacts, deleteContact } from "@/services/contacts";
 import { Contact } from "@/types/contacts";
 import { EMOTIONS } from '@/lib/emotions';
-import { DeleteConfirmationModal, NotificationModal } from "@/components/modals";
+import { DeleteConfirmationModal } from "@/components/modals";
+import { toast } from 'react-hot-toast';
 import { Plus, Search, Edit, Trash2, ExternalLink } from "lucide-react";
 
 export default function ContactsPage() {
@@ -21,7 +22,6 @@ export default function ContactsPage() {
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
 
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; contactId: string | null; contactTitle: string; isLoading: boolean }>({ isOpen:false, contactId:null, contactTitle:'', isLoading:false });
-  const [notification, setNotification] = useState<{ isOpen: boolean; type: 'success'|'error'|'info'; title: string; message: string }>({ isOpen:false, type:'info', title:'', message:'' });
 
   useEffect(() => {
     if (!authLoading && canAccessCMS) loadContacts();
@@ -64,10 +64,10 @@ export default function ContactsPage() {
     const response = await deleteContact(deleteModal.contactId);
     if (response.success) {
       setContacts(prev => prev.filter(p => p.id !== deleteModal.contactId));
-      setNotification({ isOpen:true, type:'success', title:'Sucesso', message:'Contacto removido' });
+      toast.success('Contacto removido');
       closeDelete();
     } else {
-      setNotification({ isOpen:true, type:'error', title:'Erro', message: response.error || 'Erro ao remover' });
+      toast.error(response.error || 'Erro ao remover');
       setDeleteModal(prev => ({ ...prev, isLoading:false }));
     }
   };
@@ -279,13 +279,7 @@ export default function ContactsPage() {
           isLoading={deleteModal.isLoading}
         />
 
-        <NotificationModal 
-          isOpen={notification.isOpen} 
-          type={notification.type} 
-          title={notification.title} 
-          message={notification.message} 
-          onClose={() => setNotification(prev=>({...prev,isOpen:false}))} 
-        />
+        {/* Notifications handled globally via HotToaster */}
     </CMSLayout>
   );
 }

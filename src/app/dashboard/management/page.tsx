@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import { getUserPosts, togglePostPublication, deletePost, Post, getTagsForPost } from "@/services/posts";
 import { useAuth } from "@/context/AuthContext";
-import { DeleteConfirmationModal, PublishToggleModal, NotificationModal } from "@/components/modals";
+import { DeleteConfirmationModal, PublishToggleModal } from "@/components/modals";
+import { toast } from 'react-hot-toast';
 import { EMOTIONS } from '@/lib/emotions';
 import { ManagementDataTable, DataTableFeatureFlag } from "@/components/data-table";
 
@@ -107,17 +108,7 @@ export default function Management() {
     isLoading: false
   });
 
-  const [notification, setNotification] = useState<{
-    isOpen: boolean;
-    type: "success" | "error" | "info";
-    title: string;
-    message: string;
-  }>({
-    isOpen: false,
-    type: "info",
-    title: "",
-    message: ""
-  });
+  // notifications handled via global HotToaster (react-hot-toast)
 
   // Estados para seleção múltipla
   const [bulkAction, setBulkAction] = useState<BulkActionState>({
@@ -538,7 +529,7 @@ export default function Management() {
     }
     
     if (selectedPosts.length === 0) {
-      showNotification("error", "Erro", "Nenhum post selecionado");
+  toast.error("Nenhum post selecionado");
       return;
     }
     
@@ -632,7 +623,7 @@ export default function Management() {
       const selectedPosts = bulkActionModal.posts;
       
       if (selectedPosts.length === 0) {
-        showNotification("error", "Erro", "Nenhum post selecionado para processar");
+  toast.error("Nenhum post selecionado para processar");
         setBulkActionModal(prev => ({ ...prev, isLoading: false }));
         return;
       }
@@ -640,7 +631,7 @@ export default function Management() {
       // Validar antes de executar
       const validation = validateBulkAction(action, selectedPosts);
       if (!validation.valid) {
-        showNotification("error", "Validação Falhou", validation.error!);
+  toast.error(validation.error!);
         setBulkActionModal(prev => ({ ...prev, isLoading: false }));
         return;
       }
@@ -762,30 +753,18 @@ export default function Management() {
       if (errorCount === 0) {
         const actionText = action === 'delete' ? 'eliminados' : 
                           action === 'publish' ? 'publicados' : 'despublicados';
-        showNotification(
-          "success", 
-          "Sucesso!", 
-          `${successCount} post${successCount !== 1 ? 's' : ''} ${actionText} com sucesso!`
-        );
+        toast.success(`${successCount} post${successCount !== 1 ? 's' : ''} ${actionText} com sucesso!`);
       } else if (successCount === 0) {
-        showNotification(
-          "error", 
-          "Erro", 
-          `Erro ao processar todos os posts: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? ` e mais ${errors.length - 3}...` : ''}`
-        );
+        toast.error(`Erro ao processar todos os posts: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? ` e mais ${errors.length - 3}...` : ''}`);
       } else {
         const actionText = action === 'delete' ? 'eliminados' : 
                           action === 'publish' ? 'publicados' : 'despublicados';
-        showNotification(
-          "info", 
-          "Ação Parcial", 
-          `${successCount} post${successCount !== 1 ? 's' : ''} ${actionText}. ${errorCount} falharam: ${errors.slice(0, 2).join(', ')}${errors.length > 2 ? '...' : ''}`
-        );
+        toast(`${successCount} post${successCount !== 1 ? 's' : ''} ${actionText}. ${errorCount} falharam: ${errors.slice(0, 2).join(', ')}${errors.length > 2 ? '...' : ''}`);
       }
 
     } catch (error) {
       console.error('💥 Erro geral na ação em lote:', error);
-      showNotification("error", "Erro", 'Erro inesperado ao processar ação em lote');
+      toast.error('Erro inesperado ao processar ação em lote');
     } finally {
       setBulkActionModal(prev => ({ ...prev, isLoading: false }));
     }
@@ -829,19 +808,7 @@ export default function Management() {
   };
 
   // Função para mostrar notificação
-  const showNotification = (type: "success" | "error" | "info", title: string, message: string) => {
-    setNotification({
-      isOpen: true,
-      type,
-      title,
-      message
-    });
-  };
-
-  // Função para fechar notificação
-  const closeNotification = () => {
-    setNotification(prev => ({ ...prev, isOpen: false }));
-  };
+  // Notifications handled via HotToaster (react-hot-toast)
 
   // Função para confirmar publicação/despublicação
   const handleConfirmPublish = async () => {
@@ -860,17 +827,13 @@ export default function Management() {
             : post
         ));
         closePublishModal();
-        showNotification(
-          "success", 
-          "Sucesso!", 
-          `Post ${!publishModal.isPublished ? 'publicado' : 'despublicado'} com sucesso!`
-        );
+        toast.success(`Post ${!publishModal.isPublished ? 'publicado' : 'despublicado'} com sucesso!`);
       } else {
-        showNotification("error", "Erro", response.error || 'Erro ao alterar status de publicação');
+    toast.error(response.error || 'Erro ao alterar status de publicação');
       }
     } catch (err) {
       console.error('Erro ao alterar publicação:', err);
-      showNotification("error", "Erro", 'Erro inesperado ao alterar status de publicação');
+  toast.error('Erro inesperado ao alterar status de publicação');
     } finally {
       setPublishModal(prev => ({ ...prev, isLoading: false }));
     }
@@ -898,11 +861,7 @@ export default function Management() {
     // Verificar se o post está publicado
     const postToDelete = posts.find(p => p.id === deleteModal.postId);
     if (postToDelete?.is_published) {
-      showNotification(
-        "error", 
-        "Eliminação Bloqueada", 
-        "Este post está publicado. Despublique-o primeiro antes de eliminá-lo."
-      );
+      toast.error("Este post está publicado. Despublique-o primeiro antes de eliminá-lo.");
       closeDeleteModal();
       return;
     }
@@ -916,13 +875,13 @@ export default function Management() {
         // Remover do estado local
         setPosts(prev => prev.filter(post => post.id !== deleteModal.postId));
         closeDeleteModal();
-        showNotification("success", "Sucesso!", "Post eliminado com sucesso!");
+        toast.success("Post eliminado com sucesso!");
       } else {
-        showNotification("error", "Erro", response.error || 'Erro ao eliminar post');
+        toast.error(response.error || 'Erro ao eliminar post');
       }
     } catch (err) {
-      console.error('Erro ao eliminar post:', err);
-      showNotification("error", "Erro", 'Erro inesperado ao eliminar post');
+  console.error('Erro ao eliminar post:', err);
+  toast.error('Erro inesperado ao eliminar post');
     } finally {
       setDeleteModal(prev => ({ ...prev, isLoading: false }));
     }
@@ -2301,13 +2260,7 @@ export default function Management() {
         isLoading={publishModal.isLoading}
       />
       
-      <NotificationModal
-        isOpen={notification.isOpen}
-        onClose={closeNotification}
-        type={notification.type}
-        title={notification.title}
-        message={notification.message}
-      />
+      {/* Notifications handled globally via HotToaster */}
 
       {/* Feature flag para desenvolvimento */}
       {process.env.NODE_ENV === 'development' && (

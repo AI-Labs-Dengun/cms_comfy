@@ -7,7 +7,7 @@ import FlexibleRenderer from "@/components/FlexibleRenderer";
 import { getPost, deletePost, togglePostPublication, updatePost, Post, getTagsForPost, getAllReadingTags, associateTagWithPost, removeTagFromPost, uploadFileForPost, CreatePostData } from "@/services/posts";
 import { getFileUrl, getSignedUrl } from "@/services/storage";
 import { useAuth } from "@/context/AuthContext";
-import { DeleteConfirmationModal, PublishToggleModal, NotificationModal } from "@/components/modals";
+import { DeleteConfirmationModal, PublishToggleModal } from "@/components/modals";
 import { toast } from 'react-hot-toast';
 import { supabase } from "@/lib/supabase";
 import Image from 'next/image';
@@ -69,7 +69,7 @@ export default function DetalhesConteudo() {
   const [saving, setSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  // success notification is handled by global HotToaster (react-hot-toast)
   
   // Estados para os campos editáveis
   const [editTitle, setEditTitle] = useState("");
@@ -419,8 +419,9 @@ export default function DetalhesConteudo() {
           updated_at: new Date().toISOString()
         } : null);
         
-        setIsEditing(false);
-        setShowSuccessModal(true);
+  setIsEditing(false);
+  // use global toast instead of centered modal
+  toast.success('As alterações foram salvas e o post foi atualizado com sucesso.');
       } else {
         alert(response.error || 'Erro ao atualizar post');
       }
@@ -1851,15 +1852,7 @@ export default function DetalhesConteudo() {
         isLoading={publishing}
       />
 
-      <NotificationModal
-        isOpen={showSuccessModal}
-        onClose={() => setShowSuccessModal(false)}
-        type="success"
-        title="Post Atualizado com Sucesso!"
-        message="As alterações foram salvas e o post foi atualizado com sucesso."
-        autoClose={true}
-        autoCloseDelay={3000}
-      />
+      {/* Notifications are shown via global HotToaster; no centered modal here */}
     </CMSLayout>
   );
 } 

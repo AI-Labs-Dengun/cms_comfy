@@ -11,6 +11,7 @@ import { EncryptionService } from '@/services/encryption';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { supabase } from '@/lib/supabase';
 import notificationService from '@/lib/notificationService';
+import { toast } from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 
 // Estilos CSS personalizados
@@ -121,8 +122,7 @@ export default function PsicologosPage() {
   const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>('all');
   const [recentlyUpdatedChats, setRecentlyUpdatedChats] = useState<Set<string>>(new Set());
   const [pageIsVisible] = useState(!document.hidden);
-  const [showNotification, setShowNotification] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState('');
+  // in-app notifications replaced by global HotToaster
   const [selectedChatMessages, setSelectedChatMessages] = useState<Message[]>([]);
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
   const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
@@ -584,10 +584,7 @@ export default function PsicologosPage() {
 
                   // If service falls back to in-app, show existing visual toast
                   if (!result.shown && pageIsVisible && !isChatSelected) {
-                    setNotificationMessage(`${userName}: ${preview}`);
-                    setShowNotification(true);
-                    setTimeout(() => { setShowNotification(false); }, 5000);
-                    // timeout intentionally not referenced here; component cleanup handles lifecycle
+                    toast(`${userName}: ${preview}`);
                   }
                 } catch {
                   // If something fails, fallback to direct notification to avoid regress
@@ -1368,32 +1365,7 @@ export default function PsicologosPage() {
     <>
       <style jsx>{customStyles}</style>
       <div className="flex-1 flex bg-gray-50 min-h-0 h-screen relative">
-      {/* Notificação visual para novas mensagens */}
-      {showNotification && (
-        <div className="fixed top-6 right-6 z-50 bg-white border border-gray-200 px-6 py-4 rounded-2xl shadow-2xl max-w-sm notification-slide-in backdrop-blur-sm">
-          <div className="flex items-start space-x-4">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-gray-900 mb-1">Nova mensagem</p>
-              <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">{notificationMessage}</p>
-            </div>
-            <button
-              onClick={() => setShowNotification(false)}
-              className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Inline notification removed; using global HotToaster instead */}
       {/* Coluna da lista de chats - visível sempre no desktop, condicional no mobile */}
       <div className={`w-full lg:w-96 lg:flex-shrink-0 bg-white border-r border-gray-200 flex flex-col ${
         showChatList ? 'flex' : 'hidden lg:flex'
