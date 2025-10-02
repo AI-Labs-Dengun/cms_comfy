@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import CMSLayout from "@/components/CMSLayout";
 import FlexibleRenderer from "@/components/FlexibleRenderer";
-import { getPost, deletePost, togglePostPublication, updatePost, Post, getTagsForPost, getAllReadingTags, associateTagWithPost, removeTagFromPost, uploadFileForPost, CreatePostData } from "@/services/posts";
+import { getPost, deletePost, togglePostPublication, updatePost, Post, getTagsForPost, getAllReadingTags, associateTagWithPost, removeTagFromPost, uploadFileForPost, uploadPostFiles, CreatePostData } from "@/services/posts";
 import { getFileUrl, getSignedUrl } from "@/services/storage";
 import { useAuth } from "@/context/AuthContext";
 import { DeleteConfirmationModal, PublishToggleModal } from "@/components/modals";
@@ -84,6 +84,17 @@ export default function DetalhesConteudo() {
   const [editEmotionTags, setEditEmotionTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [readingTags, setReadingTags] = useState<{id: string, name: string, color?: string}[]>([]);
+  // ====== STATES TO MANAGE EXISTING / NEW FILES WHEN EDITING (SHORTS) ======
+  const [editExistingFiles, setEditExistingFiles] = useState<Array<{ path: string; name?: string; type?: string; size?: number }>>([]);
+  const [newSelectedFiles, setNewSelectedFiles] = useState<File[]>([]);
+  const [newSelectedPreviews, setNewSelectedPreviews] = useState<string[]>([]);
+  const [fileEditError, setFileEditError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  // States for image reordering
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
+  const [draggedImageType, setDraggedImageType] = useState<'existing' | 'new' | null>(null);
+  const [draggedImageAbsIndex, setDraggedImageAbsIndex] = useState<number | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   
   // ✅ NOVOS ESTADOS PARA GERENCIAR TAGS DE LEITURA
   const [allReadingTags, setAllReadingTags] = useState<{id: string, name: string, color?: string}[]>([]);
@@ -279,6 +290,22 @@ export default function DetalhesConteudo() {
           setSelectedReadingTagIds([]);
         });
     }
+      // Initialize existing files state so the editor can remove/add files
+      if (postData.file_paths && postData.file_paths.length > 0) {
+        const files = postData.file_paths.map((p, i) => ({
+          path: p,
+          name: postData.file_names?.[i],
+          type: postData.file_types?.[i],
+          size: postData.file_sizes?.[i]
+        }));
+        setEditExistingFiles(files);
+      } else {
+        setEditExistingFiles([]);
+      }
+      // reset new selected files
+      setNewSelectedFiles([]);
+      setNewSelectedPreviews([]);
+      setFileEditError(null);
   };
 
   // Função para entrar em modo de edição
@@ -305,7 +332,19 @@ export default function DetalhesConteudo() {
           setSelectedReadingTagIds([]);
         });
     }
+      // revoke previews when canceling
+    newSelectedPreviews.forEach(url => { try { URL.revokeObjectURL(url); } catch { /* ignore */ } });
+      setNewSelectedPreviews([]);
+      setNewSelectedFiles([]);
   };
+
+    // cleanup object URLs on unmount
+    useEffect(() => {
+      return () => {
+        newSelectedPreviews.forEach(url => { try { URL.revokeObjectURL(url); } catch { /* ignore */ } });
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
   const handleReadingTagSelect = (tagId: string) => {
     setSelectedReadingTagIds([tagId]); // Apenas uma tag selecionada
@@ -368,60 +407,142 @@ export default function DetalhesConteudo() {
     description: updateData.description === null ? '' : (updateData.description ?? undefined),
   };
 
-  const response = await updatePost(post.id, payload);
+    // If editing Shorts, we may need to upload new files and compose file arrays
+    if (post.category === 'Shorts') {
+      // Validate counts and types before sending
+      const remainingExisting = editExistingFiles || [];
+      const totalCount = remainingExisting.length + newSelectedFiles.length;
 
-      if (response.success) {
-        if (post.category === 'Leitura') {
+      // If there's any video among existing or new, require exactly 1 file and it must be a video
+      const existingHasVideo = remainingExisting.some(f => f.type && f.type.startsWith('video/'));
+      const newHasVideo = newSelectedFiles.some(f => f.type.startsWith('video/'));
+      if (existingHasVideo || newHasVideo) {
+        if (totalCount !== 1) {
+          setSaving(false);
+          alert('Se o post for um vídeo Shorts deve conter exatamente 1 ficheiro de vídeo.');
+          return;
+        }
+      } else {
+        // image carousel: must have between 1 and 5 images
+        if (totalCount < 1 || totalCount > 5) {
+          setSaving(false);
+          alert('Shorts (imagens) devem conter entre 1 e 5 imagens.');
+          return;
+        }
+      }
+
+      // Upload newSelectedFiles if any
+      let uploadedData: { file_paths: string[]; file_names: string[]; file_types: string[]; file_sizes: number[] } | null = null;
+      if (newSelectedFiles.length > 0) {
+        try {
+          const uploadResult = await uploadPostFiles(newSelectedFiles, post.category);
+          if (!uploadResult.success || !uploadResult.data) {
+            setSaving(false);
+            alert(uploadResult.error || 'Erro ao upload dos novos ficheiros');
+            return;
+          }
+          uploadedData = uploadResult.data;
+        } catch (err) {
+          console.error('Erro ao fazer upload dos novos ficheiros:', err);
+          setSaving(false);
+          alert('Erro inesperado ao fazer upload dos novos ficheiros');
+          return;
+        }
+      }
+
+        // Build final arrays: start with remaining existing files, then append uploaded ones
+      const finalFilePaths: string[] = [];
+      const finalFileNames: string[] = [];
+      const finalFileTypes: string[] = [];
+      const finalFileSizes: number[] = [];
+
+      // Existing files keep their metadata (paths are server-side)
+      for (const f of remainingExisting) {
+        finalFilePaths.push(f.path);
+        if (f.name) finalFileNames.push(f.name);
+        if (f.type) finalFileTypes.push(f.type);
+        if (typeof f.size === 'number') finalFileSizes.push(f.size);
+      }
+
+      if (uploadedData) {
+        finalFilePaths.push(...uploadedData.file_paths);
+        finalFileNames.push(...uploadedData.file_names);
+        finalFileTypes.push(...uploadedData.file_types);
+        finalFileSizes.push(...uploadedData.file_sizes);
+      }
+
+      // Attach file arrays to payload (updatePost expects arrays for file fields)
+      // payload is typed below to optionally include these arrays
+      payload.file_paths = finalFilePaths;
+      payload.file_names = finalFileNames;
+      payload.file_types = finalFileTypes;
+      payload.file_sizes = finalFileSizes;
+    }
+
+    const response = await updatePost(post.id, payload);
+
+    if (response.success) {
+        // If server returned the updated post, prefer it (ensures ordering and other server-side changes are reflected)
+        if (response.data && typeof response.data === 'object') {
           try {
-            // Obter tags atuais do post
+            setPost(response.data as Post);
+          } catch {
+            // fallback to safe merge
+            setPost((prev: Post | null) => prev ? ({ ...prev, ...(response.data as Partial<Post>) }) : (response.data as Post));
+          }
+        } else {
+          // No full post returned: apply local updates so UI reflects new values (including updated file arrays attached to payload)
+          setPost((prev: Post | null) => prev ? {
+            ...prev,
+            title: updateData.title === null ? '' : (updateData.title ?? prev.title),
+            description: updateData.description === null ? '' : (updateData.description ?? prev.description),
+            content: updateData.content === undefined ? prev.content : (updateData.content ?? ''),
+            content_url: updateData.content_url ?? prev.content_url,
+            thumbnail_url: updateData.thumbnail_url === null ? undefined : (updateData.thumbnail_url ?? prev.thumbnail_url),
+            tags: updateData.tags ?? prev.tags,
+            emotion_tags: updateData.emotion_tags ?? prev.emotion_tags,
+            min_age: updateData.min_age ?? prev.min_age,
+            category: updateData.category ?? prev.category,
+            // Ensure file arrays are updated if payload carried them (Shorts flow)
+            file_paths: payload.file_paths ?? prev.file_paths,
+            file_names: payload.file_names ?? prev.file_names,
+            file_types: payload.file_types ?? prev.file_types,
+            file_sizes: payload.file_sizes ?? prev.file_sizes,
+            updated_at: new Date().toISOString()
+          } : null);
+        }
+
+        // If we updated files locally, clear temporary selections so the editor reflects the saved state
+        setNewSelectedFiles([]);
+  // revoke previews to avoid leaks
+  newSelectedPreviews.forEach(url => { try { URL.revokeObjectURL(url); } catch { /* ignore */ } });
+        setNewSelectedPreviews([]);
+
+        if (post && post.category === 'Leitura') {
+          try {
+            // Re-sync tags server-side
             const currentTags = await getTagsForPost(post.id);
             const currentTagIds = currentTags.map((tag: {id: string, name: string, color?: string}) => tag.id);
-            
-            // Remover todas as tags atuais (garantir apenas uma)
             for (const tagId of currentTagIds) {
               await removeTagFromPost(post.id, tagId);
             }
-            
-            // Adicionar apenas a tag selecionada (se houver)
             if (selectedReadingTagIds.length > 0) {
               await associateTagWithPost(post.id, selectedReadingTagIds[0]);
             }
-            
-            // Sincronizar categoria_leitura (se a função existir)
             try {
               await supabase.rpc('sync_categoria_leitura', { post_id_param: post.id });
             } catch {
               console.log('Função sync_categoria_leitura não disponível, continuando...');
             }
-            
-            // Recarregar tags para atualizar o estado
             const updatedTags = await getTagsForPost(post.id);
             setReadingTags(updatedTags);
           } catch (error) {
             console.error('Erro ao atualizar tag de leitura:', error);
-            // Continuar mesmo se houver erro nas tags
           }
         }
 
-        // Atualizar o estado local aplicando explicitamente nulls para limpar
-        // título/descrição quando o backend foi instruído a removê-los.
-        setPost((prev: Post | null) => prev ? {
-          ...prev,
-          title: updateData.title === null ? '' : (updateData.title ?? prev.title),
-          description: updateData.description === null ? '' : (updateData.description ?? prev.description),
-          content: updateData.content === undefined ? prev.content : (updateData.content ?? ''), 
-          content_url: updateData.content_url ?? prev.content_url,
-          thumbnail_url: updateData.thumbnail_url === null ? undefined : (updateData.thumbnail_url ?? prev.thumbnail_url),
-          tags: updateData.tags ?? prev.tags,
-          emotion_tags: updateData.emotion_tags ?? prev.emotion_tags,
-          min_age: updateData.min_age ?? prev.min_age, 
-          category: updateData.category ?? prev.category, 
-          updated_at: new Date().toISOString()
-        } : null);
-        
-  setIsEditing(false);
-  // use global toast instead of centered modal
-  toast.success('As alterações foram salvas e o post foi atualizado com sucesso.');
+        setIsEditing(false);
+        toast.success('As alterações foram salvas e o post foi atualizado com sucesso.');
       } else {
         alert(response.error || 'Erro ao atualizar post');
       }
@@ -430,6 +551,222 @@ export default function DetalhesConteudo() {
       alert('Erro inesperado ao salvar alterações');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ====== FILE EDIT HANDLERS for SHORTS ======
+  const handleNewFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length === 0) return;
+    addNewFiles(files);
+    // reset input value to allow re-selecting same files
+    if (e.target) e.target.value = '';
+  };
+
+  // Shared logic to add new files (from input or drop)
+  const addNewFiles = (files: File[]) => {
+    // Validate types and sizes and limit
+    const combinedCount = editExistingFiles.length + newSelectedFiles.length + files.length;
+    if (combinedCount > 5) {
+      setFileEditError('Máximo 5 imagens para Shorts (carousel). Remova algumas antes de adicionar mais.');
+      return;
+    }
+
+    const invalid = files.find(f => !f.type.startsWith('image/'));
+    if (invalid) {
+      setFileEditError('Apenas imagens são permitidas para Shorts');
+      return;
+    }
+
+    const tooLarge = files.find(f => f.size > 5 * 1024 * 1024);
+    if (tooLarge) {
+      setFileEditError('Cada imagem deve ter no máximo 5MB');
+      return;
+    }
+
+    setFileEditError(null);
+
+    // revoke previous previews to avoid leaks when replacing
+    newSelectedPreviews.forEach(url => {
+      try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+    });
+
+    const nextFiles = [...newSelectedFiles, ...files];
+    const previews = nextFiles.map(f => URL.createObjectURL(f));
+    setNewSelectedFiles(nextFiles);
+    setNewSelectedPreviews(previews);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    const dt = e.dataTransfer;
+    if (!dt) return;
+    const files = Array.from(dt.files || []);
+    if (files.length === 0) return;
+    const currentCount = editExistingFiles.length + newSelectedFiles.length;
+    if (currentCount >= 5) {
+      setFileEditError('Máximo 5 imagens para Shorts. Remova algumas imagens antes de adicionar novas.');
+      return;
+    }
+    addNewFiles(files);
+  };
+
+  const removeNewSelectedFile = (index: number) => {
+    setNewSelectedFiles(prev => {
+      const removedPreview = newSelectedPreviews[index];
+      // revoke object URL for removed preview
+  try { if (removedPreview) URL.revokeObjectURL(removedPreview); } catch { /* ignore */ }
+      const next = prev.filter((_, i) => i !== index);
+      const previews = next.map(f => URL.createObjectURL(f));
+      // revoke old previews to avoid leaks
+  newSelectedPreviews.forEach((p, i) => { if (i !== index) try { URL.revokeObjectURL(p); } catch{/*ignore*/} });
+      setNewSelectedPreviews(previews);
+      return next;
+    });
+  };
+
+  const removeExistingFile = (path: string) => {
+    setEditExistingFiles(prev => prev.filter(f => f.path !== path));
+  };
+
+  // Image reordering functions
+  const handleImageDragStart = (e: React.DragEvent, index: number, type: 'existing' | 'new') => {
+    // compute absolute index
+    const totalExisting = editExistingFiles.length;
+    const abs = type === 'existing' ? index : totalExisting + index;
+    setDraggedImageIndex(index);
+    setDraggedImageType(type);
+    setDraggedImageAbsIndex(abs);
+    try {
+      e.dataTransfer.setData('text/plain', String(abs));
+    } catch {
+      // some browsers may restrict setData in certain contexts
+    }
+    e.dataTransfer.effectAllowed = 'move';
+    // optional: set drag image for better UX (use element itself)
+    try {
+      const el = e.currentTarget as HTMLElement;
+      // guard for typed DataTransfer.setDragImage (some lib.dom versions may not include it)
+      const dt = e.dataTransfer as DataTransfer & { setDragImage?: (image: Element, x: number, y: number) => void };
+      if (el && dt.setDragImage) {
+        dt.setDragImage(el, 20, 20);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const handleImageDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDropTargetIndex(index);
+  };
+
+  const handleImageDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDropTargetIndex(null);
+  };
+
+  const handleImageDrop = (e: React.DragEvent, dropIndex: number, dropType: 'existing' | 'new' | 'absolute') => {
+    e.preventDefault();
+
+    // Determine the source absolute index (prefer the explicitly stored absolute index)
+    const totalExisting = editExistingFiles.length;
+    let sourceAbsIndex: number | null = null;
+    if (draggedImageAbsIndex !== null) {
+      sourceAbsIndex = draggedImageAbsIndex;
+    } else if (draggedImageIndex !== null && draggedImageType !== null) {
+      sourceAbsIndex = draggedImageType === 'existing' ? draggedImageIndex : totalExisting + draggedImageIndex;
+    } else {
+      // Fallback: try to read the absolute index from the dataTransfer payload
+      try {
+        const dtVal = e.dataTransfer?.getData && e.dataTransfer.getData('text/plain');
+        const parsed = dtVal ? parseInt(dtVal, 10) : NaN;
+        if (!Number.isNaN(parsed)) {
+          sourceAbsIndex = parsed;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (sourceAbsIndex === null) return;
+
+    // Calculate target absolute index based on drop type
+    let targetAbsIndex: number;
+    if (dropType === 'absolute') {
+      targetAbsIndex = dropIndex;
+    } else {
+      targetAbsIndex = dropType === 'existing' ? dropIndex : totalExisting + dropIndex;
+    }
+    
+    // Don't do anything if dropping on same position
+    if (sourceAbsIndex === targetAbsIndex) {
+      setDraggedImageIndex(null);
+      setDraggedImageType(null);
+      setDropTargetIndex(null);
+      return;
+    }
+    
+    // Create combined array of all images
+    const allImages = [
+      ...editExistingFiles.map((f, i) => ({ type: 'existing' as const, data: f, index: i })),
+      ...newSelectedFiles.map((f, i) => ({ type: 'new' as const, data: f, index: i, preview: newSelectedPreviews[i] }))
+    ];
+    
+    // Reorder the combined array
+    const [movedItem] = allImages.splice(sourceAbsIndex, 1);
+    allImages.splice(targetAbsIndex, 0, movedItem);
+    
+    // Split back into existing and new arrays
+    const newExistingFiles: typeof editExistingFiles = [];
+    const newSelectedFilesReordered: File[] = [];
+    const newPreviewsReordered: string[] = [];
+    
+    allImages.forEach(item => {
+      if (item.type === 'existing') {
+        newExistingFiles.push(item.data as typeof editExistingFiles[0]);
+      } else {
+        newSelectedFilesReordered.push(item.data as File);
+        newPreviewsReordered.push(item.preview as string);
+      }
+    });
+    
+    // Update states
+    setEditExistingFiles(newExistingFiles);
+    setNewSelectedFiles(newSelectedFilesReordered);
+    setNewSelectedPreviews(newPreviewsReordered);
+    
+    // Clear drag states
+    setDraggedImageIndex(null);
+    setDraggedImageType(null);
+    setDraggedImageAbsIndex(null);
+    setDropTargetIndex(null);
+  };
+
+  const handleImageDragEnd = () => {
+    setDraggedImageIndex(null);
+    setDraggedImageType(null);
+    setDropTargetIndex(null);
+  };
+
+  // Drag handlers para área de upload de arquivos
+  const handleFileDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  };
+
+  const handleFileDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Only set dragActive to false if leaving the drag area completely
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+      setDragActive(false);
     }
   };
 
@@ -1260,6 +1597,254 @@ export default function DetalhesConteudo() {
                     </div>
                   )}
 
+                  {/* Gestão de Imagens para Posts Shorts - Única seção que combina upload e reordenamento */}
+                  {post.category === 'Shorts' && (
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <label className="block text-xs text-gray-500 font-bold mb-1">
+                            🖼️ Gestão de Imagens
+                          </label>
+                          <p className="text-xs text-gray-500">
+                            Adicione imagens arrastando arquivos ou clicando no botão. Reorganize arrastando as imagens.
+                          </p>
+                        </div>
+                        <div className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                          {(editExistingFiles?.length || 0) + (newSelectedFiles?.length || 0)}/5
+                        </div>
+                      </div>
+
+                      {/* Error display */}
+                      {fileEditError && (
+                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <div className="flex items-center gap-2 text-red-800">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="text-sm font-medium">{fileEditError}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Unified Upload and Management Area */}
+                      <div className="space-y-4">
+                        {/* Images Grid - shows existing and new images together for dragging/reordering */}
+                        {(editExistingFiles?.length > 0 || newSelectedFiles?.length > 0) && (
+                          <div>
+                            <div className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              Imagens do Carousel - Arraste para reordenar
+                            </div>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
+                              {/* Existing files */}
+                              {editExistingFiles.map((f, idx) => {
+                                const publicUrl = getFileUrl(f.path);
+                                const absoluteIndex = idx;
+                                const isBeingDragged = draggedImageAbsIndex === absoluteIndex;
+                                const isDropTarget = dropTargetIndex !== null && dropTargetIndex <= absoluteIndex && absoluteIndex <= dropTargetIndex;
+                                
+                                return (
+                                  <div 
+                                    key={f.path} 
+                                    className={`group relative cursor-move ${isBeingDragged ? 'opacity-50' : ''} ${isDropTarget ? 'ring-2 ring-blue-400' : ''}`}
+                                    draggable
+                                    onDragStart={(e) => handleImageDragStart(e, idx, 'existing')}
+                                    onDragOver={(e) => handleImageDragOver(e, absoluteIndex)}
+                                    onDragLeave={handleImageDragLeave}
+                                    onDrop={(e) => handleImageDrop(e, absoluteIndex, 'absolute')}
+                                    onDragEnd={handleImageDragEnd}
+                                  >
+                                    {/* Drag handle indicator */}
+                                    <div className="absolute top-2 left-2 bg-black/50 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                      </svg>
+                                    </div>
+                                    
+                                    <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200 bg-white shadow-sm hover:shadow-md transition-all duration-200">
+                                      {isValidUrl(publicUrl) ? (
+                                        <Image 
+                                          src={publicUrl} 
+                                          alt={f.name || `Imagem ${idx+1}`} 
+                                          width={200} 
+                                          height={200} 
+                                          className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-200 pointer-events-none" 
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                          <div className="text-center">
+                                            <svg className="w-8 h-8 text-gray-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            <div className="text-xs text-gray-500">URL inválida</div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        removeExistingFile(f.path);
+                                      }}
+                                      className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-100 hover:scale-110 z-10"
+                                      title="Remover imagem existente"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                      <div className="text-xs text-white font-medium truncate">
+                                        {f.name || `Imagem ${idx+1}`} • #{idx + 1}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {/* New selected files */}
+                              {newSelectedFiles.map((file, idx) => {
+                                const previewUrl = newSelectedPreviews[idx];
+                                const totalExisting = editExistingFiles.length;
+                                const absoluteIndex = totalExisting + idx;
+                                const isBeingDragged = draggedImageAbsIndex === absoluteIndex;
+                                const isDropTarget = dropTargetIndex !== null && dropTargetIndex <= absoluteIndex && absoluteIndex <= dropTargetIndex;
+                                
+                                return (
+                                  <div 
+                                    key={previewUrl || `${file.name}-${absoluteIndex}`} 
+                                    className={`group relative cursor-move ${isBeingDragged ? 'opacity-50' : ''} ${isDropTarget ? 'ring-2 ring-blue-400' : ''}`}
+                                    draggable
+                                    onDragStart={(e) => handleImageDragStart(e, idx, 'new')}
+                                    onDragOver={(e) => handleImageDragOver(e, absoluteIndex)}
+                                    onDragLeave={handleImageDragLeave}
+                                    onDrop={(e) => handleImageDrop(e, absoluteIndex, 'absolute')}
+                                    onDragEnd={handleImageDragEnd}
+                                  >
+                                    {/* Drag handle indicator */}
+                                    <div className="absolute top-2 left-2 bg-black/50 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                      </svg>
+                                    </div>
+                                    
+                                    <div className="aspect-square rounded-lg overflow-hidden border-2 border-blue-200 bg-white shadow-sm hover:shadow-md transition-all duration-200">
+                                      {previewUrl ? (
+                                        <Image 
+                                          src={previewUrl} 
+                                          alt={file.name} 
+                                          width={200} 
+                                          height={200} 
+                                          className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-200 pointer-events-none" 
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-blue-50">
+                                          <div className="text-center">
+                                            <svg className="w-8 h-8 text-blue-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            <div className="text-xs text-blue-600">Nova imagem</div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        removeNewSelectedFile(idx);
+                                      }}
+                                      className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-100 hover:scale-110 z-10"
+                                      title="Remover nova imagem"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                    <div className="absolute top-8 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                      NOVA
+                                    </div>
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                      <div className="text-xs text-white font-medium truncate">
+                                        {file.name} • #{absoluteIndex + 1}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Upload Area - always visible, integrated with the management area */}
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium text-gray-700">Adicionar mais imagens</div>
+                          {((editExistingFiles?.length || 0) + (newSelectedFiles?.length || 0)) < 5 ? (
+                            <div
+                              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                                dragActive 
+                                  ? 'border-blue-500 bg-blue-50' 
+                                  : 'border-gray-300 hover:border-gray-400'
+                              }`}
+                              onDragOver={handleFileDragOver}
+                              onDragLeave={handleFileDragLeave}
+                              onDrop={handleDrop}
+                            >
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                onChange={handleNewFilesSelected}
+                                className="hidden"
+                                id="image-upload"
+                              />
+                              <label htmlFor="image-upload" className="cursor-pointer">
+                                <div className="flex flex-col items-center">
+                                  <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
+                                    dragActive ? 'bg-blue-100' : 'bg-gray-100'
+                                  }`}>
+                                    <svg className={`w-6 h-6 ${dragActive ? 'text-blue-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    </svg>
+                                  </div>
+                                  <span className={`text-sm font-medium ${dragActive ? 'text-blue-600' : 'text-gray-600'}`}>
+                                    {dragActive ? 'Solte as imagens aqui' : 'Clique para selecionar ou arraste imagens'}
+                                  </span>
+                                  <span className="text-xs text-gray-500 mt-1">
+                                    PNG, JPG, GIF • Máx 5MB por imagem
+                                  </span>
+                                  <span className="text-xs text-blue-600 mt-2">
+                                    {5 - ((editExistingFiles?.length || 0) + (newSelectedFiles?.length || 0))} slot(s) disponível(is)
+                                  </span>
+                                </div>
+                              </label>
+                            </div>
+                          ) : (
+                            <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center bg-gray-50">
+                              <div className="flex flex-col items-center">
+                                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-3">
+                                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
+                                  </svg>
+                                </div>
+                                <span className="text-sm font-medium text-gray-500">
+                                  Limite de 5 imagens atingido
+                                </span>
+                                <span className="text-xs text-gray-400 mt-1">
+                                  Remova uma imagem para adicionar novas
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mb-4">
                     <label className="block text-xs text-gray-500 font-bold mb-1">URL do Conteúdo (opcional)</label>
                     <div className="relative">
@@ -1474,6 +2059,8 @@ export default function DetalhesConteudo() {
                       </label>
                     </div>
                   </div>
+
+
                 </>
               ) : (
                 <>
