@@ -480,7 +480,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoggingOut(false);
       return { success: false, error: 'Erro de conexão ao fazer logout' };
     }
-  }, [clearCache, profile]);
+  }, [clearCache, profile, updatePsicologoStatus]);
 
   // Main function to refresh authentication - OPTIMIZED WITH MUTEX
   const refreshAuth = useCallback(async (forceRefresh: boolean = false): Promise<void> => {
