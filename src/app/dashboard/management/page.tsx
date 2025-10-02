@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from 'next/link';
 import CMSLayout from "@/components/CMSLayout";
 import { getUserPosts, togglePostPublication, deletePost, Post, getTagsForPost } from "@/services/posts";
 import { useAuth } from "@/context/AuthContext";
@@ -1873,113 +1874,138 @@ export default function Management() {
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-200">
                                 {groupPosts.map((post) => (
-                                  <tr key={post.id} className={`transition-colors ${
-                                    bulkAction.selectedPosts.has(post.id) 
-                                      ? 'bg-blue-50 hover:bg-blue-100' 
-                                      : 'hover:bg-gray-50'
-                                  }`}>
-                                    <td className="px-6 py-4">
+                                  <tr
+                                    key={post.id}
+                                    className={`relative transition-colors cursor-pointer ${
+                                      bulkAction.selectedPosts.has(post.id) 
+                                        ? 'bg-blue-50 hover:bg-blue-100' 
+                                        : 'hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    {/* Overlay invisível para capturar cliques em toda a linha */}
+                                    <td className="absolute inset-0 z-0">
+                                      <Link
+                                        href={`/dashboard/details/${post.id}`}
+                                        className="absolute inset-0 block"
+                                        aria-label={`Ver detalhes do post: ${post.title}`}
+                                      />
+                                    </td>
+                                    <td className="relative z-10 px-6 py-4">
                                       <input
                                         type="checkbox"
                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                         checked={bulkAction.selectedPosts.has(post.id)}
-                                        onChange={() => togglePostSelection(post.id)}
+                                        onChange={(e) => { e.stopPropagation(); togglePostSelection(post.id); }}
                                       />
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="relative z-10 px-6 py-4">
                                       <div className="flex flex-col">
-                                        <button
-                                          onClick={() => router.push(`/dashboard/details/${post.id}`)}
+                                        <Link
+                                          href={`/dashboard/details/${post.id}`}
                                           className="text-left text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors truncate max-w-xs"
                                           title={post.title}
                                         >
                                           {post.title}
-                                        </button>
+                                        </Link>
                                         <p className="text-xs text-gray-500 mt-1 truncate max-w-xs" title={post.description}>
                                           {post.description}
                                         </p>
                                       </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                        {post.category}
-                                      </span>
+                                    <td className="relative z-10 px-6 py-4 whitespace-nowrap">
+                                      <Link href={`/dashboard/details/${post.id}`} className="block" aria-label={`Categoria: ${post.category}`}>
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                          {post.category}
+                                        </span>
+                                      </Link>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                      {formatDate(post.created_at)}
+                                    <td className="relative z-10 px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                      <Link href={`/dashboard/details/${post.id}`} className="block text-sm text-gray-500" aria-label={`Data: ${formatDate(post.created_at)}`}>
+                                        {formatDate(post.created_at)}
+                                      </Link>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                        post.is_published 
-                                          ? 'bg-green-100 text-green-800' 
-                                          : 'bg-yellow-100 text-yellow-800'
-                                      }`}>
-                                        {post.is_published ? 'Publicado' : 'Rascunho'}
-                                      </span>
+                                    <td className="relative z-10 px-6 py-4 whitespace-nowrap">
+                                      <Link href={`/dashboard/details/${post.id}`} className="block" aria-label={`Status: ${post.is_published ? 'Publicado' : 'Rascunho'}`}>
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                          post.is_published 
+                                            ? 'bg-green-100 text-green-800' 
+                                            : 'bg-yellow-100 text-yellow-800'
+                                        }`}>
+                                          {post.is_published ? 'Publicado' : 'Rascunho'}
+                                        </span>
+                                      </Link>
                                     </td>
-                                    <td className="px-6 py-4">
-                                      <div className="flex flex-wrap gap-1">
-                                        {post.tags.slice(0, 2).map((tag, index) => (
-                                          <span
-                                            key={index}
-                                            className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800"
-                                          >
-                                            {tag}
-                                          </span>
-                                        ))}
-                                        {post.tags.length > 2 && (
-                                          <span className="text-xs text-gray-500 self-center">
-                                            +{post.tags.length - 2}
-                                          </span>
-                                        )}
-                                        {post.emotion_tags.slice(0, 1).map((tag, index) => (
-                                          <span
-                                            key={`emotion-${index}`}
-                                            className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800"
-                                          >
-                                            {tag}
-                                          </span>
-                                        ))}
-                                        {post.emotion_tags.length > 1 && (
-                                          <span className="text-xs text-gray-500 self-center">
-                                            +{post.emotion_tags.length - 1} emoções
-                                          </span>
-                                        )}
-                                      </div>
+                                    <td className="relative z-10 px-6 py-4">
+                                      <Link href={`/dashboard/details/${post.id}`} className="block" aria-label={`Tags: ${post.tags.join(', ')} ${post.emotion_tags.join(', ')}`}>
+                                        <div className="flex flex-wrap gap-1">
+                                          {post.tags.slice(0, 2).map((tag, index) => (
+                                            <span
+                                              key={index}
+                                              className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                                            >
+                                              {tag}
+                                            </span>
+                                          ))}
+                                          {post.tags.length > 2 && (
+                                            <span className="text-xs text-gray-500 self-center">
+                                              +{post.tags.length - 2}
+                                            </span>
+                                          )}
+                                          {post.emotion_tags.slice(0, 1).map((tag, index) => (
+                                            <span
+                                              key={`emotion-${index}`}
+                                              className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800"
+                                            >
+                                              {tag}
+                                            </span>
+                                          ))}
+                                          {post.emotion_tags.length > 1 && (
+                                            <span className="text-xs text-gray-500 self-center">
+                                              +{post.emotion_tags.length - 1} emoções
+                                            </span>
+                                          )}
+                                        </div>
+                                      </Link>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="relative z-10 px-6 py-4">
                                       {post.category === 'Leitura' ? (
                                         readingTagsMap[post.id] && readingTagsMap[post.id].length > 0 ? (
-                                          <div className="flex flex-wrap gap-1">
-                                            {readingTagsMap[post.id].slice(0, 2).map((tag) => (
-                                              <span
-                                                key={tag.id}
-                                                className="inline-flex items-center px-2 py-1 rounded text-xs font-medium"
-                                                style={{
-                                                  backgroundColor: tag.color ? `${tag.color}20` : '#EBF8FF',
-                                                  color: tag.color || '#2B6CB0'
-                                                }}
-                                              >
-                                                {tag.name}
-                                              </span>
-                                            ))}
-                                            {readingTagsMap[post.id].length > 2 && (
-                                              <span className="text-xs text-gray-500 self-center">
-                                                +{readingTagsMap[post.id].length - 2}
-                                              </span>
-                                            )}
-                                          </div>
+                                          <Link href={`/dashboard/details/${post.id}`} className="block" aria-label={`Categorias de leitura: ${readingTagsMap[post.id].map(t => t.name).join(', ')}`}>
+                                            <div className="flex flex-wrap gap-1">
+                                              {readingTagsMap[post.id].slice(0, 2).map((tag) => (
+                                                <span
+                                                  key={tag.id}
+                                                  className="inline-flex items-center px-2 py-1 rounded text-xs font-medium"
+                                                  style={{
+                                                    backgroundColor: tag.color ? `${tag.color}20` : '#EBF8FF',
+                                                    color: tag.color || '#2B6CB0'
+                                                  }}
+                                                >
+                                                  {tag.name}
+                                                </span>
+                                              ))}
+                                              {readingTagsMap[post.id].length > 2 && (
+                                                <span className="text-xs text-gray-500 self-center">
+                                                  +{readingTagsMap[post.id].length - 2}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </Link>
                                         ) : (
-                                          <span className="text-gray-400 text-xs italic">Sem categorias</span>
+                                          <Link href={`/dashboard/details/${post.id}`} className="block text-gray-400 text-xs italic" aria-label="Sem categorias">
+                                            Sem categorias
+                                          </Link>
                                         )
                                       ) : (
-                                        <span className="text-gray-400 text-xs">-</span>
+                                        <Link href={`/dashboard/details/${post.id}`} className="block text-gray-400 text-xs" aria-label="Sem categorias">
+                                          -
+                                        </Link>
                                       )}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <td className="relative z-10 px-6 py-4 whitespace-nowrap text-sm font-medium">
                                       <div className="flex items-center space-x-2">
-                                        <button
-                                          onClick={() => router.push(`/dashboard/details/${post.id}`)}
+                                        <Link
+                                          href={`/dashboard/details/${post.id}`}
                                           className="text-blue-600 hover:text-blue-900 transition-colors"
                                           title="Ver detalhes"
                                         >
@@ -1987,9 +2013,9 @@ export default function Management() {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                           </svg>
-                                        </button>
+                                        </Link>
                                         <button
-                                          onClick={() => openPublishModal(post.id, post.title, post.is_published)}
+                                          onClick={(e) => { e.stopPropagation(); openPublishModal(post.id, post.title, post.is_published); }}
                                           className={`transition-colors ${
                                             post.is_published 
                                               ? 'text-yellow-600 hover:text-yellow-900' 
@@ -2009,7 +2035,7 @@ export default function Management() {
                                           )}
                                         </button>
                                         <button
-                                          onClick={() => post.is_published ? null : openDeleteModal(post.id, post.title)}
+                                          onClick={(e) => { e.stopPropagation(); if (!post.is_published) openDeleteModal(post.id, post.title); }}
                                           disabled={post.is_published}
                                           className={`transition-colors ${
                                             post.is_published 
@@ -2038,23 +2064,27 @@ export default function Management() {
                         {/* Layout Mobile - Cards */}
                         <div className="lg:hidden space-y-4">
                           {groupPosts.map((post) => (
-                            <div key={post.id} className={`border border-gray-200 rounded-lg p-4 transition-colors ${
-                              bulkAction.selectedPosts.has(post.id) 
-                                ? 'bg-blue-50 border-blue-300' 
-                                : 'hover:bg-gray-50'
-                            }`}>
+                            <Link
+                              key={post.id}
+                              href={`/dashboard/details/${post.id}`}
+                              onClick={() => { /* allow inner elements to stopPropagation */ }}
+                              className={`block border border-gray-200 rounded-lg p-4 transition-colors cursor-pointer ${
+                                bulkAction.selectedPosts.has(post.id) 
+                                  ? 'bg-blue-50 border-blue-300' 
+                                  : 'hover:bg-gray-50'
+                              }`}
+                            >
                               {/* Header com checkbox, título e status */}
                               <div className="flex items-start gap-3 mb-3">
                                 <input
                                   type="checkbox"
                                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1"
                                   checked={bulkAction.selectedPosts.has(post.id)}
-                                  onChange={() => togglePostSelection(post.id)}
+                                  onChange={(e) => { e.stopPropagation(); togglePostSelection(post.id); }}
                                 />
                                 <div className="flex-1 min-w-0">
                                   <h3 
                                     className="text-lg font-semibold text-gray-900 cursor-pointer hover:text-blue-600 mb-2"
-                                    onClick={() => router.push(`/dashboard/details/${post.id}`)}
                                   >
                                     {post.title}
                                   </h3>
@@ -2153,8 +2183,8 @@ export default function Management() {
 
                               {/* Ações */}
                               <div className="flex gap-2 mt-4 pt-3 border-t border-gray-200">
-                                <button
-                                  onClick={() => router.push(`/dashboard/details/${post.id}`)}
+                                <Link
+                                  href={`/dashboard/details/${post.id}`}
                                   className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
                                   title="Ver detalhes"
                                 >
@@ -2163,9 +2193,9 @@ export default function Management() {
                                     <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7Z"/>
                                   </svg>
                                   Ver
-                                </button>
+                                </Link>
                                 <button
-                                  onClick={() => openPublishModal(post.id, post.title, post.is_published)}
+                                  onClick={(e) => { e.stopPropagation(); openPublishModal(post.id, post.title, post.is_published); }}
                                   className={`text-sm font-medium flex items-center gap-1 ${
                                     post.is_published 
                                       ? 'text-yellow-600 hover:text-yellow-800' 
@@ -2190,7 +2220,7 @@ export default function Management() {
                                   )}
                                 </button>
                                 <button
-                                  onClick={() => post.is_published ? null : openDeleteModal(post.id, post.title)}
+                                  onClick={(e) => { e.stopPropagation(); if (!post.is_published) openDeleteModal(post.id, post.title); }}
                                   disabled={post.is_published}
                                   className={`text-sm font-medium flex items-center gap-1 transition-colors ${
                                     post.is_published 
@@ -2209,7 +2239,7 @@ export default function Management() {
                                   Eliminar
                                 </button>
                               </div>
-                            </div>
+                            </Link>
                           ))}
                         </div>
                       </div>
