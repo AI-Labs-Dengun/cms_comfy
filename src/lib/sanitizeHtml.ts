@@ -11,8 +11,9 @@ export function sanitizeHtml(html: string): string {
 
   // Configuração restritiva: apenas tags básicas de formatação
   const cleanHtml = DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['p', 'strong', 'em', 'u', 'br'],
-    ALLOWED_ATTR: [],
+    ALLOWED_TAGS: ['p', 'strong', 'em', 'u', 'br', 'a'],
+    // Allow href, target and rel on anchors only
+    ALLOWED_ATTR: ['href', 'target', 'rel'],
     KEEP_CONTENT: true,
     RETURN_DOM: false,
     RETURN_DOM_FRAGMENT: false,
