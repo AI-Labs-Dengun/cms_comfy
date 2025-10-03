@@ -103,6 +103,11 @@ export default function DetalhesConteudo() {
   
   // ✅ ESTADO PARA IDADE MÍNIMA
   const [editMinAge, setEditMinAge] = useState<number>(12);
+  
+  // ✅ NOVOS ESTADOS PARA EDIÇÃO DE CONTEÚDO DE IMAGEM
+  const [isUploadingContentImage, setIsUploadingContentImage] = useState(false);
+  const [uploadContentImageError, setUploadContentImageError] = useState<string | null>(null);
+  const [requestRemoveContentImage, setRequestRemoveContentImage] = useState(false);
 
   const postId = params.id as string;
 
@@ -279,6 +284,11 @@ export default function DetalhesConteudo() {
     setRequestRemoveThumbnail(false);
     setUploadThumbnailError(null);
     setIsUploadingThumbnail(false);
+    
+    // Reset content image states
+    setRequestRemoveContentImage(false);
+    setUploadContentImageError(null);
+    setIsUploadingContentImage(false);
     
     // ✅ INICIALIZAR TAG DE LEITURA SELECIONADA (apenas a primeira)
     if (postData.category === 'Leitura') {
@@ -477,6 +487,18 @@ export default function DetalhesConteudo() {
       payload.file_names = finalFileNames;
       payload.file_types = finalFileTypes;
       payload.file_sizes = finalFileSizes;
+    } else if ((post.category === 'Ferramentas' || post.category === 'Quizzes' || post.category === 'Artigo') && requestRemoveContentImage) {
+      // ✅ LÓGICA PARA REMOVER IMAGEM DE CONTEÚDO PARA FERRAMENTAS, QUIZZES E ARTIGOS
+      payload.file_paths = [];
+      payload.file_names = [];
+      payload.file_types = [];
+      payload.file_sizes = [];
+    } else if ((post.category === 'Ferramentas' || post.category === 'Quizzes' || post.category === 'Artigo') && editExistingFiles.length > 0) {
+      // ✅ LÓGICA PARA ATUALIZAR IMAGEM DE CONTEÚDO PARA FERRAMENTAS, QUIZZES E ARTIGOS
+      payload.file_paths = editExistingFiles.map(f => f.path);
+      payload.file_names = editExistingFiles.map(f => f.name || '');
+      payload.file_types = editExistingFiles.map(f => f.type || '');
+      payload.file_sizes = editExistingFiles.map(f => f.size || 0);
     }
 
     const response = await updatePost(post.id, payload);
@@ -781,7 +803,7 @@ export default function DetalhesConteudo() {
     }
   };
 
-  // Handlers para upload/remover thumbnail
+  // ✅ HANDLERS PARA UPLOAD/REMOVER THUMBNAIL
   const handleThumbnailFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -833,6 +855,67 @@ export default function DetalhesConteudo() {
     setEditThumbnailUrl('');
     setUploadThumbnailError(null); // Limpar erros anteriores
     toast.success('Thumbnail será removida ao salvar as alterações');
+  };
+
+
+
+  // ✅ FUNÇÕES PARA LIDAR COM IMAGEM DE CONTEÚDO
+  const handleContentImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar se é uma imagem
+    if (!file.type.startsWith('image/')) {
+      setUploadContentImageError('Por favor, selecione apenas arquivos de imagem');
+      toast.error('Por favor, selecione apenas arquivos de imagem');
+      return;
+    }
+    
+    // Validar tamanho (máximo 10MB para conteúdo)
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadContentImageError('A imagem deve ter no máximo 10MB');
+      toast.error('A imagem deve ter no máximo 10MB');
+      return;
+    }
+
+    setUploadContentImageError(null);
+    setIsUploadingContentImage(true);
+
+    try {
+      const res = await uploadFileForPost(file, post?.category);
+      if (!res.success || !res.data) {
+        setUploadContentImageError(res.error || 'Erro no upload da imagem');
+        toast.error(res.error || 'Erro no upload da imagem');
+        return;
+      }
+
+      // Limpar arquivos existentes e definir novo arquivo
+      setEditExistingFiles([{
+        path: res.data.path,
+        name: res.data.file_name,
+        type: res.data.file_type,
+        size: res.data.file_size
+      }]);
+      
+      setRequestRemoveContentImage(false);
+      toast.success('Imagem carregada com sucesso!');
+    } catch (err) {
+      console.error('Erro ao fazer upload da imagem:', err);
+      const errorMsg = 'Erro inesperado ao fazer upload da imagem';
+      setUploadContentImageError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setIsUploadingContentImage(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleRemoveContentImage = () => {
+    // Mark for removal and clear existing files
+    setRequestRemoveContentImage(true);
+    setEditExistingFiles([]);
+    setUploadContentImageError(null);
+    toast.success('Imagem de conteúdo será removida ao salvar as alterações');
   };
 
   // Função para remover tag
@@ -1884,39 +1967,37 @@ export default function DetalhesConteudo() {
                         {(editThumbnailUrl.trim() || (!requestRemoveThumbnail && post.thumbnail_url)) && (
                           <div className="mb-4">
                             <div className="text-xs text-gray-600 font-medium mb-2">📷 Thumbnail atual:</div>
-                            <div className="relative inline-block">
-                              <div className="border rounded-lg overflow-hidden bg-white shadow-sm" style={{ maxWidth: '200px' }}>
-                                {isValidUrl(editThumbnailUrl || post.thumbnail_url || '') ? (
-                                  <Image 
-                                    src={editThumbnailUrl || post.thumbnail_url || ''} 
-                                    alt="Thumbnail atual"
-                                    className="w-full h-auto object-cover"
-                                    width={200}
-                                    height={150}
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
-                                      target.style.display = 'none';
-                                      const parent = target.parentElement;
-                                      if (parent) {
-                                        parent.innerHTML = `
-                                          <div class="p-4 text-center text-gray-500">
-                                            <div class="text-xs">❌ Erro ao carregar</div>
-                                          </div>
-                                        `;
-                                      }
-                                    }}
-                                  />
-                                ) : (
-                                  <div className="p-4 text-center text-gray-500">
-                                    <div className="text-xs">⚠️ URL inválida</div>
-                                  </div>
-                                )}
-                              </div>
-                              {/* Botão remover sobreposto */}
+                            <div className="relative max-w-md">
+                              {isValidUrl(editThumbnailUrl || post.thumbnail_url || '') ? (
+                                <Image 
+                                  src={editThumbnailUrl || post.thumbnail_url || ''} 
+                                  alt="Thumbnail atual"
+                                  width={448}
+                                  height={320}
+                                  className="w-full max-h-80 object-contain rounded-lg border-2 border-green-300 shadow-sm bg-gray-50"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                      parent.innerHTML = `
+                                        <div class="p-4 text-center text-gray-500 bg-gray-100 rounded-lg">
+                                          <div class="text-xs">❌ Erro ao carregar</div>
+                                        </div>
+                                      `;
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <div className="p-4 text-center text-gray-500 bg-gray-100 rounded-lg">
+                                  <div className="text-xs">⚠️ URL inválida</div>
+                                </div>
+                              )}
+                              {/* Botão X no canto superior direito */}
                               <button
                                 type="button"
                                 onClick={handleRemoveThumbnail}
-                                className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg transition-colors"
+                                className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md"
                                 title="Remover thumbnail"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1977,54 +2058,204 @@ export default function DetalhesConteudo() {
                             <div className="flex-1 border-t border-gray-300"></div>
                           </div>
 
-                          {/* Opção 2: Upload */}
+                          {/* Opção 2: Upload - Estilo da página de criação */}
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               📤 Opção 2: Fazer upload de imagem
                             </label>
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
+                            <div className={`relative border-2 border-dashed rounded-xl transition-all ${
+                              (editThumbnailUrl.trim() || (!requestRemoveThumbnail && post.thumbnail_url))
+                                ? 'border-green-300 bg-green-50' 
+                                : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50'
+                            }`}>
                               <input
                                 type="file"
-                                accept="image/*"
+                                className="absolute inset-0 opacity-0 cursor-pointer"
                                 onChange={handleThumbnailFileChange}
-                                className="hidden"
-                                id="thumbnail-upload"
+                                accept="image/*"
                                 disabled={isUploadingThumbnail}
+                                id="thumbnail-upload"
                               />
-                              <label 
-                                htmlFor="thumbnail-upload" 
-                                className={`cursor-pointer ${isUploadingThumbnail ? 'opacity-50 cursor-not-allowed' : ''}`}
-                              >
-                                <div className="flex flex-col items-center">
-                                  {isUploadingThumbnail ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
-                                      <span className="text-sm text-gray-600">Carregando...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                      </svg>
-                                      <span className="text-sm text-gray-600">
-                                        <span className="font-medium text-blue-600">Clique para selecionar</span> ou arraste uma imagem
-                                      </span>
-                                      <span className="text-xs text-gray-500 mt-1">PNG, JPG, GIF até 5MB</span>
-                                    </>
-                                  )}
-                                </div>
-                              </label>
+                              <div className="flex flex-col items-center justify-center py-6 px-6">
+                                {isUploadingThumbnail ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
+                                    <p className="text-blue-700 text-center">
+                                      <span className="font-medium">Carregando thumbnail...</span>
+                                    </p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-10 h-10 text-blue-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    <p className="text-gray-700 text-center">
+                                      <span className="font-medium">Clique para adicionar thumbnail</span>
+                                      <br />
+                                      <span className="text-sm text-gray-500">JPG, PNG, GIF até 5MB</span>
+                                    </p>
+                                  </>
+                                )}
+                              </div>
                             </div>
                             {uploadThumbnailError && (
-                              <div className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
-                                ❌ {uploadThumbnailError}
+                              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                  <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                                  </svg>
+                                  <span className="text-sm font-medium text-red-800">{uploadThumbnailError}</span>
+                                </div>
                               </div>
                             )}
                           </div>
                         </div>
                       </div>
                     </div>
-                  )}                  {/* Idade Mínima */}
+                  )}
+
+                  {/* ✅ SEÇÃO PARA EDITAR IMAGEM DE CONTEÚDO (Ferramentas, Quizzes, Artigos) */}
+                  {(post.category === "Ferramentas" || post.category === "Quizzes" || post.category === "Artigo") && (
+                    <div className="mb-6">
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <label className="text-sm font-semibold text-gray-900">
+                            Imagem de Conteúdo {post.category === 'Ferramentas' ? 'da Ferramenta' : post.category === 'Quizzes' ? 'do Quiz' : 'do Artigo'}
+                          </label>
+                        </div>
+                        
+                        {/* Preview atual da imagem de conteúdo */}
+                        {editExistingFiles.length > 0 && !requestRemoveContentImage && (
+                          <div className="mb-4">
+                            <div className="text-xs text-gray-600 font-medium mb-2">🖼️ Imagem atual:</div>
+                            <div className="relative inline-block max-w-md">
+                              {isValidUrl(getFileUrl(editExistingFiles[0].path)) ? (
+                                <Image 
+                                  src={getFileUrl(editExistingFiles[0].path)} 
+                                  alt="Imagem de conteúdo atual"
+                                  width={448}
+                                  height={320}
+                                  className="w-full max-h-80 object-contain rounded-lg border-2 border-green-300 shadow-sm bg-gray-50"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                      parent.innerHTML = `
+                                        <div class="p-4 text-center text-gray-500 bg-gray-100 rounded-lg">
+                                          <div class="font-medium text-sm">Erro ao carregar imagem</div>
+                                          <div class="text-xs mt-1">A imagem pode estar indisponível</div>
+                                        </div>
+                                      `;
+                                    }
+                                  }}
+                                  onLoad={() => {
+                                    console.log('✅ Imagem de conteúdo carregada com sucesso');
+                                  }}
+                                />
+                              ) : (
+                                <div className="p-4 text-center text-gray-500 bg-gray-100 rounded-lg">
+                                  <div className="font-medium text-sm">Imagem inválida</div>
+                                  <div className="text-xs mt-1">URL da imagem não é válida</div>
+                                </div>
+                              )}
+                              {/* Botão X no canto superior direito */}
+                              <button
+                                type="button"
+                                onClick={handleRemoveContentImage}
+                                className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md"
+                                title="Remover imagem"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Campo para upload de nova imagem - Estilo da página de criação */}
+                        <div className={`relative border-2 border-dashed rounded-xl transition-all ${
+                          requestRemoveContentImage || editExistingFiles.length === 0
+                            ? 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50'
+                            : 'border-green-300 bg-green-50'
+                        }`}>
+                          <input
+                            type="file"
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            onChange={handleContentImageFileChange}
+                            accept="image/*"
+                            disabled={isUploadingContentImage}
+                            id="content-image-upload"
+                          />
+                          <div className="flex flex-col items-center justify-center py-6 px-6">
+                            {isUploadingContentImage ? (
+                              <>
+                                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
+                                <p className="text-blue-700 text-center">
+                                  <span className="font-medium">Fazendo upload da imagem...</span>
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-10 h-10 text-blue-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <p className="text-gray-700 text-center">
+                                  <span className="font-medium">
+                                    {editExistingFiles.length > 0 && !requestRemoveContentImage 
+                                      ? 'Clique para substituir imagem' 
+                                      : 'Clique para adicionar imagem'
+                                    }
+                                  </span>
+                                  <br />
+                                  <span className="text-sm text-gray-500">JPG, PNG, GIF, WebP até 10MB</span>
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Estados de erro e aviso */}
+                        {uploadContentImageError && (
+                          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                              </svg>
+                              <span className="text-sm font-medium text-red-800">{uploadContentImageError}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {requestRemoveContentImage && (
+                          <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                              </svg>
+                              <span className="text-sm font-medium text-orange-800">A imagem será removida ao salvar</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRequestRemoveContentImage(false);
+                                toast('Remoção cancelada');
+                              }}
+                              className="mt-2 text-xs text-orange-700 hover:text-orange-900 underline"
+                            >
+                              Cancelar remoção
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Idade Mínima */}
                   <div className="mb-4">
                     <label className="block text-xs text-gray-500 font-bold mb-1">
                       Idade Mínima
