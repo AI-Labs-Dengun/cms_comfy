@@ -586,6 +586,26 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       category = 'Vídeo'
     }
 
+  // Log para debug antes de chamar a função RPC
+    console.log('🔄 Chamando update_post com parâmetros:', {
+      post_id_param: postId,
+      author_id_param: user.id,
+      title_param: postData.title || '',
+      description_param: postData.description || '',
+      category_param: category,
+      content_param: postData.content || null, 
+      content_url_param: contentUrl,
+      thumbnail_url_param: thumbnailUrl, 
+      tags_param: postData.tags || [],
+      emotion_tags_param: postData.emotion_tags || [],
+      file_paths_param: filePaths,
+      file_names_param: fileNames,
+      file_types_param: fileTypes,
+      file_sizes_param: fileSizes,
+      duration_param: duration || null, 
+      min_age_param: postData.min_age || 12 
+    });
+
   // Call the database function (use unified fields)
     const { data, error } = await supabase.rpc('update_post', {
       post_id_param: postId,
@@ -607,14 +627,23 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
     })
 
     if (error) {
-      console.error('Erro ao atualizar post:', error)
+      console.error('❌ Erro RPC ao atualizar post:', error)
+      console.error('❌ Detalhes do erro:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
       return {
         success: false,
         error: 'Erro ao atualizar post: ' + error.message
       }
     }
 
+    console.log('✅ Resposta da RPC update_post:', data);
+
     if (!data.success) {
+      console.error('❌ RPC retornou falha:', data);
       return {
         success: false,
         error: data.error || 'Erro desconhecido ao atualizar post'
