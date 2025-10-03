@@ -43,7 +43,9 @@ const CATEGORY_FOLDERS: Record<string, string> = {
   'Artigo': 'artigo',
   'Livro': 'livro',
   'Áudio': 'audio',
-  'Leitura': 'leitura'
+  'Leitura': 'leitura',
+  'Ferramentas': 'ferramentas',
+  'Quizzes': 'quizzes'
 }
 
 // Function to validate a file

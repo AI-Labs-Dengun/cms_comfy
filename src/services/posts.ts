@@ -17,7 +17,7 @@ export interface FileValidation {
 export interface CreatePostData {
   title: string
   description: string
-  category: 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura'
+  category: 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura' | 'Ferramentas' | 'Quizzes'
   content?: string 
   content_url?: string
   // ✅ UNIFIED FIELDS: support one or multiple files

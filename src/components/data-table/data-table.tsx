@@ -153,6 +153,8 @@ export function DataTable<TData, TValue>({
             >
               <option value="">Todas as categorias</option>
               <option value="Artigo">Artigo</option>
+              <option value="Ferramentas">Ferramentas</option>
+              <option value="Quizzes">Quizzes</option>
               <option value="Leitura">Leitura</option>
               <option value="Vídeo">Vídeo</option>
             </select>

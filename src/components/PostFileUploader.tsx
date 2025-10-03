@@ -172,7 +172,7 @@ export default function PostFileUploader({
       return 'image/*,video/*';
     } else if (category === 'Vídeo' || category === 'Podcast') {
       return 'video/*,audio/*';
-    } else if (category === 'Artigo') {
+    } else if (category === 'Artigo' || category === 'Ferramentas' || category === 'Quizzes') {
       return 'image/*,application/pdf,text/*';
     }
     return '*/*';

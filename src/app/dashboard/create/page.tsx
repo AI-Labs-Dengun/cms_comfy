@@ -180,7 +180,7 @@ export default function CreateContent() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState(""); // New field for textual content
-  const [category, setCategory] = useState<"Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura">("Vídeo");
+  const [category, setCategory] = useState<"Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura" | "Ferramentas" | "Quizzes">("Vídeo");
   // Removido readingCategory pois não é mais necessário
   const [contentUrl, setContentUrl] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -603,8 +603,8 @@ export default function CreateContent() {
         }
       }
 
-  // Upload de thumbnail se fornecida (para Podcast, Artigo, Leitura e Vídeo)
-  if ((category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo") && thumbnailFile) {
+  // Upload de thumbnail se fornecida (para Podcast, Artigo, Leitura, Vídeo, Ferramentas e Quizzes)
+  if ((category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Ferramentas" || category === "Quizzes") && thumbnailFile) {
         console.log(`🖼️ Fazendo upload de thumbnail para categoria ${category}:`, {
           fileName: thumbnailFile.name,
           fileSize: thumbnailFile.size,
@@ -929,7 +929,7 @@ export default function CreateContent() {
                       <select
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-medium cursor-pointer bg-white shadow-sm"
                         value={category}
-                        onChange={(e) => setCategory(e.target.value as "Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura")}
+                        onChange={(e) => setCategory(e.target.value as "Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura" | "Ferramentas" | "Quizzes")}
                       >
                         <option value="Vídeo">📹 Vídeo</option>
                         <option value="Podcast">🎙️ Podcast</option>
@@ -938,6 +938,8 @@ export default function CreateContent() {
                         <option value="Áudio">🎵 Áudio</option>
                         <option value="Shorts">⚡ Shorts</option>
                         <option value="Leitura">📖 Leitura</option>
+                        <option value="Ferramentas">🔧 Ferramentas</option>
+                        <option value="Quizzes">❓ Quizzes</option>
                       </select>
                     </div>
 
@@ -1206,7 +1208,7 @@ export default function CreateContent() {
                     </div>
 
                     {/* Thumbnail upload (for Podcast and Article) */}
-                    {(category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo") && (
+                    {(category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Ferramentas" || category === "Quizzes") && (
                       <div>
                         <label className="block text-sm font-medium mb-3 text-gray-700">
                           <span className="flex items-center">
