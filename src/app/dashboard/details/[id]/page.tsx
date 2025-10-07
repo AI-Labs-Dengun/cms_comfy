@@ -487,14 +487,14 @@ export default function DetalhesConteudo() {
       payload.file_names = finalFileNames;
       payload.file_types = finalFileTypes;
       payload.file_sizes = finalFileSizes;
-    } else if ((post.category === 'Ferramentas' || post.category === 'Quizzes' || post.category === 'Artigo') && requestRemoveContentImage) {
-      // ✅ LÓGICA PARA REMOVER IMAGEM DE CONTEÚDO PARA FERRAMENTAS, QUIZZES E ARTIGOS
+    } else if ((post.category === 'Ferramentas' || post.category === 'Quizzes' || post.category === 'Artigo' || post.category === 'Leitura') && requestRemoveContentImage) {
+      // ✅ LÓGICA PARA REMOVER IMAGEM DE CONTEÚDO PARA FERRAMENTAS, QUIZZES, ARTIGOS E LEITURA
       payload.file_paths = [];
       payload.file_names = [];
       payload.file_types = [];
       payload.file_sizes = [];
-    } else if ((post.category === 'Ferramentas' || post.category === 'Quizzes' || post.category === 'Artigo') && editExistingFiles.length > 0) {
-      // ✅ LÓGICA PARA ATUALIZAR IMAGEM DE CONTEÚDO PARA FERRAMENTAS, QUIZZES E ARTIGOS
+    } else if ((post.category === 'Ferramentas' || post.category === 'Quizzes' || post.category === 'Artigo' || post.category === 'Leitura') && editExistingFiles.length > 0) {
+      // ✅ LÓGICA PARA ATUALIZAR IMAGEM DE CONTEÚDO PARA FERRAMENTAS, QUIZZES, ARTIGOS E LEITURA
       payload.file_paths = editExistingFiles.map(f => f.path);
       payload.file_names = editExistingFiles.map(f => f.name || '');
       payload.file_types = editExistingFiles.map(f => f.type || '');
@@ -2114,8 +2114,8 @@ export default function DetalhesConteudo() {
                     </div>
                   )}
 
-                  {/* ✅ SEÇÃO PARA EDITAR IMAGEM DE CONTEÚDO (Ferramentas, Quizzes, Artigos) */}
-                  {(post.category === "Ferramentas" || post.category === "Quizzes" || post.category === "Artigo") && (
+                  {/* ✅ SEÇÃO PARA EDITAR IMAGEM DE CONTEÚDO (Ferramentas, Quizzes, Artigos, Leitura) */}
+                  {(post.category === "Ferramentas" || post.category === "Quizzes" || post.category === "Artigo" || post.category === "Leitura") && (
                     <div className="mb-6">
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-3">
@@ -2123,7 +2123,7 @@ export default function DetalhesConteudo() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
                           <label className="text-sm font-semibold text-gray-900">
-                            Imagem de Conteúdo {post.category === 'Ferramentas' ? 'da Ferramenta' : post.category === 'Quizzes' ? 'do Quiz' : 'do Artigo'}
+                            Imagem de Conteúdo {post.category === 'Ferramentas' ? 'da Ferramenta' : post.category === 'Quizzes' ? 'do Quiz' : post.category === 'Artigo' ? 'do Artigo' : 'de Leitura (Capa)'}
                           </label>
                         </div>
                         
