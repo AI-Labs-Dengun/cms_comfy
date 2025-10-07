@@ -366,8 +366,8 @@ export default function CreateContent() {
       if (category === "Shorts" && contentUrl.trim()) {
         const contentType = detectContentType(contentUrl);
           if (!contentType || contentType === 'external') {
-          setError("Para Shorts, use URLs do YouTube, Instagram Reels ou TikTok");
-          toast.error("Para Shorts, use URLs do YouTube, Instagram Reels ou TikTok");
+          setError("Para Shorts, use URLs do YouTube");
+          toast.error("Para Shorts, use URLs do YouTube");
           return;
         }
       }
