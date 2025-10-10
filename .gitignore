@@ -41,6 +41,9 @@ yarn-error.log*
 next-env.d.ts
 
 
+# package locks
+package-lock.json
+
 md/
 schema_supabase.sql
 md_views/
