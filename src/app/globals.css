@@ -2,6 +2,7 @@
 
 @plugin 'tailwindcss-animate';
 @import "tailwindcss";
+@import "../styles/responsive-table.css";
 
 @custom-variant dark (&:is(.dark *));
 
