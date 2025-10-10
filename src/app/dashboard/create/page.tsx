@@ -1179,16 +1179,9 @@ export default function CreateContent() {
                       </label>
                       <p className="text-sm text-gray-600 mb-4">
                         <strong>Escolha uma das opções abaixo para adicionar o conteúdo do seu post.</strong>
-                        {category === 'Shorts' && (
-                          <span className="block text-blue-600 font-medium mt-1">
-                            💡 Para Shorts: use URLs do YouTube Shorts, Instagram Reels, TikTok OU faça upload de vídeo.
-                          </span>
-                        )}
-                        {category !== 'Shorts' && (
                           <span className="block text-gray-500 mt-1">
                             💡 Você pode usar uma URL externa ou fazer upload de arquivos.
                           </span>
-                        )}
                       </p>
                       
                       {/* Seletor de Modo */}
