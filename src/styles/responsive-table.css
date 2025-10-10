@@ -1,0 +1,111 @@
+/* Estilos específicos para tabelas responsivas e alinhamento consistente */
+
+.responsive-table {
+  @apply w-full border-collapse;
+  table-layout: auto;
+  min-width: 800px;
+}
+
+.responsive-table th,
+.responsive-table td {
+  @apply border-0;
+  vertical-align: top;
+}
+
+/* Prevent layout shift during hydration */
+.responsive-table th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* Colunas específicas com larguras responsivas */
+.col-select {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+}
+
+.col-title {
+  width: 30%;
+  min-width: 200px;
+  max-width: 350px;
+}
+
+.col-category {
+  width: 12%;
+  min-width: 110px;
+  max-width: 140px;
+}
+
+.col-date {
+  width: 12%;
+  min-width: 110px;
+  max-width: 140px;
+}
+
+.col-status {
+  width: 10%;
+  min-width: 100px;
+  max-width: 120px;
+}
+
+.col-tags {
+  width: 20%;
+  min-width: 160px;
+  max-width: 220px;
+}
+
+.col-reading-categories {
+  width: 18%;
+  min-width: 140px;
+  max-width: 180px;
+}
+
+.col-actions {
+  width: 96px;
+  min-width: 80px;
+  max-width: 96px;
+}
+
+/* Prevent text overflow and maintain alignment */
+.table-cell-content {
+  @apply truncate;
+  max-width: 100%;
+  display: block;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 1024px) {
+  .responsive-table {
+    min-width: 700px;
+  }
+  
+  .col-title {
+    min-width: 180px;
+  }
+  
+  .col-tags,
+  .col-reading-categories {
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 768px) {
+  .responsive-table {
+    min-width: 600px;
+  }
+}
+
+/* Skeleton loading for smooth hydration */
+.table-skeleton {
+  @apply animate-pulse;
+}
+
+.table-skeleton .skeleton-row {
+  @apply bg-gray-200 h-4 rounded mb-2;
+}
+
+.table-skeleton .skeleton-cell {
+  @apply bg-gray-100 h-8 rounded;
+}

@@ -321,17 +321,31 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <Table>
+      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <Table className="responsive-table">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="bg-gray-50 border-b border-gray-200">
                 {headerGroup.headers.map((header) => {
+                  // Classes CSS customizadas para colunas específicas
+                  const getColumnClass = (columnId: string) => {
+                    switch (columnId) {
+                      case 'select': return 'col-select'
+                      case 'title': return 'col-title'
+                      case 'category': return 'col-category'
+                      case 'created_at': return 'col-date'
+                      case 'is_published': return 'col-status'
+                      case 'tags': return 'col-tags'
+                      case 'reading_categories': return 'col-reading-categories'
+                      case 'actions': return 'col-actions'
+                      default: return ''
+                    }
+                  }
+                  
                   return (
                     <TableHead 
                       key={header.id}
-                      style={{ width: header.getSize() }}
-                      className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-50"
+                      className={`px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-50 ${getColumnClass(header.column.id)}`}
                     >
                       {header.isPlaceholder
                         ? null
@@ -367,18 +381,36 @@ export function DataTable<TData, TValue>({
                     row.getIsSelected() ? 'bg-blue-50 border-blue-200' : 'bg-white'
                   }`}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell 
-                      key={cell.id}
-                      style={{ width: cell.column.getSize() }}
-                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    // Classes CSS customizadas para colunas específicas
+                    const getColumnClass = (columnId: string) => {
+                      switch (columnId) {
+                        case 'select': return 'col-select'
+                        case 'title': return 'col-title'
+                        case 'category': return 'col-category'
+                        case 'created_at': return 'col-date'
+                        case 'is_published': return 'col-status'
+                        case 'tags': return 'col-tags'
+                        case 'reading_categories': return 'col-reading-categories'
+                        case 'actions': return 'col-actions'
+                        default: return ''
+                      }
+                    }
+                    
+                    return (
+                      <TableCell 
+                        key={cell.id}
+                        className={`px-4 py-3 text-sm text-gray-900 ${getColumnClass(cell.column.id)}`}
+                      >
+                        <div className="table-cell-content">
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </div>
+                      </TableCell>
+                    )
+                  })}
                 </TableRow>
               ))
             ) : (

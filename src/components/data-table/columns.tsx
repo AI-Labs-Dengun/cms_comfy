@@ -49,7 +49,6 @@ export const createColumns = ({
     ),
     enableSorting: false,
     enableHiding: false,
-    size: 40,
   },
 
   // Coluna do título
@@ -71,7 +70,7 @@ export const createColumns = ({
       const post = row.original
       return (
         <div 
-          className="cursor-pointer hover:text-blue-600 font-medium max-w-xs truncate"
+          className="cursor-pointer hover:text-blue-600 font-medium truncate"
           onClick={() => onViewPost(post.id)}
           title={post.title}
         >
@@ -79,7 +78,6 @@ export const createColumns = ({
         </div>
       )
     },
-    size: 250,
   },
 
   // Coluna da categoria
@@ -98,11 +96,10 @@ export const createColumns = ({
       )
     },
     cell: ({ row }) => (
-      <span className="bg-gray-100 px-2 py-1 rounded text-xs font-medium">
+      <span className="bg-gray-100 px-2 py-1 rounded text-xs font-medium whitespace-nowrap">
         {row.getValue("category")}
       </span>
     ),
-    size: 120,
   },
 
   // Coluna da data
@@ -124,7 +121,7 @@ export const createColumns = ({
       const dateString = row.getValue("created_at") as string
       const date = new Date(dateString)
       return (
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-gray-600 whitespace-nowrap">
           {date.toLocaleDateString('pt-PT', {
             year: 'numeric',
             month: 'short',
@@ -133,7 +130,6 @@ export const createColumns = ({
         </span>
       )
     },
-    size: 120,
   },
 
   // Coluna do status
@@ -155,7 +151,7 @@ export const createColumns = ({
       const isPublished = row.getValue("is_published") as boolean
       return (
         <span 
-          className={`px-2 py-1 rounded text-xs font-medium ${
+          className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
             isPublished 
               ? 'bg-green-100 text-green-800' 
               : 'bg-yellow-100 text-yellow-800'
@@ -165,7 +161,6 @@ export const createColumns = ({
         </span>
       )
     },
-    size: 100,
   },
 
   // Coluna das tags
@@ -177,24 +172,23 @@ export const createColumns = ({
       if (!tags || tags.length === 0) return <span className="text-gray-400">—</span>
       
       return (
-        <div className="flex flex-wrap gap-1 max-w-xs">
+        <div className="flex flex-wrap gap-1">
           {tags.slice(0, 2).map((tag, index) => (
             <span 
               key={index}
-              className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs"
+              className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs whitespace-nowrap"
             >
               {tag}
             </span>
           ))}
           {tags.length > 2 && (
-            <span className="text-xs text-gray-500 self-center">
-              +{tags.length - 2} mais
+            <span className="text-xs text-gray-500 self-center whitespace-nowrap">
+              +{tags.length - 2}
             </span>
           )}
         </div>
       )
     },
-    size: 180,
   },
 
   // Coluna das categorias de leitura (apenas para posts de leitura)
@@ -215,11 +209,11 @@ export const createColumns = ({
       }
 
       return (
-        <div className="flex flex-wrap gap-1 max-w-xs">
+        <div className="flex flex-wrap gap-1">
           {readingTags.slice(0, 2).map((tag) => (
             <span 
               key={tag.id}
-              className="px-2 py-1 rounded-full text-xs font-medium"
+              className="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap"
               style={{ 
                 backgroundColor: tag.color ? `${tag.color}20` : '#EEF2FF',
                 color: tag.color || '#3B82F6'
@@ -229,14 +223,13 @@ export const createColumns = ({
             </span>
           ))}
           {readingTags.length > 2 && (
-            <span className="text-xs text-gray-500 self-center">
-              +{readingTags.length - 2} mais
+            <span className="text-xs text-gray-500 self-center whitespace-nowrap">
+              +{readingTags.length - 2}
             </span>
           )}
         </div>
       )
     },
-    size: 200,
   },
 
   // Coluna de ações
@@ -249,9 +242,6 @@ export const createColumns = ({
     ),
     enableHiding: false,
     enableSorting: false,
-    size: 80,
-    maxSize: 80,
-    minSize: 80,
     cell: ({ row }) => {
       const post = row.original
 
