@@ -33,10 +33,10 @@ export default function EditReferencePage() {
       
       if (response.success && response.data && !Array.isArray(response.data)) {
         const reference = response.data;
-        setTagId(reference.tag_id);
-        setTitle(reference.title);
-        setDescription(reference.description);
-        setUrl(reference.url);
+  setTagId(reference.tag_id ?? "");
+  setTitle(reference.title);
+  setDescription(reference.description ?? "");
+  setUrl(reference.url);
       } else {
         setError(response.error || 'Referência não encontrada');
       }
@@ -61,19 +61,9 @@ export default function EditReferencePage() {
   setError(null);
 
     try {
-      // Validações
-      if (!tagId) {
-        setError("Tag é obrigatória");
-        return;
-      }
-
+      // Validações mínimas
       if (!title.trim()) {
         setError("Título é obrigatório");
-        return;
-      }
-
-      if (!description.trim()) {
-        setError("Descrição é obrigatória");
         return;
       }
 
@@ -91,9 +81,9 @@ export default function EditReferencePage() {
       }
 
       const response = await updateReference(referenceId, {
-        tag_id: tagId,
+        tag_id: tagId || null,
         title: title.trim(),
-        description: description.trim(),
+        description: description.trim() || null,
         url: url.trim()
       });
 
@@ -190,7 +180,6 @@ export default function EditReferencePage() {
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-900">
                   Tag
-                  <span className="text-red-500 ml-1">*</span>
                 </label>
                 <p className="text-xs text-gray-500 mb-2">
                   Selecione uma tag existente ou crie uma nova para categorizar a referência
@@ -231,7 +220,6 @@ export default function EditReferencePage() {
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-900">
                   Descrição
-                  <span className="text-red-500 ml-1">*</span>
                 </label>
                 <p className="text-xs text-gray-500 mb-2">
                   Breve descrição do conteúdo da referência
@@ -242,7 +230,6 @@ export default function EditReferencePage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
-                  required
                   disabled={saving}
                 />
               </div>
@@ -298,9 +285,7 @@ export default function EditReferencePage() {
                   className="bg-black text-white px-6 py-2 rounded-md font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   disabled={
                     saving || 
-                    !tagId || 
                     !title.trim() || 
-                    !description.trim() || 
                     !url.trim()
                   }
                 >

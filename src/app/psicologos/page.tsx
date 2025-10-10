@@ -136,21 +136,13 @@ export default function PsicologosPage() {
   // Log para debug quando o chat selecionado muda
   useEffect(() => {
     if (selectedChat?.id) {
-      console.log('🔄 Chat selecionado mudou:', selectedChat.id);
       
       // ✅ TESTE DE ENCRIPTAÇÃO para debug
       try {
         const testMessage = "Teste de encriptação";
         const encrypted = EncryptionService.encryptMessage(testMessage, selectedChat.id);
         const decrypted = EncryptionService.decryptMessage(encrypted, selectedChat.id);
-        
-        console.log('🧪 TESTE DE ENCRIPTAÇÃO:', {
-          original: testMessage,
-          encrypted: encrypted,
-          decrypted: decrypted,
-          success: testMessage === decrypted,
-          isEncrypted: EncryptionService.isDefinitelyEncrypted(encrypted)
-        });
+        console.log('🔐 Teste de encriptação:', { original: testMessage, decrypted });
       } catch (error) {
         console.error('❌ ERRO NO TESTE DE ENCRIPTAÇÃO:', error);
       }
@@ -159,14 +151,6 @@ export default function PsicologosPage() {
 
   // Função para processar novas mensagens no chat selecionado - OTIMIZADA
   const handleNewMessageInSelectedChat = useCallback((message: Message) => {
-    console.log('💬 Nova mensagem no chat selecionado:', message);
-    console.log('🔍 handleNewMessageInSelectedChat chamada - detalhes:', {
-      messageId: message.id,
-      chatId: message.chat_id,
-      content: message.content,
-      senderType: message.sender_type,
-      timestamp: message.created_at
-    });
     
     // ✅ OTIMIZAÇÃO: A mensagem já foi processada no handleNewMessage
     // Apenas verificar se ainda precisa de desencriptação (caso raro)
@@ -177,7 +161,6 @@ export default function PsicologosPage() {
         const isStillEncrypted = EncryptionService.isDefinitelyEncrypted(message.content);
         
         if (isStillEncrypted) {
-          console.log('⚠️ Mensagem ainda parece encriptada, forçando desencriptação adicional:', message.content);
           
           // Forçar desencriptação adicional
           const decryptedContent = EncryptionService.processMessageForDisplay(message.content, selectedChat.id);
@@ -186,19 +169,13 @@ export default function PsicologosPage() {
             content: decryptedContent
           };
           
-          console.log('✅ Desencriptação adicional realizada:', {
-            originalContent: message.content,
-            processedContent: processedMessage.content
-          });
         } else {
-          console.log('✅ Mensagem já está desencriptada corretamente (otimização funcionando)');
         }
       } catch (error) {
         console.error('❌ Erro ao verificar/processar mensagem:', error);
         processedMessage = message; // Manter mensagem original em caso de erro
       }
     } else {
-      console.log('⚠️ Mensagem não processada - chat não selecionado ou diferente');
     }
     
     setSelectedChatMessages(prevMessages => {
@@ -210,7 +187,6 @@ export default function PsicologosPage() {
       );
       
       if (!messageExists) {
-        console.log('✅ Adicionando nova mensagem ao chat selecionado:', processedMessage.content);
         
         // Criar uma nova mensagem com chave única
         const newMessage = {
@@ -227,17 +203,14 @@ export default function PsicologosPage() {
         // 1. A mensagem não é do psicólogo atual
         // 2. E a página não está visível (está em background/minimizada)
         if (processedMessage.sender_type === 'app_user' && (!pageIsVisible || document.hidden)) {
-          console.log('🔔 Mostrando indicador de nova mensagem no chat (página não visível)');
           setShowNewMessageIndicator(true);
           // Esconder o indicador após 3 segundos
           setTimeout(() => setShowNewMessageIndicator(false), 3000);
         } else if (processedMessage.sender_type === 'app_user') {
-          console.log('⚠️ Não mostrando indicador - chat está visível e ativo');
         }
         
         return updatedMessages;
       }
-      console.log('⚠️ Mensagem já existe no chat selecionado, ignorando duplicata:', processedMessage.id);
       return prevMessages;
           });
   }, [pageIsVisible, selectedChat?.id]);
@@ -249,19 +222,8 @@ export default function PsicologosPage() {
     }
     
     try {
-      console.log('🔓 Desencriptando conteúdo:', {
-        chatId: chatId,
-        originalContent: content
-      });
       
       const decryptedContent = EncryptionService.processMessageForDisplay(content, chatId);
-      
-      console.log('✅ Conteúdo desencriptado:', {
-        chatId: chatId,
-        originalContent: content,
-        decryptedContent: decryptedContent,
-        wasEncrypted: content !== decryptedContent
-      });
       
       return decryptedContent;
     } catch (error) {
@@ -280,7 +242,6 @@ export default function PsicologosPage() {
   // Para mensagens novas, use a otimização no handleNewMessage
   const updateChatInList = useCallback(async (chatId: string) => {
     try {
-      console.log('🔄 Atualizando chat na lista:', chatId);
       
       // Buscar a última mensagem diretamente da tabela de mensagens
       const { data: lastMessage, error: messageError } = await supabase
@@ -313,7 +274,6 @@ export default function PsicologosPage() {
       }
 
       const unreadCount = unreadMessages ? unreadMessages.length : 0;
-      console.log('📊 Mensagens não lidas encontradas:', unreadCount);
 
       // Buscar o chat completo
       const fullChatResult = await getChats();
@@ -334,14 +294,6 @@ export default function PsicologosPage() {
             is_active: fullChat.is_active !== undefined ? fullChat.is_active : true
           };
           
-          console.log('📝 Chat sanitizado com última mensagem:', {
-            id: sanitizedChat.id,
-            last_message_content: sanitizedChat.last_message_content,
-            last_message_at: sanitizedChat.last_message_at,
-            sender: sanitizedChat.last_message_sender_name,
-            unread_count: sanitizedChat.unread_count_psicologo
-          });
-          
           setChats(prevChats => {
             const existingIndex = prevChats.findIndex(chat => chat.id === chatId);
             let updatedChats;
@@ -351,7 +303,6 @@ export default function PsicologosPage() {
               updatedChats[existingIndex] = sanitizedChat;
             } else {
               // Adicionar novo chat
-              console.log('➕ Novo chat adicionado à lista:', chatId);
               updatedChats = [...prevChats, sanitizedChat];
             }
             
@@ -368,7 +319,6 @@ export default function PsicologosPage() {
             return updatedChats;
           });
         } else {
-          console.log('❌ Chat não encontrado:', chatId);
         }
       } else {
         console.error('❌ Erro ao buscar chats:', fullChatResult.error);
@@ -378,38 +328,11 @@ export default function PsicologosPage() {
     }
   }, [decryptMessageContent]);
 
-  // Função para lidar com nova mensagem - OTIMIZADA
-  // 
-  // 🚀 OTIMIZAÇÕES IMPLEMENTADAS:
-  // 
-  // 1. ✅ PROCESSAMENTO ÚNICO: A mensagem é desencriptada apenas uma vez
-  //    - Antes: Desencriptação dupla (handleNewMessage + handleNewMessageInSelectedChat)
-  //    - Agora: Desencriptação única no início do handleNewMessage
-  // 
-  // 2. ✅ ATUALIZAÇÃO IMEDIATA: Lista de chats mostra conteúdo desencriptado instantaneamente
-  //    - Antes: Mensagem encriptada aparecia na lista até updateChatInList executar
-  //    - Agora: Conteúdo desencriptado aparece imediatamente
-  // 
-  // 3. ✅ ELIMINAÇÃO DE REQUISIÇÕES: Não busca última mensagem da base de dados para mensagens novas
-  //    - Antes: Sempre chamava updateChatInList (busca + desencriptação)
-  //    - Agora: Apenas atualiza contadores de mensagens não lidas quando necessário
-  // 
-  // 4. ✅ NOTIFICAÇÕES OTIMIZADAS: Usa conteúdo já processado
-  //    - Antes: Notificações mostravam conteúdo encriptado
-  //    - Agora: Notificações mostram conteúdo desencriptado
-  // 
-  // 5. ✅ MELHOR PERFORMANCE: Reduz tempo de processamento e requisições à base de dados
-  //    - Reduz latência na interface
-  //    - Diminui carga no servidor
-  //    - Melhora experiência do usuário
   const handleNewMessage = useCallback(async (message: Message) => {
     const startTime = performance.now();
-    console.log('💬 Nova mensagem recebida:', message);
-    console.log('⏱️ Timestamp de processamento:', new Date().toISOString());
     
     // Atualizar o chat correspondente à mensagem
     if (message.chat_id) {
-      console.log('🔄 Atualizando chat', message.chat_id, 'com nova mensagem:', message.content);
       
       // Verificar se o chat está selecionado (aberto)
       const isChatSelected = selectedChat?.id === message.chat_id;
@@ -419,11 +342,6 @@ export default function PsicologosPage() {
       let processedContent = message.content;
       
       // ✅ SEMPRE tentar desencriptar a mensagem (abordagem mais robusta)
-      console.log('🔍 PROCESSANDO MENSAGEM:', {
-        messageContent: message.content,
-        contentLength: message.content?.length || 0,
-        chatId: message.chat_id
-      });
       
       if (message.content && message.content.length > 0) {
         processedContent = decryptMessageContent(message.content, message.chat_id);
@@ -433,14 +351,10 @@ export default function PsicologosPage() {
         };
         
         const wasEncrypted = message.content !== processedContent;
-        console.log('✅ Mensagem processada:', {
-          originalContent: message.content,
-          processedContent: processedContent,
-          wasEncrypted: wasEncrypted,
-          contentChanged: wasEncrypted
-        });
+        if (wasEncrypted) {
+          console.log('🔓 Mensagem desencriptada para:', message.chat_id);
+        }
       } else {
-        console.log('⚠️ Mensagem vazia ou sem conteúdo');
         processedContent = message.content;
         processedMessage = message;
       }
@@ -451,13 +365,6 @@ export default function PsicologosPage() {
         if (chatIndex >= 0) {
           const updatedChats = [...prevChats];
           const chat = updatedChats[chatIndex];
-          
-          console.log('📝 Chat atual antes da atualização:', {
-            id: chat.id,
-            last_message_content: chat.last_message_content,
-            last_message_at: chat.last_message_at,
-            isSelected: isChatSelected
-          });
           
           // Se o chat está selecionado (aberto), não incrementar o contador de não lidas
           const newUnreadCount = isChatSelected && message.sender_type === 'app_user' 
@@ -476,20 +383,6 @@ export default function PsicologosPage() {
             unread_count_psicologo: newUnreadCount
           };
           
-          console.log('✅ Chat atualizado com mensagem desencriptada:', {
-            id: updatedChats[chatIndex].id,
-            last_message_content: updatedChats[chatIndex].last_message_content,
-            last_message_at: updatedChats[chatIndex].last_message_at,
-            sender: updatedChats[chatIndex].last_message_sender_name,
-            sender_type: updatedChats[chatIndex].last_message_sender_type,
-            unread_count: updatedChats[chatIndex].unread_count_psicologo,
-            isSelected: isChatSelected,
-            message_sender_type: message.sender_type,
-            processed_content: processedContent,
-            original_content: message.content,
-            content_changed: message.content !== processedContent
-          });
-          
           // GARANTIR reordenação imediata por data da última mensagem
           return updatedChats.sort((a, b) => {
             const dateA = new Date(a.last_message_at || a.created_at).getTime();
@@ -504,7 +397,6 @@ export default function PsicologosPage() {
       if (isChatSelected) {
         // Passar a mensagem já processada para evitar dupla desencriptação
         handleNewMessageInSelectedChat(processedMessage);
-        console.log('📝 Chat selecionado: processando mensagem já desencriptada no chat');
       }
       
       // ✅ ELIMINAR chamada desnecessária ao updateChatInList para mensagens novas
@@ -562,13 +454,6 @@ export default function PsicologosPage() {
                   ? messageContent.substring(0, 50) + '...' 
                   : messageContent;
                 
-                console.log('🔔 Exibindo notificação para chat fechado:', {
-                  userName,
-                  preview,
-                  chatId: message.chat_id,
-                  pageVisible: pageIsVisible
-                });
-                
                 // Try using centralized notification service
                 try {
                   const result = await notificationService.notify({
@@ -598,7 +483,6 @@ export default function PsicologosPage() {
                 }
               } else if ('Notification' in window && Notification.permission === 'default') {
                 // Se a permissão ainda não foi solicitada, solicitar via service
-                console.log('🔔 Solicitando permissão para notificações...');
                 notificationService.requestPermission().then(permission => {
                   if (permission === 'granted') {
                     // Tentar novamente atrav\u00e9s do service
@@ -624,12 +508,11 @@ export default function PsicologosPage() {
     
     // Log do tempo total de processamento
     const endTime = performance.now();
-    console.log(`⏱️ Tempo total de processamento da mensagem: ${(endTime - startTime).toFixed(2)}ms`);
+    console.log(`⏱️ Processamento de mensagem: ${endTime - startTime}ms`);
   }, [selectedChat, handleNewMessageInSelectedChat, pageIsVisible, decryptMessageContent]);
 
   // Função para lidar com atualização de chat
   const handleChatUpdate = useCallback(async (updatedChat: Chat) => {
-    console.log('🔄 Chat atualizado:', updatedChat);
     
     // Buscar o contador real de mensagens não lidas da base de dados
     let realUnreadCount = 0;
@@ -646,7 +529,6 @@ export default function PsicologosPage() {
         console.error('❌ Erro ao buscar mensagens não lidas:', unreadError);
       } else {
         realUnreadCount = unreadMessages ? unreadMessages.length : 0;
-        console.log('📊 Contador real de mensagens não lidas:', realUnreadCount);
       }
     } catch (error) {
       console.error('❌ Erro ao buscar contador de mensagens não lidas:', error);
@@ -664,8 +546,6 @@ export default function PsicologosPage() {
       status: updatedChat.status || 'novo_chat',
       is_active: updatedChat.is_active !== undefined ? updatedChat.is_active : true
     };
-    
-    console.log('📝 Chat sanitizado:', sanitizedChat);
     
     // Marcar chat como recentemente atualizado
     setRecentlyUpdatedChats(prev => new Set([...prev, sanitizedChat.id]));
@@ -697,7 +577,6 @@ export default function PsicologosPage() {
 
   // Função para lidar com novo chat criado
   const handleChatCreated = useCallback(async (newChat: Chat) => {
-    console.log('🆕 Novo chat criado:', newChat);
     
     // Buscar o contador real de mensagens não lidas da base de dados
     let realUnreadCount = 0;
@@ -714,7 +593,6 @@ export default function PsicologosPage() {
         console.error('❌ Erro ao buscar mensagens não lidas:', unreadError);
       } else {
         realUnreadCount = unreadMessages ? unreadMessages.length : 0;
-        console.log('📊 Contador real de mensagens não lidas para novo chat:', realUnreadCount);
       }
     } catch (error) {
       console.error('❌ Erro ao buscar contador de mensagens não lidas:', error);
@@ -744,7 +622,6 @@ export default function PsicologosPage() {
 
   // Função para lidar com chat deletado
   const handleChatDeleted = useCallback((chatId: string) => {
-    console.log('🗑️ Chat deletado:', chatId);
     setChats(prevChats => prevChats.filter(chat => chat.id !== chatId));
     
     // Se o chat selecionado foi deletado, limpar seleção
@@ -765,10 +642,8 @@ export default function PsicologosPage() {
   // Hook de visibilidade da página
   usePageVisibility({
     onVisible: () => {
-      console.log('👁️ PsicologosPage - Página visível');
     },
     onHidden: () => {
-      console.log('👁️ PsicologosPage - Página oculta');
     },
     minHiddenTime: 30000, // 30 segundos
     disableAutoRefresh: false // Habilitar verificações para esta página específica
@@ -776,9 +651,8 @@ export default function PsicologosPage() {
 
   // Carregar chats disponíveis - OTIMIZADO para não recarregar desnecessariamente
   useEffect(() => {
-    // NÃO carregar se não tem usuário autenticado
+    // NÃO carregar se não tem utilizador autenticado
     if (!user || !profile || !isAuthenticated) {
-      console.log('⏭️ PsicologosPage - Usuário não autenticado, aguardando...');
       return;
     }
 
@@ -791,13 +665,11 @@ export default function PsicologosPage() {
         
         // Se cache ainda é válido (5 minutos)
         if (now - timestamp < CACHE_DURATION) {
-          console.log('📦 PsicologosPage - Carregando chats do cache');
           setChats(data || []);
           setHasLoadedOnce(true);
           setLoading(false);
           return;
         } else {
-          console.log('⏰ PsicologosPage - Cache expirado, removendo...');
           sessionStorage.removeItem(CHATS_CACHE_KEY);
         }
       } catch (error) {
@@ -808,14 +680,12 @@ export default function PsicologosPage() {
 
     // Se já carregou uma vez e temos dados, NÃO recarregar
     if (hasLoadedOnce && chats.length > 0) {
-      console.log('✅ PsicologosPage - Chats já carregados, pulando recarga desnecessária');
       setLoading(false);
       return;
     }
 
     const loadChats = async () => {
       try {
-        console.log('🔄 PsicologosPage - Carregando chats pela primeira vez...');
         setLoading(true);
         setError(null);
 
@@ -823,19 +693,6 @@ export default function PsicologosPage() {
         
         if (result.success) {
           
-          // Verificar se os chats têm last_message_content
-          if (result.data) {
-            result.data.forEach((chat, index) => {
-              console.log(`Chat ${index + 1}:`, {
-                id: chat.id,
-                name: chat.masked_user_name,
-                last_message_content: chat.last_message_content,
-                last_message_at: chat.last_message_at,
-                last_message_sender_type: chat.last_message_sender_type,
-                last_message_sender_name: chat.last_message_sender_name
-              });
-            });
-          }
           
           // Garantir que sempre temos um array, mesmo que vazio
           const chatsData = result.data || [];
@@ -848,12 +705,10 @@ export default function PsicologosPage() {
               data: chatsData,
               timestamp: Date.now()
             }));
-            console.log('💾 PsicologosPage - Chats salvos no cache');
           } catch (error) {
             console.error('❌ Erro ao salvar cache:', error);
           }
           
-          console.log('✅ PsicologosPage - Chats carregados com sucesso');
         } else {
           console.error('❌ Erro ao carregar chats:', result.error);
           // Se o erro for sobre tabela não existir, mostrar mensagem específica
@@ -889,14 +744,10 @@ export default function PsicologosPage() {
   useEffect(() => {
     if ('Notification' in window) {
       if (Notification.permission === 'default') {
-        console.log('🔔 Solicitando permissão para notificações...');
-        Notification.requestPermission().then(permission => {
-          console.log('🔔 Permissão de notificação:', permission);
+        Notification.requestPermission().then(() => {
         });
       } else if (Notification.permission === 'granted') {
-        console.log('🔔 Notificações já permitidas');
       } else {
-        console.log('🔔 Notificações bloqueadas pelo usuário');
       }
     }
   }, []);
@@ -904,7 +755,6 @@ export default function PsicologosPage() {
   // Marcar mensagens como lidas quando um chat é selecionado
   useEffect(() => {
     if (selectedChat && selectedChat.unread_count_psicologo && selectedChat.unread_count_psicologo > 0) {
-      console.log('📖 Chat selecionado tem mensagens não lidas, marcando como lidas...');
       // O ChatInterface irá marcar as mensagens como lidas automaticamente
     }
   }, [selectedChat]);
@@ -913,7 +763,6 @@ export default function PsicologosPage() {
   useEffect(() => {
     const updateUnreadCounts = async () => {
       if (chats.length > 0) {
-        console.log('🔄 Atualizando contadores de mensagens não lidas (background)...');
         for (const chat of chats) {
           // Não atualizar o chat selecionado aqui, pois ele será atualizado pelo ChatInterface
           if (chat.id !== selectedChat?.id) {
@@ -963,7 +812,7 @@ export default function PsicologosPage() {
     // Verificar se é hoje
     if (date.toDateString() === today.toDateString()) {
       // Mostrar apenas o horário (HH:MM)
-      return date.toLocaleTimeString('pt-BR', {
+      return date.toLocaleTimeString('pt-PT', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false
@@ -976,7 +825,7 @@ export default function PsicologosPage() {
     }
 
     // Para outras datas, mostrar DD/MM/YYYY
-    return date.toLocaleDateString('pt-BR', {
+    return date.toLocaleDateString('pt-PT', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
@@ -989,7 +838,7 @@ export default function PsicologosPage() {
       return 'Você';
     }
     
-    // Para usuários, usar o nome mascarado
+  // Para utilizadores, usar o nome mascarado
     return chat.masked_user_name || 'Utilizador';
   };
 
@@ -1009,7 +858,6 @@ export default function PsicologosPage() {
     
     // Marcar mensagens como lidas imediatamente quando o chat é selecionado
     if (chat.unread_count_psicologo && chat.unread_count_psicologo > 0) {
-      console.log('📖 Marcando mensagens como lidas ao selecionar chat:', chat.id);
       try {
         // Atualizar o chat na lista imediatamente para refletir que não há mais mensagens não lidas
         setChats(prevChats => 
@@ -1039,7 +887,6 @@ export default function PsicologosPage() {
     
     try {
       setIsLoadingMoreMessages(true);
-      console.log(`📥 Carregando mensagens do chat ${chatId} (offset: ${offset}, limit: ${messagesLimit})`);
       
       // Capturar informações precisas do scroll ANTES de carregar novas mensagens
       let scrollInfo: {
@@ -1077,11 +924,6 @@ export default function PsicologosPage() {
             }
           }
           
-          console.log('📊 Capturado estado do scroll antes de carregar:', {
-            scrollTop: scrollInfo.scrollTop,
-            scrollHeight: scrollInfo.scrollHeight,
-            firstVisibleElement: scrollInfo.firstVisibleElement ? scrollInfo.firstVisibleElement.getAttribute('data-message-id') : 'none'
-          });
         }
       }
       
@@ -1096,13 +938,11 @@ export default function PsicologosPage() {
         if (isInitialLoad) {
           // Carregamento inicial - substituir todas as mensagens
           setSelectedChatMessages(newMessages);
-          console.log('✅ Mensagens iniciais carregadas:', newMessages.length);
           
           // Scroll automático para última mensagem após carregamento inicial
           setTimeout(() => {
             const messagesContainer = messagesContainerRef.current || document.querySelector('.chat-messages-container') as HTMLElement;
             if (messagesContainer) {
-              console.log('📜 PsicologosPage - Scroll automático para última mensagem após carregamento');
               messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
           }, 150);
@@ -1121,7 +961,6 @@ export default function PsicologosPage() {
             );
             return uniqueMessages;
           });
-          console.log('✅ Mais mensagens carregadas:', newMessages.length);
           
           // Restaurar posição do scroll de forma precisa
           if (scrollInfo) {
@@ -1139,7 +978,6 @@ export default function PsicologosPage() {
                     const newScrollTop = container.scrollTop + (rect.top - containerRect.top) - scrollInfo!.firstVisibleElementTop;
                     
                     container.scrollTop = newScrollTop;
-                    console.log('✅ Posição restaurada usando elemento de referência');
                     return;
                   }
                 }
@@ -1151,13 +989,7 @@ export default function PsicologosPage() {
                 if (heightDifference > 0) {
                   const newScrollTop = scrollInfo!.scrollTop + heightDifference;
                   container.scrollTop = newScrollTop;
-                  console.log('✅ Posição restaurada usando diferença de altura:', {
-                    oldPosition: scrollInfo!.scrollTop,
-                    heightDifference,
-                    newPosition: newScrollTop
-                  });
                 } else {
-                  console.log('⚠️ Nenhum ajuste de scroll necessário');
                 }
               } catch (error) {
                 console.error('❌ Erro ao restaurar posição do scroll:', error);
@@ -1186,28 +1018,13 @@ export default function PsicologosPage() {
   const handleRefreshChats = async () => {
     try {
       setIsRefreshingChats(true);
-      console.log('🔄 Atualizando lista de chats...');
       
       const result = await getChats();
       
       if (result.success) {
-        // Verificar se os chats têm last_message_content
-        if (result.data) {
-          result.data.forEach((chat, index) => {
-            console.log(`Chat ${index + 1} (refresh):`, {
-              id: chat.id,
-              name: chat.masked_user_name,
-              last_message_content: chat.last_message_content,
-              last_message_at: chat.last_message_at,
-              last_message_sender_type: chat.last_message_sender_type,
-              last_message_sender_name: chat.last_message_sender_name
-            });
-          });
-        }
         
         // ✅ Atualizar a lista de chats (já desencriptados pela função getChats)
         setChats(result.data || []);
-        console.log('✅ Lista de chats atualizada com sucesso');
         
 
         
@@ -1231,7 +1048,6 @@ export default function PsicologosPage() {
 
   // Função para sair do chat (limpar seleção)
   const handleCloseChat = () => {
-    console.log('🔍 PsicologosPage - Fechando chat instantaneamente');
     
     // Fechar o chat imediatamente
     setSelectedChat(null);
@@ -1241,7 +1057,6 @@ export default function PsicologosPage() {
     
     // Se havia um chat selecionado, atualizar em background (sem bloquear a UI)
     if (selectedChat) {
-      console.log('📖 Atualizando chat em background:', selectedChat.id);
       updateChatInList(selectedChat.id).catch(error => {
         console.error('❌ Erro ao atualizar chat ao fechar:', error);
       });
@@ -1334,7 +1149,7 @@ export default function PsicologosPage() {
   if (loading) {
     return (
       <div className="flex-1 flex justify-center items-center bg-gray-50">
-        <LoadingSpinner size="lg" text="Carregando conversas..." />
+        <LoadingSpinner size="lg" text="A carregar conversas..." />
       </div>
     );
   }
@@ -1448,8 +1263,8 @@ export default function PsicologosPage() {
                     }`}
                   >
                     {status === 'novo_chat' ? 'Novo chat' :
-                     status === 'a_decorrer' ? 'A decorrer' :
-                     status === 'follow_up' ? 'Follow up' :
+                     status === 'a_decorrer' ? 'Em curso' :
+                     status === 'follow_up' ? 'Seguimento' :
                      'Encerrado'}
                   </button>
                 ))}
@@ -1459,7 +1274,7 @@ export default function PsicologosPage() {
             {/* Filtros de Associação */}
             <div className="space-y-3">
               <div className="flex items-center space-x-2">
-                <span className="text-sm font-semibold text-gray-700">Associação</span>
+                <span className="text-sm font-semibold text-gray-700">Chats</span>
                 <div className="flex-1 h-px bg-gray-200"></div>
               </div>
               
@@ -1467,7 +1282,7 @@ export default function PsicologosPage() {
                 {[
                   { key: 'all', label: 'Todos', color: 'gray' },
                   { key: 'available', label: 'Disponíveis', color: 'orange' },
-                  { key: 'assigned_to_me', label: 'Meus chats', color: 'blue' }
+                  { key: 'assigned_to_me', label: 'Os meus chats', color: 'blue' }
                 ].map((filter) => (
                   <button
                     key={filter.key}
@@ -1537,7 +1352,7 @@ export default function PsicologosPage() {
                   onClick={() => handleSelectChat(chat)}
                 >
                   <div className="flex items-start space-x-4">
-                    {/* Avatar do usuário */}
+                    {/* Avatar do utilizador */}
                     <div className="flex-shrink-0 relative">
                       <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm ${
                         (chat.unread_count_psicologo || 0) > 0
@@ -1592,7 +1407,7 @@ export default function PsicologosPage() {
                       ) : (
                         <div className="mb-4">
                           <p className="text-sm text-gray-400 italic">
-                            Nenhuma mensagem ainda
+                            Ainda sem mensagens
                           </p>
                         </div>
                       )}
@@ -1679,20 +1494,20 @@ export default function PsicologosPage() {
                 Selecione uma conversa
               </h2>
               <p className="text-gray-600 text-lg leading-relaxed mb-6">
-                Escolha uma conversa da lista para começar a responder e ajudar seus pacientes
+                Escolha uma conversa da lista para começar a responder e ajudar os seus utentes
               </p>
               <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>Novos chats</span>
+                  <span>Conversas novas</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span>Em andamento</span>
+                  <span>Em curso</span>
                 </div>
-                <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                  <span>Follow up</span>
+                  <span>Seguimento</span>
                 </div>
               </div>
             </div>

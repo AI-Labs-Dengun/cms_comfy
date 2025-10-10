@@ -65,13 +65,15 @@ export default function ReferencesPage() {
   // Filtrar referências
   const filteredReferences = useMemo(() => {
     return references.filter((reference) => {
-      const matchesSearch = search === "" || 
-        reference.title.toLowerCase().includes(search.toLowerCase()) ||
-        (reference.tag?.name.toLowerCase().includes(search.toLowerCase()) || false) ||
-        reference.description.toLowerCase().includes(search.toLowerCase());
+      const searchLower = search.toLowerCase();
+      const titleMatches = reference.title?.toLowerCase().includes(searchLower) || false;
+      const tagMatches = reference.tag?.name?.toLowerCase().includes(searchLower) || false;
+      const descriptionMatches = (reference.description ?? "").toLowerCase().includes(searchLower);
+
+      const matchesSearch = search === "" || titleMatches || tagMatches || descriptionMatches;
 
       const matchesTag = filterTagIds.length === 0 || 
-        filterTagIds.includes(reference.tag_id);
+        (reference.tag_id ? filterTagIds.includes(reference.tag_id) : false);
 
       return matchesSearch && matchesTag;
     });

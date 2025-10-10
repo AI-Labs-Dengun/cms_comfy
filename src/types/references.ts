@@ -9,9 +9,9 @@ export interface ReferenceTag {
 
 export interface Reference {
   id: string;
-  tag_id: string;
+  tag_id?: string | null;
   title: string;
-  description: string;
+  description?: string | null;
   url: string;
   created_by: string;
   created_at: string;
@@ -21,16 +21,16 @@ export interface Reference {
 }
 
 export interface CreateReferenceData {
-  tag_id: string;
+  tag_id?: string | null;
   title: string;
-  description: string;
+  description?: string | null;
   url: string;
 }
 
 export interface UpdateReferenceData {
-  tag_id?: string;
+  tag_id?: string | null;
   title?: string;
-  description?: string;
+  description?: string | null;
   url?: string;
 }
 

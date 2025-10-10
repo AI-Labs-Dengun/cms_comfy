@@ -16,6 +16,100 @@ import { toast } from 'react-hot-toast';
 
 import { EMOTIONS } from '@/lib/emotions';
 
+// Mapping from category to session/badge with consistent colors
+const CATEGORY_SESSION_MAP: Record<string, { label: string; color: string; bgColor: string }> = {
+  'Vídeo': { label: 'Biblioteca', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+  'Podcast': { label: 'Biblioteca', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+  'Artigo': { label: 'Biblioteca', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+  'Livro': { label: 'Biblioteca', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+  'Áudio': { label: 'Biblioteca', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+  'Shorts': { label: 'Media', color: 'text-purple-700', bgColor: 'bg-purple-100' },
+  'Leitura': { label: 'Leitura', color: 'text-green-700', bgColor: 'bg-green-100' },
+  'Ferramentas': { label: 'Biblioteca', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+  'Quizzes': { label: 'Biblioteca', color: 'text-blue-700', bgColor: 'bg-blue-100' }
+};
+
+// Small accessible dropdown component for category selection that shows a badge
+type CategoryType = "Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura" | "Ferramentas" | "Quizzes";
+
+function CategoryDropdown({ value, onChange }: { value: CategoryType; onChange: (v: CategoryType) => void }) {
+  const [open, setOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+  
+  const toggle = () => setOpen((s) => !s);
+
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [open]);
+
+  const options = [
+    { value: 'Vídeo', label: '📹 Vídeo' },
+    { value: 'Podcast', label: '🎙️ Podcast' },
+    { value: 'Artigo', label: '📰 Artigo' },
+    { value: 'Livro', label: '📚 Livro' },
+    { value: 'Áudio', label: '🎵 Áudio' },
+    { value: 'Shorts', label: '⚡ Shorts' },
+    { value: 'Leitura', label: '📖 Leitura' },
+    { value: 'Ferramentas', label: '🔧 Ferramentas' },
+    { value: 'Quizzes', label: '❓ Quizzes' }
+  ];
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full text-left border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-medium bg-white shadow-sm flex items-center justify-between"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span>{options.find(o => o.value === value)?.label || 'Selecione'}</span>
+        <div className="flex items-center gap-2">
+          {CATEGORY_SESSION_MAP[value] && (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_SESSION_MAP[value].color} ${CATEGORY_SESSION_MAP[value].bgColor}`}>
+              {CATEGORY_SESSION_MAP[value].label}
+            </span>
+          )}
+          <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {open && (
+        <ul role="listbox" className="absolute z-40 mt-2 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden">
+            {options.map((opt) => (
+            <li
+              key={opt.value}
+              role="option"
+                aria-selected={opt.value === value}
+                onClick={() => { onChange(opt.value as CategoryType); setOpen(false); }}
+              className={`px-4 py-3 cursor-pointer flex items-center justify-between hover:bg-blue-50 transition-colors ${opt.value === value ? 'bg-blue-100 border-l-2 border-blue-500' : ''}`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{opt.label}</span>
+              </div>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_SESSION_MAP[opt.value].color} ${CATEGORY_SESSION_MAP[opt.value].bgColor}`}>
+                {CATEGORY_SESSION_MAP[opt.value].label}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // Modal to create a new reading category
 const CreateReadingTagModal = ({ 
   isOpen, 
@@ -926,21 +1020,11 @@ export default function CreateContent() {
                           Categoria
                         </span>
                       </label>
-                      <select
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-medium cursor-pointer bg-white shadow-sm"
+                      {/* Custom dropdown with badge indicating app session */}
+                      <CategoryDropdown
                         value={category}
-                        onChange={(e) => setCategory(e.target.value as "Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura" | "Ferramentas" | "Quizzes")}
-                      >
-                        <option value="Vídeo">📹 Vídeo</option>
-                        <option value="Podcast">🎙️ Podcast</option>
-                        <option value="Artigo">📰 Artigo</option>
-                        <option value="Livro">📚 Livro</option>
-                        <option value="Áudio">🎵 Áudio</option>
-                        <option value="Shorts">⚡ Shorts</option>
-                        <option value="Leitura">📖 Leitura</option>
-                        <option value="Ferramentas">🔧 Ferramentas</option>
-                        <option value="Quizzes">❓ Quizzes</option>
-                      </select>
+                        onChange={(v) => setCategory(v)}
+                      />
                     </div>
 
                     {/* Idade Mínima */}
@@ -1095,16 +1179,9 @@ export default function CreateContent() {
                       </label>
                       <p className="text-sm text-gray-600 mb-4">
                         <strong>Escolha uma das opções abaixo para adicionar o conteúdo do seu post.</strong>
-                        {category === 'Shorts' && (
-                          <span className="block text-blue-600 font-medium mt-1">
-                            💡 Para Shorts: use URLs do YouTube Shorts, Instagram Reels, TikTok OU faça upload de vídeo.
-                          </span>
-                        )}
-                        {category !== 'Shorts' && (
                           <span className="block text-gray-500 mt-1">
                             💡 Você pode usar uma URL externa ou fazer upload de arquivos.
                           </span>
-                        )}
                       </p>
                       
                       {/* Seletor de Modo */}

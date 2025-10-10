@@ -212,10 +212,18 @@ export default function TagSelector({
   return (
     <div className="tag-selector relative">
       {/* Campo de seleção */}
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
+        onKeyDown={(e) => {
+          if (disabled) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(!isOpen);
+          }
+        }}
+        aria-disabled={disabled}
         className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md text-left focus:outline-none focus:ring-2 focus:ring-black transition-colors ${
           disabled 
             ? 'bg-gray-100 text-gray-500 cursor-not-allowed' 
@@ -235,8 +243,23 @@ export default function TagSelector({
             <span className="text-gray-500">{placeholder}</span>
           )}
         </div>
-        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
+        <div className="flex items-center gap-2">
+          {selectedTag && !disabled && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTagSelect("");
+              }}
+              title="Remover seleção"
+              className="p-1 rounded text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+      </div>
 
       {/* Dropdown */}
       {isOpen && !disabled && (
@@ -251,6 +274,17 @@ export default function TagSelector({
             </div>
           ) : (
             <>
+              {/* Opção para limpar seleção */}
+              <div className="px-3 py-1">
+                <button
+                  type="button"
+                  onClick={() => { onTagSelect(""); setIsOpen(false); }}
+                  className="w-full text-left text-sm text-gray-600 px-2 py-2 hover:bg-gray-100 rounded"
+                >
+                  Limpar seleção
+                </button>
+              </div>
+              <div className="border-t border-gray-100" />
               {/* Lista de tags */}
               {tags.length > 0 && (
                 <div className="py-1">
