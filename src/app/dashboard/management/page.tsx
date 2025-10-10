@@ -1882,15 +1882,7 @@ export default function Management() {
                                         : 'hover:bg-gray-50'
                                     }`}
                                   >
-                                    {/* Overlay invisível para capturar cliques em toda a linha */}
-                                    <td className="absolute inset-0 z-0">
-                                      <Link
-                                        href={`/dashboard/details/${post.id}`}
-                                        className="absolute inset-0 block"
-                                        aria-label={`Ver detalhes do post: ${post.title}`}
-                                      />
-                                    </td>
-                                    <td className="relative z-10 col-select px-4 py-3">
+                                    <td className="col-select px-4 py-3">
                                       <input
                                         type="checkbox"
                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -1898,7 +1890,7 @@ export default function Management() {
                                         onChange={(e) => { e.stopPropagation(); togglePostSelection(post.id); }}
                                       />
                                     </td>
-                                    <td className="relative z-10 col-title px-4 py-3">
+                                    <td className="col-title px-4 py-3">
                                       <div className="flex flex-col">
                                         <Link
                                           href={`/dashboard/details/${post.id}`}
@@ -1912,19 +1904,19 @@ export default function Management() {
                                         </p>
                                       </div>
                                     </td>
-                                    <td className="relative z-10 col-category px-4 py-3">
+                                    <td className="col-category px-4 py-3">
                                       <Link href={`/dashboard/details/${post.id}`} className="block" aria-label={`Categoria: ${post.category}`}>
                                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 whitespace-nowrap">
                                           {post.category}
                                         </span>
                                       </Link>
                                     </td>
-                                    <td className="relative z-10 col-date px-4 py-3 text-sm text-gray-500">
+                                    <td className="col-date px-4 py-3 text-sm text-gray-500">
                                       <Link href={`/dashboard/details/${post.id}`} className="block text-sm text-gray-500 whitespace-nowrap" aria-label={`Data: ${formatDate(post.created_at)}`}>
                                         {formatDate(post.created_at).replace(/de /g, '')}
                                       </Link>
                                     </td>
-                                    <td className="relative z-10 col-status px-4 py-3">
+                                    <td className="col-status px-4 py-3">
                                       <Link href={`/dashboard/details/${post.id}`} className="block" aria-label={`Status: ${post.is_published ? 'Publicado' : 'Rascunho'}`}>
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
                                           post.is_published 
@@ -1935,7 +1927,7 @@ export default function Management() {
                                         </span>
                                       </Link>
                                     </td>
-                                    <td className="relative z-10 col-tags px-4 py-3">
+                                    <td className="col-tags px-4 py-3">
                                       <Link href={`/dashboard/details/${post.id}`} className="block" aria-label={`Tags: ${post.tags.join(', ')} ${post.emotion_tags.join(', ')}`}>
                                         <div className="flex flex-wrap gap-1">
                                           {post.tags.slice(0, 2).map((tag, index) => (
@@ -1967,7 +1959,7 @@ export default function Management() {
                                         </div>
                                       </Link>
                                     </td>
-                                    <td className="relative z-10 col-reading-categories px-4 py-3">
+                                    <td className="col-reading-categories px-4 py-3">
                                       {post.category === 'Leitura' ? (
                                         readingTagsMap[post.id] && readingTagsMap[post.id].length > 0 ? (
                                           <Link href={`/dashboard/details/${post.id}`} className="block" aria-label={`Categorias de leitura: ${readingTagsMap[post.id].map(t => t.name).join(', ')}`}>
@@ -2002,7 +1994,7 @@ export default function Management() {
                                         </Link>
                                       )}
                                     </td>
-                                    <td className="relative z-10 col-actions px-4 py-3 text-sm font-medium">
+                                    <td className="col-actions px-4 py-3 text-sm font-medium">
                                       <div className="flex items-center space-x-2">
                                         <Link
                                           href={`/dashboard/details/${post.id}`}
@@ -2064,11 +2056,9 @@ export default function Management() {
                         {/* Layout Mobile - Cards */}
                         <div className="lg:hidden space-y-4">
                           {groupPosts.map((post) => (
-                            <Link
+                            <div
                               key={post.id}
-                              href={`/dashboard/details/${post.id}`}
-                              onClick={() => { /* allow inner elements to stopPropagation */ }}
-                              className={`block border border-gray-200 rounded-lg p-4 transition-colors cursor-pointer ${
+                              className={`border border-gray-200 rounded-lg p-4 transition-colors ${
                                 bulkAction.selectedPosts.has(post.id) 
                                   ? 'bg-blue-50 border-blue-300' 
                                   : 'hover:bg-gray-50'
@@ -2080,14 +2070,15 @@ export default function Management() {
                                   type="checkbox"
                                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1"
                                   checked={bulkAction.selectedPosts.has(post.id)}
-                                  onChange={(e) => { e.stopPropagation(); togglePostSelection(post.id); }}
+                                  onChange={() => { togglePostSelection(post.id); }}
                                 />
                                 <div className="flex-1 min-w-0">
-                                  <h3 
-                                    className="text-lg font-semibold text-gray-900 cursor-pointer hover:text-blue-600 mb-2"
+                                  <Link
+                                    href={`/dashboard/details/${post.id}`}
+                                    className="text-lg font-semibold text-gray-900 hover:text-blue-600 mb-2 block"
                                   >
                                     {post.title}
-                                  </h3>
+                                  </Link>
                                 </div>
                                 <span className={`px-2 py-1 rounded text-xs font-medium flex-shrink-0 ${
                                   post.is_published 
@@ -2239,7 +2230,7 @@ export default function Management() {
                                   Eliminar
                                 </button>
                               </div>
-                            </Link>
+                            </div>
                           ))}
                         </div>
                       </div>
