@@ -1794,10 +1794,10 @@ export default function Management() {
                         {/* Tabela Desktop Otimizada */}
                         <div className="hidden lg:block">
                           <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
+                            <table className="responsive-table divide-y divide-gray-200">
                               <thead className="bg-gray-50">
                                 <tr>
-                                  <th className="px-6 py-3 text-left">
+                                  <th className="col-select px-4 py-3 text-left">
                                     <input
                                       type="checkbox"
                                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -1819,7 +1819,7 @@ export default function Management() {
                                       }}
                                     />
                                   </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  <th className="col-title px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     <button
                                       onClick={() => toggleSort('title')}
                                       className="flex items-center gap-1 hover:text-gray-700 transition-colors group"
@@ -1828,7 +1828,7 @@ export default function Management() {
                                       {getSortIcon('title')}
                                     </button>
                                   </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  <th className="col-category px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     <button
                                       onClick={() => toggleSort('category')}
                                       className="flex items-center gap-1 hover:text-gray-700 transition-colors group"
@@ -1837,7 +1837,7 @@ export default function Management() {
                                       {getSortIcon('category')}
                                     </button>
                                   </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  <th className="col-date px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     <button
                                       onClick={() => toggleSort('created_at')}
                                       className="flex items-center gap-1 hover:text-gray-700 transition-colors group"
@@ -1846,7 +1846,7 @@ export default function Management() {
                                       {getSortIcon('created_at')}
                                     </button>
                                   </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  <th className="col-status px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     <button
                                       onClick={() => toggleSort('is_published')}
                                       className="flex items-center gap-1 hover:text-gray-700 transition-colors group"
@@ -1855,7 +1855,7 @@ export default function Management() {
                                       {getSortIcon('is_published')}
                                     </button>
                                   </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  <th className="col-tags px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     <button
                                       onClick={() => toggleSort('tags')}
                                       className="flex items-center gap-1 hover:text-gray-700 transition-colors group"
@@ -1864,10 +1864,10 @@ export default function Management() {
                                       {getSortIcon('tags')}
                                     </button>
                                   </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  <th className="col-reading-categories px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Categorias de Leitura
                                   </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  <th className="col-actions px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Ações
                                   </th>
                                 </tr>
@@ -1890,7 +1890,7 @@ export default function Management() {
                                         aria-label={`Ver detalhes do post: ${post.title}`}
                                       />
                                     </td>
-                                    <td className="relative z-10 px-6 py-4">
+                                    <td className="relative z-10 col-select px-4 py-3">
                                       <input
                                         type="checkbox"
                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -1898,35 +1898,35 @@ export default function Management() {
                                         onChange={(e) => { e.stopPropagation(); togglePostSelection(post.id); }}
                                       />
                                     </td>
-                                    <td className="relative z-10 px-6 py-4">
+                                    <td className="relative z-10 col-title px-4 py-3">
                                       <div className="flex flex-col">
                                         <Link
                                           href={`/dashboard/details/${post.id}`}
-                                          className="text-left text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors truncate max-w-xs"
+                                          className="text-left text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors table-cell-content"
                                           title={post.title}
                                         >
                                           {post.title}
                                         </Link>
-                                        <p className="text-xs text-gray-500 mt-1 truncate max-w-xs" title={post.description}>
+                                        <p className="text-xs text-gray-500 mt-1 table-cell-content" title={post.description}>
                                           {post.description}
                                         </p>
                                       </div>
                                     </td>
-                                    <td className="relative z-10 px-6 py-4 whitespace-nowrap">
+                                    <td className="relative z-10 col-category px-4 py-3">
                                       <Link href={`/dashboard/details/${post.id}`} className="block" aria-label={`Categoria: ${post.category}`}>
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 whitespace-nowrap">
                                           {post.category}
                                         </span>
                                       </Link>
                                     </td>
-                                    <td className="relative z-10 px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                      <Link href={`/dashboard/details/${post.id}`} className="block text-sm text-gray-500" aria-label={`Data: ${formatDate(post.created_at)}`}>
-                                        {formatDate(post.created_at)}
+                                    <td className="relative z-10 col-date px-4 py-3 text-sm text-gray-500">
+                                      <Link href={`/dashboard/details/${post.id}`} className="block text-sm text-gray-500 whitespace-nowrap" aria-label={`Data: ${formatDate(post.created_at)}`}>
+                                        {formatDate(post.created_at).replace(/de /g, '')}
                                       </Link>
                                     </td>
-                                    <td className="relative z-10 px-6 py-4 whitespace-nowrap">
+                                    <td className="relative z-10 col-status px-4 py-3">
                                       <Link href={`/dashboard/details/${post.id}`} className="block" aria-label={`Status: ${post.is_published ? 'Publicado' : 'Rascunho'}`}>
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
                                           post.is_published 
                                             ? 'bg-green-100 text-green-800' 
                                             : 'bg-yellow-100 text-yellow-800'
@@ -1935,39 +1935,39 @@ export default function Management() {
                                         </span>
                                       </Link>
                                     </td>
-                                    <td className="relative z-10 px-6 py-4">
+                                    <td className="relative z-10 col-tags px-4 py-3">
                                       <Link href={`/dashboard/details/${post.id}`} className="block" aria-label={`Tags: ${post.tags.join(', ')} ${post.emotion_tags.join(', ')}`}>
                                         <div className="flex flex-wrap gap-1">
                                           {post.tags.slice(0, 2).map((tag, index) => (
                                             <span
                                               key={index}
-                                              className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                                              className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap"
                                             >
                                               {tag}
                                             </span>
                                           ))}
                                           {post.tags.length > 2 && (
-                                            <span className="text-xs text-gray-500 self-center">
+                                            <span className="text-xs text-gray-500 self-center whitespace-nowrap">
                                               +{post.tags.length - 2}
                                             </span>
                                           )}
                                           {post.emotion_tags.slice(0, 1).map((tag, index) => (
                                             <span
                                               key={`emotion-${index}`}
-                                              className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800"
+                                              className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800 whitespace-nowrap"
                                             >
                                               {tag}
                                             </span>
                                           ))}
                                           {post.emotion_tags.length > 1 && (
-                                            <span className="text-xs text-gray-500 self-center">
+                                            <span className="text-xs text-gray-500 self-center whitespace-nowrap">
                                               +{post.emotion_tags.length - 1} emoções
                                             </span>
                                           )}
                                         </div>
                                       </Link>
                                     </td>
-                                    <td className="relative z-10 px-6 py-4">
+                                    <td className="relative z-10 col-reading-categories px-4 py-3">
                                       {post.category === 'Leitura' ? (
                                         readingTagsMap[post.id] && readingTagsMap[post.id].length > 0 ? (
                                           <Link href={`/dashboard/details/${post.id}`} className="block" aria-label={`Categorias de leitura: ${readingTagsMap[post.id].map(t => t.name).join(', ')}`}>
@@ -1975,7 +1975,7 @@ export default function Management() {
                                               {readingTagsMap[post.id].slice(0, 2).map((tag) => (
                                                 <span
                                                   key={tag.id}
-                                                  className="inline-flex items-center px-2 py-1 rounded text-xs font-medium"
+                                                  className="inline-flex items-center px-2 py-1 rounded text-xs font-medium whitespace-nowrap"
                                                   style={{
                                                     backgroundColor: tag.color ? `${tag.color}20` : '#EBF8FF',
                                                     color: tag.color || '#2B6CB0'
@@ -1985,7 +1985,7 @@ export default function Management() {
                                                 </span>
                                               ))}
                                               {readingTagsMap[post.id].length > 2 && (
-                                                <span className="text-xs text-gray-500 self-center">
+                                                <span className="text-xs text-gray-500 self-center whitespace-nowrap">
                                                   +{readingTagsMap[post.id].length - 2}
                                                 </span>
                                               )}
@@ -2002,7 +2002,7 @@ export default function Management() {
                                         </Link>
                                       )}
                                     </td>
-                                    <td className="relative z-10 px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <td className="relative z-10 col-actions px-4 py-3 text-sm font-medium">
                                       <div className="flex items-center space-x-2">
                                         <Link
                                           href={`/dashboard/details/${post.id}`}
