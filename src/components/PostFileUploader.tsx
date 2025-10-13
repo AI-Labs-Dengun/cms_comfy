@@ -76,8 +76,8 @@ export default function PostFileUploader({
     }
 
     // Para Shorts, limitar a 5 arquivos
-    if (category === 'Shorts' && fileArray.length > 5) {
-      alert('Máximo 5 arquivos permitidos para Shorts');
+    if (category === 'Shorts' && fileArray.length > 10) {
+      alert('Máximo 10 arquivos permitidos para Shorts');
       return;
     }
 
@@ -161,7 +161,7 @@ export default function PostFileUploader({
   // Texto de instruções baseado na categoria
   const getInstructionText = () => {
     if (category === 'Shorts') {
-      return 'Arraste até 5 imagens para criar um carousel OU 1 vídeo único';
+  return 'Arraste até 10 imagens para criar um carousel OU 1 vídeo único';
     }
     return 'Arraste 1 arquivo ou clique para selecionar';
   };
