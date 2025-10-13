@@ -564,21 +564,21 @@ export default function CreateContent() {
         }, 200);
 
         try {
-          // Validação extra específica para Shorts (reafirmar regra 1-5 imagens OU 1 vídeo)
+          // Validação extra específica para Shorts (reafirmar regra 1-10 imagens OU 1 vídeo)
           if (category === 'Shorts' && fileValidation) {
             const count = fileValidation.file_count;
             // Accept: carousel (1-5 images), single image, or single video
             if (!fileValidation.is_carousel && !fileValidation.is_single_video && !fileValidation.is_single_image) {
-              setError('Para Shorts envie de 1 a 5 imagens (carousel) ou 1 vídeo único');
-              toast.error('Para Shorts envie de 1 a 5 imagens (carousel) ou 1 vídeo único');
+              setError('Para Shorts envie de 1 a 10 imagens (carousel) ou 1 vídeo único');
+              toast.error('Para Shorts envie de 1 a 10 imagens (carousel) ou 1 vídeo único');
               clearInterval(progressInterval);
               return;
             }
 
-            // If it's a carousel, ensure between 1 and 5 images (allowing 1 as valid)
-            if (fileValidation.is_carousel && (count < 1 || count > 5)) {
-              setError('Para Shorts envie de 1 a 5 imagens (carousel)');
-              toast.error('Para Shorts envie de 1 a 5 imagens (carousel)');
+            // If it's a carousel, ensure between 1 and 10 images (allowing 1 as valid)
+            if (fileValidation.is_carousel && (count < 1 || count > 10)) {
+              setError('Para Shorts envie de 1 a 10 imagens (carousel)');
+              toast.error('Para Shorts envie de 1 a 10 imagens (carousel)');
               clearInterval(progressInterval);
               return;
             }
