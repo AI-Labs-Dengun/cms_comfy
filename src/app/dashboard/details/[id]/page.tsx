@@ -1693,7 +1693,7 @@ export default function DetalhesConteudo() {
                           </p>
                         </div>
                         <div className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                          {(editExistingFiles?.length || 0) + (newSelectedFiles?.length || 0)}/5
+                          {(editExistingFiles?.length || 0) + (newSelectedFiles?.length || 0)}/10
                         </div>
                       </div>
 
@@ -1866,7 +1866,7 @@ export default function DetalhesConteudo() {
                         {/* Upload Area - always visible, integrated with the management area */}
                         <div className="space-y-2">
                           <div className="text-sm font-medium text-gray-700">Adicionar mais imagens</div>
-                          {((editExistingFiles?.length || 0) + (newSelectedFiles?.length || 0)) < 5 ? (
+                          {((editExistingFiles?.length || 0) + (newSelectedFiles?.length || 0)) < 10 ? (
                             <div
                               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                                 dragActive 
