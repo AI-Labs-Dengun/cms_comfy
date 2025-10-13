@@ -131,14 +131,14 @@ export function validatePostFiles(files: File[], category: string): FileValidati
       };
     }
     
-  // Multiple images for Shorts (max 5)
-    if (allImages && filesCount > 5) {
+  // Multiple images for Shorts (max 10)
+    if (allImages && filesCount > 10) {
       return {
         valid: false,
         is_carousel: false,
         is_single_video: false,
         is_single_image: false,
-        error: 'Máximo 5 imagens permitidas para Shorts',
+        error: 'Máximo 10 imagens permitidas para Shorts',
         file_count: filesCount,
         category,
         type: 'unknown'
