@@ -433,10 +433,10 @@ export default function DetalhesConteudo() {
           return;
         }
       } else {
-        // image carousel: must have between 1 and 5 images
-        if (totalCount < 1 || totalCount > 5) {
+        // image carousel: must have between 1 and 10 images
+        if (totalCount < 1 || totalCount > 10) {
           setSaving(false);
-          alert('Shorts (imagens) devem conter entre 1 e 5 imagens.');
+          alert('Shorts (imagens) devem conter entre 1 e 10 imagens.');
           return;
         }
       }
@@ -589,8 +589,8 @@ export default function DetalhesConteudo() {
   const addNewFiles = (files: File[]) => {
     // Validate types and sizes and limit
     const combinedCount = editExistingFiles.length + newSelectedFiles.length + files.length;
-    if (combinedCount > 5) {
-      setFileEditError('Máximo 5 imagens para Shorts (carousel). Remova algumas antes de adicionar mais.');
+    if (combinedCount > 10) {
+      setFileEditError('Máximo 10 imagens para Shorts (carousel). Remova algumas antes de adicionar mais.');
       return;
     }
 
@@ -628,8 +628,8 @@ export default function DetalhesConteudo() {
     const files = Array.from(dt.files || []);
     if (files.length === 0) return;
     const currentCount = editExistingFiles.length + newSelectedFiles.length;
-    if (currentCount >= 5) {
-      setFileEditError('Máximo 5 imagens para Shorts. Remova algumas imagens antes de adicionar novas.');
+    if (currentCount >= 10) {
+      setFileEditError('Máximo 10 imagens para Shorts. Remova algumas imagens antes de adicionar novas.');
       return;
     }
     addNewFiles(files);
@@ -1901,7 +1901,7 @@ export default function DetalhesConteudo() {
                                     PNG, JPG, GIF • Máx 5MB por imagem
                                   </span>
                                   <span className="text-xs text-blue-600 mt-2">
-                                    {5 - ((editExistingFiles?.length || 0) + (newSelectedFiles?.length || 0))} slot(s) disponível(is)
+                                    {10 - ((editExistingFiles?.length || 0) + (newSelectedFiles?.length || 0))} slot(s) disponível(is)
                                   </span>
                                 </div>
                               </label>
@@ -1915,7 +1915,7 @@ export default function DetalhesConteudo() {
                                   </svg>
                                 </div>
                                 <span className="text-sm font-medium text-gray-500">
-                                  Limite de 5 imagens atingido
+                                  Limite de 10 imagens atingido
                                 </span>
                                 <span className="text-xs text-gray-400 mt-1">
                                   Remova uma imagem para adicionar novas
