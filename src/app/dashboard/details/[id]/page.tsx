@@ -272,7 +272,7 @@ export default function DetalhesConteudo() {
   // Função para inicializar valores de edição
   const initializeEditValues = (postData: Post) => {
     setEditTitle(postData.title);
-    setEditDescription(postData.description);
+    setEditDescription(postData.description || "");  // Pode ser null para Podcast
     setEditContent(postData.content || ""); 
     setEditContentUrl(postData.content_url || "");
     setEditThumbnailUrl(postData.thumbnail_url || ""); 
@@ -399,6 +399,8 @@ export default function DetalhesConteudo() {
         description:
           post.category === 'Shorts'
             ? (editDescription.trim() === '' ? null : editDescription.trim())
+            : post.category === 'Podcast'
+            ? (editDescription.trim() === '' ? null : editDescription.trim())  // Podcast: opcional
             : (editDescription.trim() || undefined),
         // Shorts must not have textual content; sending undefined means no change
         content: post.category === 'Shorts' ? undefined : (editContent.trim() || undefined),
@@ -1481,7 +1483,8 @@ export default function DetalhesConteudo() {
                       // For Shorts we allow empty title/description; only enforce min age.
                       disabled={
                         saving ||
-                        (post.category !== 'Shorts' && (!editTitle.trim() || !editDescription.trim())) ||
+                        (post.category !== 'Shorts' && !editTitle.trim()) ||
+                        (post.category !== 'Shorts' && post.category !== 'Podcast' && !editDescription.trim()) ||
                         (editMinAge !== 12 && editMinAge !== 16)
                       }
                       className="bg-green-600 text-white px-4 py-2 rounded-md font-medium hover:bg-green-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -2305,12 +2308,14 @@ export default function DetalhesConteudo() {
                     <div className="text-gray-900 font-bold whitespace-pre-line">{post.title}</div>
                   </div>
                   
-                  <div className="mb-2">
-                    <div className="text-xs text-gray-500 font-bold">Descrição</div>
-                    <div className="text-gray-900">
-                      <FlexibleRenderer content={post.description} />
+                  {post.description && (
+                    <div className="mb-2">
+                      <div className="text-xs text-gray-500 font-bold">Descrição</div>
+                      <div className="text-gray-900">
+                        <FlexibleRenderer content={post.description} />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                                      {post.content && (
                      <div className="mb-2">
