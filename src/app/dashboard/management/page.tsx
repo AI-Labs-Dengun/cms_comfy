@@ -141,9 +141,10 @@ export default function Management() {
   const [useNewDataTable, setUseNewDataTable] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('cms-use-new-datatable')
-      return saved === 'true'
+      // Se não houver valor salvo, usar true como padrão
+      return saved !== null ? saved === 'true' : true
     }
-    return false
+    return true
   });
 
   // Persist feature flag state
@@ -349,7 +350,7 @@ export default function Management() {
       const searchLower = search.toLowerCase();
       const matchesSearch = search === "" || (
         post.title.toLowerCase().includes(searchLower) ||
-        post.description.toLowerCase().includes(searchLower) ||
+        (post.description && post.description.toLowerCase().includes(searchLower)) ||
         post.category.toLowerCase().includes(searchLower) ||
         post.tags.some((tag: string) => tag.toLowerCase().includes(searchLower)) ||
         post.emotion_tags.some((emo: string) => emo.toLowerCase().includes(searchLower))
@@ -1899,9 +1900,14 @@ export default function Management() {
                                         >
                                           {post.title}
                                         </Link>
-                                        <p className="text-xs text-gray-500 mt-1 table-cell-content" title={post.description}>
-                                          {post.description}
-                                        </p>
+                                        {post.description && (
+                                          <p className="text-xs text-gray-500 mt-1 table-cell-content" title={post.description}>
+                                            {post.description}
+                                          </p>
+                                        )}
+                                        {!post.description && post.category === 'Podcast' && (
+                                          <p className="text-xs text-gray-400 italic mt-1">Sem descrição</p>
+                                        )}
                                       </div>
                                     </td>
                                     <td className="col-category px-4 py-3">
