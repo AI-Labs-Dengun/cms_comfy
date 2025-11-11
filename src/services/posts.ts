@@ -16,7 +16,7 @@ export interface FileValidation {
 // Types for posts (UPDATED to support arrays)
 export interface CreatePostData {
   title: string
-  description: string
+  description?: string  // Opcional - obrigatória apenas para categorias exceto Podcast e Shorts
   category: 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura' | 'Ferramentas' | 'Quizzes'
   content?: string 
   content_url?: string
@@ -37,7 +37,7 @@ export interface CreatePostData {
 export interface Post {
   id: string
   title: string
-  description: string
+  description?: string  // Opcional - pode ser NULL para Podcast
   category: string
   content?: string
   content_url?: string
@@ -338,10 +338,19 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       }
     }
 
-    if (postData.category !== 'Shorts' && (!postData.title || !postData.description)) {
+    // Validar título e descrição (descrição opcional para Podcast e Shorts)
+    if (postData.category !== 'Shorts' && postData.category !== 'Podcast') {
+      if (!postData.title || !postData.description) {
+        return {
+          success: false,
+          error: 'Título e descrição são obrigatórios'
+        }
+      }
+    } else if (postData.category !== 'Shorts' && !postData.title) {
+      // Para Podcast, apenas título é obrigatório
       return {
         success: false,
-        error: 'Título e descrição são obrigatórios'
+        error: 'Título é obrigatório'
       }
     }
 
@@ -376,8 +385,8 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
     const { data, error } = await supabase.rpc('create_post', {
       author_id_param: user.id,
       title_param: postData.title,
-      description_param: postData.description,
       category_param: postData.category,
+      description_param: postData.description || null,
       content_param: postData.content || null, 
       content_url_param: postData.content_url || null,
       tags_param: postData.tags || [],
@@ -611,8 +620,8 @@ export async function updatePost(postId: string, postData: Partial<CreatePostDat
       post_id_param: postId,
       author_id_param: user.id,
       title_param: postData.title || '',
-      description_param: postData.description || '',
       category_param: category,
+      description_param: postData.description || null,
       content_param: postData.content || null, 
       content_url_param: contentUrl,
       thumbnail_url_param: thumbnailUrl, 
