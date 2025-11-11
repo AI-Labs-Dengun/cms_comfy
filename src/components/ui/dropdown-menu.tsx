@@ -23,7 +23,7 @@ const DropdownMenu: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   return (
     <DropdownMenuContext.Provider value={{ open, setOpen }}>
-      <div className="relative inline-block">
+      <div className="relative inline-block z-50">
         {children}
       </div>
     </DropdownMenuContext.Provider>
@@ -38,6 +38,7 @@ const DropdownMenuTrigger = React.forwardRef<
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault()
+    e.stopPropagation()
     setOpen(!open)
     onClick?.(e)
   }
@@ -51,7 +52,8 @@ const DropdownMenuTrigger = React.forwardRef<
     const childProps = (child.props || {}) as { onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void; className?: string; [key: string]: unknown }
 
     const mergedOnClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-      try { e.preventDefault() } catch {}
+      e.preventDefault()
+      e.stopPropagation()
       setOpen(!open)
       // call both child's and provided onClick handlers if present
       if (typeof childProps.onClick === 'function') childProps.onClick(e)
@@ -117,7 +119,9 @@ const DropdownMenuContent = React.forwardRef<
 
     if (open) {
       document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
     }
   }, [open, setOpen])
 
@@ -127,7 +131,7 @@ const DropdownMenuContent = React.forwardRef<
     <div
       ref={assignRef}
       className={cn(
-        "absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-white p-1 shadow-lg animate-in fade-in-0 zoom-in-95",
+        "absolute z-[9999] min-w-[8rem] overflow-hidden rounded-md border bg-white p-1 shadow-lg animate-in fade-in-0 zoom-in-95",
         align === "start" && "left-0",
         align === "center" && "left-1/2 -translate-x-1/2",
         align === "end" && "right-0",
