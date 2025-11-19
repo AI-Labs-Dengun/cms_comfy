@@ -410,8 +410,9 @@ export default function CreateContent() {
         return;
       }
 
-      // Validar tags
-      if (tags.length === 0) {
+      // Validar tags (exceto para Shorts)
+      // ✅ REGRA ESPECIAL: Posts da categoria Shorts não requerem tags
+      if (category !== "Shorts" && tags.length === 0) {
         setError("É obrigatório adicionar pelo menos uma tag");
         toast.error("É obrigatório adicionar pelo menos uma tag");
         return;
@@ -1462,12 +1463,15 @@ export default function CreateContent() {
                         <path fillRule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                       </svg>
                       Tags
-                      <span className="text-red-500 ml-1">*</span>
+                      {category !== 'Shorts' && <span className="text-red-500 ml-1">*</span>}
+                      {category === 'Shorts' && <span className="text-gray-500 ml-2 text-xs">(opcional)</span>}
                     </span>
                   </label>
                   <p className="text-sm text-gray-600 mb-3">
                     {category === 'Leitura' 
                       ? 'Tags gerais para o post (além das categorias de leitura específicas)' 
+                      : category === 'Shorts'
+                      ? 'Adicione tags para facilitar a busca (opcional para Shorts)'
                       : 'Adicione tags que descrevam o conteúdo'
                     }
                   </p>
@@ -1594,7 +1598,7 @@ export default function CreateContent() {
                         (category !== "Shorts" && category !== "Podcast" && !description.trim()) ||
                         (category !== "Shorts" && !content.trim()) ||
                         (!hasContentUrl && !hasOldFile && !hasUploadedFiles && !hasSelectedFiles) ||
-                        tags.length === 0 ||
+                        (category !== "Shorts" && tags.length === 0) ||
                         emotions.length === 0 ||
                         (category === "Leitura" && selectedReadingTags.length === 0) ||
                         (minAge !== 12 && minAge !== 16)
@@ -1625,7 +1629,7 @@ export default function CreateContent() {
                           if (category !== "Shorts" && category !== "Podcast" && !description.trim()) return "Adicione uma descrição";
                           if (category !== "Shorts" && !content.trim()) return "Adicione conteúdo textual";
                           if (!hasContentUrl && !hasOldFile && !hasUploadedFiles && !hasSelectedFiles) return "Adicione URL ou arquivo";
-                          if (tags.length === 0) return "Adicione pelo menos uma tag";
+                          if (category !== "Shorts" && tags.length === 0) return "Adicione pelo menos uma tag";
                           if (emotions.length === 0) return "Selecione uma tag de emoção";
                           if (category === "Leitura" && selectedReadingTags.length === 0) return "Selecione uma categoria de leitura";
                           if (minAge !== 12 && minAge !== 16) return "Selecione uma idade mínima";
