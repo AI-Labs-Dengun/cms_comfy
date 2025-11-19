@@ -2521,7 +2521,16 @@ export default function DetalhesConteudo() {
               {isEditing ? (
                 <>
                   <div className="mb-4">
-                    <label className="block text-xs text-gray-500 font-bold mb-1">Tags</label>
+                    <label className="block text-xs text-gray-500 font-bold mb-1">
+                      Tags
+                      {post.category !== 'Shorts' && <span className="text-red-500 ml-1">*</span>}
+                      {post.category === 'Shorts' && <span className="text-gray-500 ml-2 text-xs font-normal">(opcional)</span>}
+                    </label>
+                    {post.category === 'Shorts' && (
+                      <p className="text-xs text-gray-500 mb-2">
+                        Adicione tags para facilitar a busca (opcional para Shorts)
+                      </p>
+                    )}
                     <input
                       type="text"
                       value={tagInput}
