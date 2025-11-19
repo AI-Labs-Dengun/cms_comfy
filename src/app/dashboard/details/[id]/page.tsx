@@ -519,7 +519,8 @@ export default function DetalhesConteudo() {
           setPost((prev: Post | null) => prev ? {
             ...prev,
             title: updateData.title === null ? '' : (updateData.title ?? prev.title),
-            description: updateData.description === null ? '' : (updateData.description ?? prev.description),
+            // ✅ CORREÇÃO: Quando descrição é removida (null), definir como undefined para UI atualizar
+            description: updateData.description === null ? undefined : (updateData.description ?? prev.description),
             content: updateData.content === undefined ? prev.content : (updateData.content ?? ''),
             content_url: updateData.content_url ?? prev.content_url,
             thumbnail_url: updateData.thumbnail_url === null ? undefined : (updateData.thumbnail_url ?? prev.thumbnail_url),
@@ -565,6 +566,10 @@ export default function DetalhesConteudo() {
           }
         }
 
+        // ✅ CORREÇÃO: Recarregar o post do servidor para garantir sincronização completa
+        // Isso garante que todos os dados (incluindo descrição removida) sejam atualizados
+        await loadPost();
+        
         setIsEditing(false);
         toast.success('As alterações foram salvas e o post foi atualizado com sucesso.');
       } else {
@@ -1480,11 +1485,10 @@ export default function DetalhesConteudo() {
                     
                     <button 
                       onClick={handleSaveEdit}
-                      // For Shorts we allow empty title/description; only enforce min age.
+                      // For Shorts we allow empty title/description; description is now optional for all categories
                       disabled={
                         saving ||
                         (post.category !== 'Shorts' && !editTitle.trim()) ||
-                        (post.category !== 'Shorts' && post.category !== 'Podcast' && !editDescription.trim()) ||
                         (editMinAge !== 12 && editMinAge !== 16)
                       }
                       className="bg-green-600 text-white px-4 py-2 rounded-md font-medium hover:bg-green-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
