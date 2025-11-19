@@ -16,7 +16,7 @@ export interface FileValidation {
 // Types for posts (UPDATED to support arrays)
 export interface CreatePostData {
   title: string
-  description?: string  // Opcional - obrigatória apenas para categorias exceto Podcast e Shorts
+  description?: string  // Opcional - pode ser NULL para todas as categorias
   category: 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura' | 'Ferramentas' | 'Quizzes'
   content?: string 
   content_url?: string
@@ -37,7 +37,7 @@ export interface CreatePostData {
 export interface Post {
   id: string
   title: string
-  description?: string  // Opcional - pode ser NULL para Podcast
+  description?: string  // Opcional - pode ser NULL para todas as categorias
   category: string
   content?: string
   content_url?: string
@@ -327,10 +327,7 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
     console.log('✅ Usuário CMS autorizado para criar post:', { userId: user.id, userRole: profile.user_role });
 
   // Validate required data
-    // Category is always required. Title and description are required for
-    // most categories but intentionally optional for 'Shorts'. The UI
-    // already enforces this, but keep a server-side check to avoid
-    // accidental empty category.
+    // Category is always required
     if (!postData.category) {
       return {
         success: false,
@@ -338,16 +335,9 @@ export async function createPost(postData: CreatePostData): Promise<ApiResponse<
       }
     }
 
-    // Validar título e descrição (descrição opcional para Podcast e Shorts)
-    if (postData.category !== 'Shorts' && postData.category !== 'Podcast') {
-      if (!postData.title || !postData.description) {
-        return {
-          success: false,
-          error: 'Título e descrição são obrigatórios'
-        }
-      }
-    } else if (postData.category !== 'Shorts' && !postData.title) {
-      // Para Podcast, apenas título é obrigatório
+    // Validate title (required for all categories except Shorts)
+    // Description is now optional for all categories
+    if (postData.category !== 'Shorts' && !postData.title?.trim()) {
       return {
         success: false,
         error: 'Título é obrigatório'
