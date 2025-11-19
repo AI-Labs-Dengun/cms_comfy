@@ -387,18 +387,11 @@ export default function CreateContent() {
 
     try {
       // Validar dados obrigatórios
-      // Title and description validation (description optional for Shorts and Podcast)
+      // Title validation (description is now optional for all categories)
       if (category !== "Shorts") {
         if (!title.trim()) {
           setError("Título é obrigatório");
           toast.error("Título é obrigatório");
-          return;
-        }
-
-        // Description is optional only for Podcast
-        if (category !== "Podcast" && !description.trim()) {
-          setError("Descrição é obrigatória");
-          toast.error("Descrição é obrigatória");
           return;
         }
       }
@@ -1113,19 +1106,11 @@ export default function CreateContent() {
                             <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
                           </svg>
                           Descrição
-                          {category !== 'Shorts' && category !== 'Podcast' && (
-                            <span className="text-red-500 ml-1">*</span>
-                          )}
-                          {category === 'Podcast' && (
-                            <span className="text-gray-500 ml-2 text-xs">(opcional)</span>
-                          )}
+                          <span className="text-gray-500 ml-2 text-xs">(opcional)</span>
                         </span>
                       </label>
                       <p className="text-xs text-gray-500 mb-3">
-                        {category === 'Podcast' 
-                          ? 'Digite uma breve descrição do seu podcast (opcional)'
-                          : 'Digite uma breve descrição do seu post (resumo/introdução)'
-                        }
+                        Digite uma breve descrição do seu post (opcional - resumo/introdução)
                       </p>
                       <textarea
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-medium resize-none bg-white shadow-sm"
@@ -1133,7 +1118,6 @@ export default function CreateContent() {
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={3}
-                        required={category !== "Shorts" && category !== "Podcast"}
                       />
                     </div>
 
@@ -1595,7 +1579,6 @@ export default function CreateContent() {
                       return (
                         isUploading || 
                         (category !== "Shorts" && !title.trim()) ||
-                        (category !== "Shorts" && category !== "Podcast" && !description.trim()) ||
                         (category !== "Shorts" && !content.trim()) ||
                         (!hasContentUrl && !hasOldFile && !hasUploadedFiles && !hasSelectedFiles) ||
                         (category !== "Shorts" && tags.length === 0) ||
@@ -1626,7 +1609,6 @@ export default function CreateContent() {
                           const hasSelectedFiles = selectedFiles.length > 0 && fileValidation?.valid;
                           
                           if (category !== "Shorts" && !title.trim()) return "Adicione um título";
-                          if (category !== "Shorts" && category !== "Podcast" && !description.trim()) return "Adicione uma descrição";
                           if (category !== "Shorts" && !content.trim()) return "Adicione conteúdo textual";
                           if (!hasContentUrl && !hasOldFile && !hasUploadedFiles && !hasSelectedFiles) return "Adicione URL ou arquivo";
                           if (category !== "Shorts" && tags.length === 0) return "Adicione pelo menos uma tag";
