@@ -692,8 +692,8 @@ export default function CreateContent() {
         }
       }
 
-  // Upload de thumbnail se fornecida (para Podcast, Artigo, Leitura, Vídeo, Ferramentas e Quizzes)
-  if ((category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Ferramentas" || category === "Quizzes") && thumbnailFile) {
+  // Upload de thumbnail se fornecida (para Podcast, Artigo, Leitura, Vídeo, Áudio, Ferramentas e Quizzes)
+  if ((category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Áudio" || category === "Ferramentas" || category === "Quizzes") && thumbnailFile) {
         console.log(`🖼️ Fazendo upload de thumbnail para categoria ${category}:`, {
           fileName: thumbnailFile.name,
           fileSize: thumbnailFile.size,
@@ -1276,8 +1276,8 @@ export default function CreateContent() {
                       {renderContentPreview()}
                     </div>
 
-                    {/* Thumbnail upload (for Podcast and Article) */}
-                    {(category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Ferramentas" || category === "Quizzes") && (
+                    {/* Thumbnail upload (for Podcast, Article, Audio, Video, Reading, Tools and Quizzes) */}
+                    {(category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Áudio" || category === "Ferramentas" || category === "Quizzes") && (
                       <div>
                         <label className="block text-sm font-medium mb-3 text-gray-700">
                           <span className="flex items-center">
