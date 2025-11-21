@@ -1954,8 +1954,8 @@ export default function DetalhesConteudo() {
                     </div>
                   </div>
 
-                  {/* ✅ CAMPO PARA EDITAR THUMBNAIL URL (Podcasts, Artigos, Ferramentas e Quizzes) */}
-                  {((post.category === "Podcast" && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Ferramentas" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Quizzes" && !(post.file_paths && post.file_paths.length > 0))) && (
+                  {/* ✅ CAMPO PARA EDITAR THUMBNAIL URL (Podcasts, Áudio, Artigos, Ferramentas e Quizzes) */}
+                  {((post.category === "Podcast" && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Áudio" && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Ferramentas" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Quizzes" && !(post.file_paths && post.file_paths.length > 0))) && (
                     <div className="mb-6">
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-3">
@@ -1964,6 +1964,7 @@ export default function DetalhesConteudo() {
                           </svg>
                           <label className="text-sm font-semibold text-gray-900">
                             {post.category === 'Podcast' ? 'Thumbnail do Podcast' : 
+                             post.category === 'Áudio' ? 'Thumbnail do Áudio' :
                              post.category === 'Ferramentas' ? 'Thumbnail das Ferramentas' :
                              post.category === 'Quizzes' ? 'Thumbnail dos Quizzes' :
                              'Thumbnail do Artigo'}
