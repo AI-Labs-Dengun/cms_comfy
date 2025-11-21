@@ -9,7 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { DeleteConfirmationModal, PublishToggleModal } from "@/components/modals";
 import { toast } from 'react-hot-toast';
 import { EMOTIONS } from '@/lib/emotions';
-import { ManagementDataTable, DataTableFeatureFlag } from "@/components/data-table";
+
 
 // Tipos para os filtros
 interface FilterState {
@@ -137,21 +137,7 @@ export default function Management() {
 
   const [readingTagsMap, setReadingTagsMap] = useState<{[postId: string]: {id: string, name: string, color?: string}[]}>({});
 
-  // Feature flag para alternar entre tabela atual e DataTable
-  const [useNewDataTable, setUseNewDataTable] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('cms-use-new-datatable')
-      return saved === 'true'
-    }
-    return false
-  });
 
-  // Persist feature flag state
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('cms-use-new-datatable', String(useNewDataTable))
-    }
-  }, [useNewDataTable]);
 
   // Buscar posts ao carregar o componente
   useEffect(() => {
@@ -349,7 +335,7 @@ export default function Management() {
       const searchLower = search.toLowerCase();
       const matchesSearch = search === "" || (
         post.title.toLowerCase().includes(searchLower) ||
-        post.description.toLowerCase().includes(searchLower) ||
+        (post.description && post.description.toLowerCase().includes(searchLower)) ||
         post.category.toLowerCase().includes(searchLower) ||
         post.tags.some((tag: string) => tag.toLowerCase().includes(searchLower)) ||
         post.emotion_tags.some((emo: string) => emo.toLowerCase().includes(searchLower))
@@ -544,21 +530,6 @@ export default function Management() {
 
   const closeBulkActionModal = () => {
     setBulkActionModal(prev => ({ ...prev, isOpen: false }));
-  };
-
-  // Handler para conectar DataTable bulk actions com nosso sistema
-  const handleDataTableBulkAction = (action: 'delete' | 'publish' | 'unpublish', selectedPosts: Post[]) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🔗 DataTable bulk action interceptada: ${action} para ${selectedPosts.length} posts`);
-    }
-    
-    // Usar nosso sistema de modal de confirmação bulk
-    setBulkActionModal({
-      isOpen: true,
-      action,
-      posts: selectedPosts,
-      isLoading: false
-    });
   };
 
   // Função para validar a consistência dos dados antes de executar ações em lote
@@ -1272,9 +1243,8 @@ export default function Management() {
               <p className="mt-1 text-gray-600">Monitore e edite o seu conteúdo de forma eficiente</p>
             </div>
             
-            {/* Filtros avançados para implementação original */}
-            {!useNewDataTable && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            {/* Filtros avançados */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
                 {/* Barra de busca principal */}
                 <div className="mb-4">
                   <div className="relative max-w-2xl">
@@ -1501,7 +1471,6 @@ export default function Management() {
                 </div>
               )}
             </div>
-            )}
 
             {/* Status e filtros ativos */}
             {!loading && !error && (
@@ -1728,30 +1697,6 @@ export default function Management() {
                   </div>
                 ) : (
                   <div className="w-full space-y-6">
-                    {/* Alternar entre implementação atual e nova DataTable */}
-                    {useNewDataTable ? (
-                      /* Nova implementação com DataTable */
-                      <ManagementDataTable
-                        posts={posts}
-                        filteredPosts={filteredPosts}
-                        loading={loading}
-                        search={search}
-                        filters={filters}
-                        readingTagsMap={readingTagsMap}
-                        onOpenPublishModal={openPublishModal}
-                        onOpenDeleteModal={openDeleteModal}
-                        onBulkAction={handleDataTableBulkAction}
-                        onViewPost={(postId) => router.push(`/dashboard/details/${postId}`)}
-                        showFilters={showFilters}
-                        onToggleFilters={() => setShowFilters(!showFilters)}
-                        showGroupedView={showGroupedView}
-                        onToggleGroupedView={() => setShowGroupedView(!showGroupedView)}
-                        hasActiveFilters={hasActiveFilters()}
-                        onClearAllFilters={clearAllFilters}
-                      />
-                    ) : (
-                      /* Implementação atual (original) */
-                      <>
                     {Object.entries(processedPosts).map(([groupName, groupPosts]) => (
                       <div key={groupName} className="bg-white rounded-lg shadow border overflow-hidden">
                         {/* Cabeçalho do grupo */}
@@ -1899,9 +1844,14 @@ export default function Management() {
                                         >
                                           {post.title}
                                         </Link>
-                                        <p className="text-xs text-gray-500 mt-1 table-cell-content" title={post.description}>
-                                          {post.description}
-                                        </p>
+                                        {post.description && (
+                                          <p className="text-xs text-gray-500 mt-1 table-cell-content" title={post.description}>
+                                            {post.description}
+                                          </p>
+                                        )}
+                                        {!post.description && post.category === 'Podcast' && (
+                                          <p className="text-xs text-gray-400 italic mt-1">Sem descrição</p>
+                                        )}
                                       </div>
                                     </td>
                                     <td className="col-category px-4 py-3">
@@ -2235,8 +2185,6 @@ export default function Management() {
                         </div>
                       </div>
                     ))}
-                      </>
-                    )}
                   </div>
                 )}
               </>
@@ -2247,14 +2195,6 @@ export default function Management() {
 
       {/* Barra de ações em lote */}
       <BulkActionBar />
-
-      {/* Feature flag toggle - apenas em desenvolvimento */}
-      {process.env.NODE_ENV === 'development' && (
-        <DataTableFeatureFlag
-          enabled={useNewDataTable}
-          onToggle={setUseNewDataTable}
-        />
-      )}
 
       {/* Modais - Renderizados fora do CMSLayout para garantir z-index correto */}
       <BulkActionModal />
@@ -2282,14 +2222,6 @@ export default function Management() {
       />
       
       {/* Notifications handled globally via HotToaster */}
-
-      {/* Feature flag para desenvolvimento */}
-      {process.env.NODE_ENV === 'development' && (
-        <DataTableFeatureFlag
-          enabled={useNewDataTable}
-          onToggle={setUseNewDataTable}
-        />
-      )}
     </>
   );
 } 

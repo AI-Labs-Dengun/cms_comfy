@@ -272,7 +272,7 @@ export default function DetalhesConteudo() {
   // Função para inicializar valores de edição
   const initializeEditValues = (postData: Post) => {
     setEditTitle(postData.title);
-    setEditDescription(postData.description);
+    setEditDescription(postData.description || "");  // Pode ser null para Podcast
     setEditContent(postData.content || ""); 
     setEditContentUrl(postData.content_url || "");
     setEditThumbnailUrl(postData.thumbnail_url || ""); 
@@ -399,6 +399,8 @@ export default function DetalhesConteudo() {
         description:
           post.category === 'Shorts'
             ? (editDescription.trim() === '' ? null : editDescription.trim())
+            : post.category === 'Podcast'
+            ? (editDescription.trim() === '' ? null : editDescription.trim())  // Podcast: opcional
             : (editDescription.trim() || undefined),
         // Shorts must not have textual content; sending undefined means no change
         content: post.category === 'Shorts' ? undefined : (editContent.trim() || undefined),
@@ -517,7 +519,8 @@ export default function DetalhesConteudo() {
           setPost((prev: Post | null) => prev ? {
             ...prev,
             title: updateData.title === null ? '' : (updateData.title ?? prev.title),
-            description: updateData.description === null ? '' : (updateData.description ?? prev.description),
+            // ✅ CORREÇÃO: Quando descrição é removida (null), definir como undefined para UI atualizar
+            description: updateData.description === null ? undefined : (updateData.description ?? prev.description),
             content: updateData.content === undefined ? prev.content : (updateData.content ?? ''),
             content_url: updateData.content_url ?? prev.content_url,
             thumbnail_url: updateData.thumbnail_url === null ? undefined : (updateData.thumbnail_url ?? prev.thumbnail_url),
@@ -563,6 +566,10 @@ export default function DetalhesConteudo() {
           }
         }
 
+        // ✅ CORREÇÃO: Recarregar o post do servidor para garantir sincronização completa
+        // Isso garante que todos os dados (incluindo descrição removida) sejam atualizados
+        await loadPost();
+        
         setIsEditing(false);
         toast.success('As alterações foram salvas e o post foi atualizado com sucesso.');
       } else {
@@ -1478,10 +1485,10 @@ export default function DetalhesConteudo() {
                     
                     <button 
                       onClick={handleSaveEdit}
-                      // For Shorts we allow empty title/description; only enforce min age.
+                      // For Shorts we allow empty title/description; description is now optional for all categories
                       disabled={
                         saving ||
-                        (post.category !== 'Shorts' && (!editTitle.trim() || !editDescription.trim())) ||
+                        (post.category !== 'Shorts' && !editTitle.trim()) ||
                         (editMinAge !== 12 && editMinAge !== 16)
                       }
                       className="bg-green-600 text-white px-4 py-2 rounded-md font-medium hover:bg-green-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -1947,8 +1954,8 @@ export default function DetalhesConteudo() {
                     </div>
                   </div>
 
-                  {/* ✅ CAMPO PARA EDITAR THUMBNAIL URL (Podcasts, Artigos, Ferramentas e Quizzes) */}
-                  {((post.category === "Podcast" && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Ferramentas" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Quizzes" && !(post.file_paths && post.file_paths.length > 0))) && (
+                  {/* ✅ CAMPO PARA EDITAR THUMBNAIL URL (Podcasts, Áudio, Artigos, Ferramentas e Quizzes) */}
+                  {((post.category === "Podcast" && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Áudio" && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Ferramentas" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Quizzes" && !(post.file_paths && post.file_paths.length > 0))) && (
                     <div className="mb-6">
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-3">
@@ -1957,6 +1964,7 @@ export default function DetalhesConteudo() {
                           </svg>
                           <label className="text-sm font-semibold text-gray-900">
                             {post.category === 'Podcast' ? 'Thumbnail do Podcast' : 
+                             post.category === 'Áudio' ? 'Thumbnail do Áudio' :
                              post.category === 'Ferramentas' ? 'Thumbnail das Ferramentas' :
                              post.category === 'Quizzes' ? 'Thumbnail dos Quizzes' :
                              'Thumbnail do Artigo'}
@@ -2305,12 +2313,14 @@ export default function DetalhesConteudo() {
                     <div className="text-gray-900 font-bold whitespace-pre-line">{post.title}</div>
                   </div>
                   
-                  <div className="mb-2">
-                    <div className="text-xs text-gray-500 font-bold">Descrição</div>
-                    <div className="text-gray-900">
-                      <FlexibleRenderer content={post.description} />
+                  {post.description && (
+                    <div className="mb-2">
+                      <div className="text-xs text-gray-500 font-bold">Descrição</div>
+                      <div className="text-gray-900">
+                        <FlexibleRenderer content={post.description} />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                                      {post.content && (
                      <div className="mb-2">
@@ -2516,7 +2526,16 @@ export default function DetalhesConteudo() {
               {isEditing ? (
                 <>
                   <div className="mb-4">
-                    <label className="block text-xs text-gray-500 font-bold mb-1">Tags</label>
+                    <label className="block text-xs text-gray-500 font-bold mb-1">
+                      Tags
+                      {post.category !== 'Shorts' && <span className="text-red-500 ml-1">*</span>}
+                      {post.category === 'Shorts' && <span className="text-gray-500 ml-2 text-xs font-normal">(opcional)</span>}
+                    </label>
+                    {post.category === 'Shorts' && (
+                      <p className="text-xs text-gray-500 mb-2">
+                        Adicione tags para facilitar a busca (opcional para Shorts)
+                      </p>
+                    )}
                     <input
                       type="text"
                       value={tagInput}

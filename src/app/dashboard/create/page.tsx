@@ -387,17 +387,11 @@ export default function CreateContent() {
 
     try {
       // Validar dados obrigatórios
-      // Title and description are optional for Shorts
+      // Title validation (description is now optional for all categories)
       if (category !== "Shorts") {
         if (!title.trim()) {
           setError("Título é obrigatório");
           toast.error("Título é obrigatório");
-          return;
-        }
-
-        if (!description.trim()) {
-          setError("Descrição é obrigatória");
-          toast.error("Descrição é obrigatória");
           return;
         }
       }
@@ -409,8 +403,9 @@ export default function CreateContent() {
         return;
       }
 
-      // Validar tags
-      if (tags.length === 0) {
+      // Validar tags (exceto para Shorts)
+      // ✅ REGRA ESPECIAL: Posts da categoria Shorts não requerem tags
+      if (category !== "Shorts" && tags.length === 0) {
         setError("É obrigatório adicionar pelo menos uma tag");
         toast.error("É obrigatório adicionar pelo menos uma tag");
         return;
@@ -697,8 +692,8 @@ export default function CreateContent() {
         }
       }
 
-  // Upload de thumbnail se fornecida (para Podcast, Artigo, Leitura, Vídeo, Ferramentas e Quizzes)
-  if ((category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Ferramentas" || category === "Quizzes") && thumbnailFile) {
+  // Upload de thumbnail se fornecida (para Podcast, Artigo, Leitura, Vídeo, Áudio, Ferramentas e Quizzes)
+  if ((category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Áudio" || category === "Ferramentas" || category === "Quizzes") && thumbnailFile) {
         console.log(`🖼️ Fazendo upload de thumbnail para categoria ${category}:`, {
           fileName: thumbnailFile.name,
           fileSize: thumbnailFile.size,
@@ -1111,13 +1106,11 @@ export default function CreateContent() {
                             <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
                           </svg>
                           Descrição
-                          {category !== 'Shorts' && (
-                            <span className="text-red-500 ml-1">*</span>
-                          )}
+                          <span className="text-gray-500 ml-2 text-xs">(opcional)</span>
                         </span>
                       </label>
                       <p className="text-xs text-gray-500 mb-3">
-                        Digite uma breve descrição do seu post (resumo/introdução)
+                        Digite uma breve descrição do seu post (opcional - resumo/introdução)
                       </p>
                       <textarea
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-medium resize-none bg-white shadow-sm"
@@ -1125,7 +1118,6 @@ export default function CreateContent() {
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={3}
-                        required={category !== "Shorts"}
                       />
                     </div>
 
@@ -1284,8 +1276,8 @@ export default function CreateContent() {
                       {renderContentPreview()}
                     </div>
 
-                    {/* Thumbnail upload (for Podcast and Article) */}
-                    {(category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Ferramentas" || category === "Quizzes") && (
+                    {/* Thumbnail upload (for Podcast, Article, Audio, Video, Reading, Tools and Quizzes) */}
+                    {(category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Áudio" || category === "Ferramentas" || category === "Quizzes") && (
                       <div>
                         <label className="block text-sm font-medium mb-3 text-gray-700">
                           <span className="flex items-center">
@@ -1455,12 +1447,15 @@ export default function CreateContent() {
                         <path fillRule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                       </svg>
                       Tags
-                      <span className="text-red-500 ml-1">*</span>
+                      {category !== 'Shorts' && <span className="text-red-500 ml-1">*</span>}
+                      {category === 'Shorts' && <span className="text-gray-500 ml-2 text-xs">(opcional)</span>}
                     </span>
                   </label>
                   <p className="text-sm text-gray-600 mb-3">
                     {category === 'Leitura' 
                       ? 'Tags gerais para o post (além das categorias de leitura específicas)' 
+                      : category === 'Shorts'
+                      ? 'Adicione tags para facilitar a busca (opcional para Shorts)'
                       : 'Adicione tags que descrevam o conteúdo'
                     }
                   </p>
@@ -1584,10 +1579,9 @@ export default function CreateContent() {
                       return (
                         isUploading || 
                         (category !== "Shorts" && !title.trim()) ||
-                        (category !== "Shorts" && !description.trim()) ||
                         (category !== "Shorts" && !content.trim()) ||
                         (!hasContentUrl && !hasOldFile && !hasUploadedFiles && !hasSelectedFiles) ||
-                        tags.length === 0 ||
+                        (category !== "Shorts" && tags.length === 0) ||
                         emotions.length === 0 ||
                         (category === "Leitura" && selectedReadingTags.length === 0) ||
                         (minAge !== 12 && minAge !== 16)
@@ -1615,10 +1609,9 @@ export default function CreateContent() {
                           const hasSelectedFiles = selectedFiles.length > 0 && fileValidation?.valid;
                           
                           if (category !== "Shorts" && !title.trim()) return "Adicione um título";
-                          if (category !== "Shorts" && !description.trim()) return "Adicione uma descrição";
                           if (category !== "Shorts" && !content.trim()) return "Adicione conteúdo textual";
                           if (!hasContentUrl && !hasOldFile && !hasUploadedFiles && !hasSelectedFiles) return "Adicione URL ou arquivo";
-                          if (tags.length === 0) return "Adicione pelo menos uma tag";
+                          if (category !== "Shorts" && tags.length === 0) return "Adicione pelo menos uma tag";
                           if (emotions.length === 0) return "Selecione uma tag de emoção";
                           if (category === "Leitura" && selectedReadingTags.length === 0) return "Selecione uma categoria de leitura";
                           if (minAge !== 12 && minAge !== 16) return "Selecione uma idade mínima";

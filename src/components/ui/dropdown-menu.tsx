@@ -23,7 +23,7 @@ const DropdownMenu: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   return (
     <DropdownMenuContext.Provider value={{ open, setOpen }}>
-      <div className="relative inline-block">
+      <div className="relative inline-block z-50">
         {children}
       </div>
     </DropdownMenuContext.Provider>
@@ -38,6 +38,7 @@ const DropdownMenuTrigger = React.forwardRef<
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault()
+    e.stopPropagation()
     setOpen(!open)
     onClick?.(e)
   }
@@ -48,10 +49,16 @@ const DropdownMenuTrigger = React.forwardRef<
   if (asChild) {
     const child = React.Children.only(children) as React.ReactElement<Record<string, unknown>>
 
-    const childProps = (child.props || {}) as { onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void; className?: string; [key: string]: unknown }
+    const childProps = (child.props || {}) as { 
+      onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void
+      className?: string
+      type?: string
+      [key: string]: unknown 
+    }
 
     const mergedOnClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-      try { e.preventDefault() } catch {}
+      e.preventDefault()
+      e.stopPropagation()
       setOpen(!open)
       // call both child's and provided onClick handlers if present
       if (typeof childProps.onClick === 'function') childProps.onClick(e)
@@ -60,17 +67,15 @@ const DropdownMenuTrigger = React.forwardRef<
 
     // clone the child and merge props; forward ref by using the child's ref prop if present
     const cloned = React.cloneElement(child, {
+      ...childProps,
       className: cn("inline-flex items-center justify-center", childProps.className, className),
       onClick: mergedOnClick,
+      type: 'button', // Ensure it's a button type to prevent form submission
       'aria-expanded': open,
       'aria-haspopup': 'true',
       ...props,
     })
 
-    // If the child accepts a ref, attach forwarded ref
-    // React.cloneElement doesn't accept `ref` in the props object for function components,
-    // so we set it via createElement with forwarded ref if needed. Simpler: return cloned and
-    // rely on React to forward ref when child is a component created with forwardRef.
     return cloned
   }
 
@@ -117,7 +122,9 @@ const DropdownMenuContent = React.forwardRef<
 
     if (open) {
       document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
     }
   }, [open, setOpen])
 
@@ -127,10 +134,10 @@ const DropdownMenuContent = React.forwardRef<
     <div
       ref={assignRef}
       className={cn(
-        "absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-white p-1 shadow-lg animate-in fade-in-0 zoom-in-95",
-        align === "start" && "left-0",
-        align === "center" && "left-1/2 -translate-x-1/2",
-        align === "end" && "right-0",
+        "absolute z-[9999] min-w-[8rem] overflow-hidden rounded-md border border-gray-200 bg-white p-1 shadow-lg",
+        align === "start" && "left-0 top-full mt-1",
+        align === "center" && "left-1/2 -translate-x-1/2 top-full mt-1",
+        align === "end" && "right-0 top-full mt-1",
         className
       )}
       {...props}
