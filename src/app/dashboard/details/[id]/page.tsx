@@ -381,6 +381,14 @@ export default function DetalhesConteudo() {
         return;
       }
 
+      // Validar conteúdo textual (obrigatório exceto para Shorts e Podcast)
+      if (post.category !== "Shorts" && post.category !== "Podcast" && !editContent.trim()) {
+        alert("Conteúdo textual é obrigatório para esta categoria");
+        toast.error("Conteúdo textual é obrigatório");
+        setSaving(false);
+        return;
+      }
+
     // For Shorts we want to explicitly clear title/description when the user
     // erased them. Sending null signals the backend to remove the value. For
     // other categories we keep previous behavior (send trimmed strings or
@@ -1489,6 +1497,7 @@ export default function DetalhesConteudo() {
                       disabled={
                         saving ||
                         (post.category !== 'Shorts' && !editTitle.trim()) ||
+                        (post.category !== 'Shorts' && post.category !== 'Podcast' && !editContent.trim()) ||
                         (editMinAge !== 12 && editMinAge !== 16)
                       }
                       className="bg-green-600 text-white px-4 py-2 rounded-md font-medium hover:bg-green-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -1664,7 +1673,8 @@ export default function DetalhesConteudo() {
                     <div className="mb-4">
                       <label className="block text-xs text-gray-500 font-bold mb-1">
                         Conteúdo
-                        <span className="text-xs text-gray-500 ml-2">(não disponível para Shorts)</span>
+                        {post.category === "Podcast" && <span className="text-xs text-gray-500 ml-2">(opcional para Podcasts)</span>}
+                        {post.category !== "Podcast" && <span className="text-xs text-gray-500 ml-2">(não disponível para Shorts)</span>}
                       </label>
                       <TipTapEditor
                         initialHtml={editContent}
