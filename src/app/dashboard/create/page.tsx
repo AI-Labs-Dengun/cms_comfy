@@ -396,8 +396,8 @@ export default function CreateContent() {
         }
       }
 
-      // Validar conteúdo textual (obrigatório para todas as categorias exceto Shorts)
-      if (category !== "Shorts" && !content.trim()) {
+      // Validar conteúdo textual (obrigatório para todas as categorias exceto Shorts e Podcast)
+      if (category !== "Shorts" && category !== "Podcast" && !content.trim()) {
         setError("Conteúdo textual é obrigatório");
         toast.error("Conteúdo textual é obrigatório");
         return;
@@ -1130,11 +1130,15 @@ export default function CreateContent() {
                               <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
                             </svg>
                             Conteúdo Textual
-                            <span className="text-red-500 ml-1">*</span>
+                            {category !== "Podcast" && <span className="text-red-500 ml-1">*</span>}
+                            {category === "Podcast" && <span className="text-gray-500 ml-2 text-xs">(opcional)</span>}
                           </span>
                         </label>
                         <p className="text-xs text-gray-500 mb-3">
-                          Digite o conteúdo principal do seu post (texto completo do artigo/post)
+                          {category === "Podcast" 
+                            ? "Digite o conteúdo do post (opcional para Podcasts - pode usar apenas descrição)"
+                            : "Digite o conteúdo principal do seu post (texto completo do artigo/post)"
+                          }
                         </p>
                         <div className="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm">
                           <TipTapEditor
@@ -1579,7 +1583,7 @@ export default function CreateContent() {
                       return (
                         isUploading || 
                         (category !== "Shorts" && !title.trim()) ||
-                        (category !== "Shorts" && !content.trim()) ||
+                        (category !== "Shorts" && category !== "Podcast" && !content.trim()) ||
                         (!hasContentUrl && !hasOldFile && !hasUploadedFiles && !hasSelectedFiles) ||
                         (category !== "Shorts" && tags.length === 0) ||
                         emotions.length === 0 ||
@@ -1609,7 +1613,7 @@ export default function CreateContent() {
                           const hasSelectedFiles = selectedFiles.length > 0 && fileValidation?.valid;
                           
                           if (category !== "Shorts" && !title.trim()) return "Adicione um título";
-                          if (category !== "Shorts" && !content.trim()) return "Adicione conteúdo textual";
+                          if (category !== "Shorts" && category !== "Podcast" && !content.trim()) return "Adicione conteúdo textual";
                           if (!hasContentUrl && !hasOldFile && !hasUploadedFiles && !hasSelectedFiles) return "Adicione URL ou arquivo";
                           if (category !== "Shorts" && tags.length === 0) return "Adicione pelo menos uma tag";
                           if (emotions.length === 0) return "Selecione uma tag de emoção";
