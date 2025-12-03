@@ -429,25 +429,32 @@ export default function DetalhesConteudo() {
 
     // If editing Shorts, we may need to upload new files and compose file arrays
     if (post.category === 'Shorts') {
-      // Validate counts and types before sending
+      // ✅ Se tem content_url (YouTube, TikTok, etc), não precisa validar arquivos locais
+      const hasExternalUrl = editContentUrl.trim().length > 0;
+      
+      // Define remainingExisting outside the validation block so it's accessible later
       const remainingExisting = editExistingFiles || [];
-      const totalCount = remainingExisting.length + newSelectedFiles.length;
+      
+      if (!hasExternalUrl) {
+        // Validate counts and types before sending (apenas se não tiver URL externa)
+        const totalCount = remainingExisting.length + newSelectedFiles.length;
 
-      // If there's any video among existing or new, require exactly 1 file and it must be a video
-      const existingHasVideo = remainingExisting.some(f => f.type && f.type.startsWith('video/'));
-      const newHasVideo = newSelectedFiles.some(f => f.type.startsWith('video/'));
-      if (existingHasVideo || newHasVideo) {
-        if (totalCount !== 1) {
-          setSaving(false);
-          alert('Se o post for um vídeo Shorts deve conter exatamente 1 ficheiro de vídeo.');
-          return;
-        }
-      } else {
-        // image carousel: must have between 1 and 10 images
-        if (totalCount < 1 || totalCount > 10) {
-          setSaving(false);
-          alert('Shorts (imagens) devem conter entre 1 e 10 imagens.');
-          return;
+        // If there's any video among existing or new, require exactly 1 file and it must be a video
+        const existingHasVideo = remainingExisting.some(f => f.type && f.type.startsWith('video/'));
+        const newHasVideo = newSelectedFiles.some(f => f.type.startsWith('video/'));
+        if (existingHasVideo || newHasVideo) {
+          if (totalCount !== 1) {
+            setSaving(false);
+            alert('Se o post for um vídeo Shorts deve conter exatamente 1 ficheiro de vídeo.');
+            return;
+          }
+        } else {
+          // image carousel: must have between 1 and 10 images
+          if (totalCount < 1 || totalCount > 10) {
+            setSaving(false);
+            alert('Shorts (imagens) devem conter entre 1 e 10 imagens.');
+            return;
+          }
         }
       }
 
@@ -1700,13 +1707,34 @@ export default function DetalhesConteudo() {
                   {/* Gestão de Imagens para Posts Shorts - Única seção que combina upload e reordenamento */}
                   {post.category === 'Shorts' && (
                     <div className="mb-6">
+                      {/* Info box explicando as opções */}
+                      {!editContentUrl.trim() && (
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div className="text-sm text-blue-800">
+                              <strong>Shorts aceita 3 formatos:</strong>
+                              <ul className="mt-1 ml-4 list-disc space-y-1">
+                                <li><strong>Vídeo único:</strong> Faça upload de 1 vídeo (MP4, MOV, etc.)</li>
+                                <li><strong>Carousel de imagens:</strong> Adicione 1-10 imagens</li>
+                                <li><strong>Link externo:</strong> Cole URL do YouTube, TikTok ou Instagram no campo acima</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                                            
                       <div className="flex items-center justify-between mb-4">
                         <div>
                           <label className="block text-xs text-gray-500 font-bold mb-1">
-                            🖼️ Gestão de Imagens
+                            🖼️ Gestão de Arquivos Locais
                           </label>
                           <p className="text-xs text-gray-500">
-                            Adicione imagens arrastando arquivos ou clicando no botão. Reorganize arrastando as imagens.
+                            {editContentUrl.trim() 
+                              ? "Upload desativado (usando URL externa)" 
+                              : "Adicione imagens/vídeo arrastando arquivos ou clicando no botão. Reorganize arrastando as imagens."}
                           </p>
                         </div>
                         <div className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
@@ -1883,7 +1911,23 @@ export default function DetalhesConteudo() {
                         {/* Upload Area - always visible, integrated with the management area */}
                         <div className="space-y-2">
                           <div className="text-sm font-medium text-gray-700">Adicionar mais imagens</div>
-                          {((editExistingFiles?.length || 0) + (newSelectedFiles?.length || 0)) < 10 ? (
+                          {editContentUrl.trim() ? (
+                            <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center bg-gray-50">
+                              <div className="flex flex-col items-center">
+                                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-3">
+                                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                  </svg>
+                                </div>
+                                <span className="text-sm font-medium text-gray-500">
+                                  Upload desativado
+                                </span>
+                                <span className="text-xs text-gray-400 mt-1">
+                                  Este Short está usando URL externa. Remova a URL para fazer upload de arquivos.
+                                </span>
+                              </div>
+                            </div>
+                          ) : ((editExistingFiles?.length || 0) + (newSelectedFiles?.length || 0)) < 10 ? (
                             <div
                               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                                 dragActive 
@@ -1946,19 +1990,32 @@ export default function DetalhesConteudo() {
                   )}
 
                   <div className="mb-4">
-                    <label className="block text-xs text-gray-500 font-bold mb-1">URL do Conteúdo (opcional)</label>
+                    <label className="block text-xs text-gray-500 font-bold mb-1">
+                      URL do Conteúdo (opcional)
+                    </label>
                     <div className="relative">
                       <input
                         type="url"
                         value={editContentUrl}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditContentUrl(e.target.value)}
                         className={`w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium ${post?.file_paths && post.file_paths.length > 0 ? 'bg-gray-100 opacity-50' : ''}`}
-                        placeholder={post?.file_paths && post.file_paths.length > 0 ? "Este post tem ficheiro anexado" : "https://exemplo.com/conteudo"}
+                        placeholder={
+                          post.category === 'Shorts' 
+                            ? "https://youtube.com/shorts/... ou https://tiktok.com/..." 
+                            : post?.file_paths && post.file_paths.length > 0 
+                              ? "Este post tem ficheiro anexado" 
+                              : "https://exemplo.com/conteudo"
+                        }
                         disabled={!!(post?.file_paths && post.file_paths.length > 0)}
                       />
                       {(post?.file_paths && post.file_paths.length > 0) && (
                         <div className="mt-1 text-xs text-gray-500">
                           ⚠️ Este post tem um ficheiro anexado. Não é possível adicionar URL externa.
+                        </div>
+                      )}
+                      {post.category === 'Shorts' && !editContentUrl.trim() && !(post?.file_paths && post.file_paths.length > 0) && (
+                        <div className="mt-1 text-xs text-blue-600">
+                          💡 Dica: Cole aqui o link do YouTube Shorts, TikTok ou Instagram Reel
                         </div>
                       )}
                     </div>
