@@ -8,10 +8,16 @@
  * Suporta:
  * - URLs completas: http://example.com, https://example.com
  * - URLs com www: www.example.com
+ * - URLs sem protocolo: example.com, youtube.com/watch
  * - URLs com paths, query params, fragments
  * - URLs com portas: http://localhost:3000
+ * 
+ * Padrão de detecção:
+ * 1. URLs com protocolo (http:// ou https://)
+ * 2. URLs com www.
+ * 3. URLs sem protocolo (domínio.extensão)
  */
-const URL_REGEX = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_+.~#?&/=]*))|(www\.[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_+.~#?&/=]*))/gi;
+const URL_REGEX = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_+.~#?&/=]*))|(www\.[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_+.~#?&/=]*))|((?:^|\s)[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z]{2,6}\b(?:[-a-zA-Z0-9()@:%_+.~#?&/=]*))/gi;
 
 /**
  * Verifica se o texto contém URLs
@@ -59,10 +65,19 @@ export function linkifyToMarkdown(text: string): string {
       return match;
     }
     
-    // Se começa com www., adicionar https://
-    const url = cleanMatch.startsWith('www.') 
-      ? `https://${cleanMatch}` 
-      : cleanMatch;
+    // Determinar a URL completa baseado no formato do match
+    let url: string;
+    if (cleanMatch.startsWith('http://') || cleanMatch.startsWith('https://')) {
+      // Já tem protocolo
+      url = cleanMatch;
+    } else if (cleanMatch.startsWith('www.')) {
+      // Começa com www., adicionar https://
+      url = `https://${cleanMatch}`;
+    } else {
+      // URL sem protocolo (ex: youtube.com, example.com/path)
+      // Adicionar https:// automaticamente
+      url = `https://${cleanMatch}`;
+    }
     
     // Validar que a URL não contém caracteres perigosos
     if (url.includes('<') || url.includes('>') || url.includes('"') || url.includes("'")) {
@@ -109,8 +124,11 @@ export function isValidUrl(url: string): boolean {
   }
   
   try {
-    // Adicionar https:// se começar com www.
-    const urlToTest = url.startsWith('www.') ? `https://${url}` : url;
+    // Adicionar https:// se não tiver protocolo
+    let urlToTest = url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      urlToTest = `https://${url}`;
+    }
     
     // Tentar criar objeto URL (valida formato)
     const urlObj = new URL(urlToTest);
@@ -139,7 +157,12 @@ export function extractDomain(url: string): string | null {
   }
   
   try {
-    const urlToTest = url.startsWith('www.') ? `https://${url}` : url;
+    // Adicionar https:// se não tiver protocolo
+    let urlToTest = url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      urlToTest = `https://${url}`;
+    }
+    
     const urlObj = new URL(urlToTest);
     
     // Remover www. do hostname se existir
@@ -147,4 +170,50 @@ export function extractDomain(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Remove formatação Markdown de um texto, deixando apenas o conteúdo limpo
+ * Útil para exibir previews de mensagens sem a sintaxe Markdown
+ * 
+ * @param text - Texto com formatação Markdown
+ * @returns Texto limpo sem formatação Markdown
+ * 
+ * @example
+ * stripMarkdown("Veja [youtube.com](https://youtube.com)")
+ * // Retorna: "Veja youtube.com"
+ * 
+ * @example
+ * stripMarkdown("**Negrito** e *itálico*")
+ * // Retorna: "Negrito e itálico"
+ */
+export function stripMarkdown(text: string): string {
+  if (!text || typeof text !== 'string') {
+    return text;
+  }
+  
+  let cleaned = text;
+  
+  // Remover links Markdown: [texto](url) -> texto
+  cleaned = cleaned.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+  
+  // Remover negrito: **texto** ou __texto__ -> texto
+  cleaned = cleaned.replace(/(\*\*|__)(.*?)\1/g, '$2');
+  
+  // Remover itálico: *texto* ou _texto_ -> texto
+  cleaned = cleaned.replace(/(\*|_)(.*?)\1/g, '$2');
+  
+  // Remover código inline: `texto` -> texto
+  cleaned = cleaned.replace(/`([^`]+)`/g, '$1');
+  
+  // Remover headers: # texto -> texto
+  cleaned = cleaned.replace(/^#{1,6}\s+/gm, '');
+  
+  // Remover listas: - texto ou * texto -> texto
+  cleaned = cleaned.replace(/^[\s]*[-*+]\s+/gm, '');
+  
+  // Remover listas numeradas: 1. texto -> texto
+  cleaned = cleaned.replace(/^[\s]*\d+\.\s+/gm, '');
+  
+  return cleaned.trim();
 }

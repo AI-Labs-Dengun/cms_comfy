@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import notificationService from '@/lib/notificationService';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
+import { stripMarkdown } from '@/lib/linkify';
 
 // Estilos CSS personalizados
 const customStyles = `
@@ -450,9 +451,10 @@ export default function PsicologosPage() {
               if ('Notification' in window && Notification.permission === 'granted') {
                 const userName = chatData.masked_user_name || 'Utilizador';
                 const messageContent = processedContent || 'Nova mensagem'; // ✅ Usar conteúdo processado
-                const preview = messageContent.length > 50 
-                  ? messageContent.substring(0, 50) + '...' 
-                  : messageContent;
+                const cleanContent = stripMarkdown(messageContent); // Remover formatação Markdown
+                const preview = cleanContent.length > 50 
+                  ? cleanContent.substring(0, 50) + '...' 
+                  : cleanContent;
                 
                 // Try using centralized notification service
                 try {
@@ -1400,7 +1402,7 @@ export default function PsicologosPage() {
                               {formatSenderName(chat)}:
                             </span>
                             <span className="text-gray-600 ml-1">
-                              {chat.last_message_content}
+                              {stripMarkdown(chat.last_message_content)}
                             </span>
                           </p>
                         </div>
