@@ -10,6 +10,8 @@ import { useEncryptedChat } from '@/hooks/useEncryptedChat';
 import { EncryptionService } from '@/services/encryption';
 import { supabase } from '@/lib/supabase';
 import SelfAssignButton from '@/components/SelfAssignButton';
+import FlexibleRenderer from '@/components/FlexibleRenderer';
+import { linkifyToMarkdown } from '@/lib/linkify';
 
 interface ChatInterfaceProps {
   chatId: string;
@@ -510,7 +512,10 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
       setSending(true);
       
       // Guardar o conteúdo da mensagem antes de limpar o campo
-      const messageContent = newMessage.trim();
+      const trimmedMessage = newMessage.trim();
+      
+      // Converter URLs para formato Markdown antes de enviar
+      const messageContent = linkifyToMarkdown(trimmedMessage);
       
       // Limpar o campo de entrada imediatamente
       setNewMessage('');
@@ -1122,7 +1127,7 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
                   <div
                     className={`px-4 py-3 pb-6 rounded-2xl shadow-sm ${
                       message.sender_type === 'psicologo'
-                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+                        ? 'bg-gray-100 text-gray-900 border border-gray-200'
                         : 'bg-white text-gray-900 border border-gray-200'
                     }`}
                   >
@@ -1137,11 +1142,11 @@ export default function ChatInterface({ chatId, onBack, onClose, onChatUpdate, o
                       - max-width: 100%: garante que não ultrapasse o container
                     */}
                     <div className="message-content text-sm">
-                      {message.content}
+                      <FlexibleRenderer content={message.content} />
                     </div>
                     <p
                       className={`text-xs mt-2 ${
-                        message.sender_type === 'psicologo' ? 'text-blue-100' : 'text-gray-400'
+                        message.sender_type === 'psicologo' ? 'text-gray-500' : 'text-gray-400'
                       }`}
                     >
                       {formatMessageTime(message.created_at)}
