@@ -47,3 +47,5 @@ package-lock.json
 md/
 schema_supabase.sql
 md_views/
+
+docs/
