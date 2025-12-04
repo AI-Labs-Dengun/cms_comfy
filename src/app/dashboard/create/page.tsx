@@ -26,11 +26,12 @@ const CATEGORY_SESSION_MAP: Record<string, { label: string; color: string; bgCol
   'Shorts': { label: 'Media', color: 'text-purple-700', bgColor: 'bg-purple-100' },
   'Leitura': { label: 'Leitura', color: 'text-green-700', bgColor: 'bg-green-100' },
   'Ferramentas': { label: 'Biblioteca', color: 'text-blue-700', bgColor: 'bg-blue-100' },
-  'Quizzes': { label: 'Biblioteca', color: 'text-blue-700', bgColor: 'bg-blue-100' }
+  'Quizzes': { label: 'Biblioteca', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+  'Filme e Série': { label: 'Biblioteca', color: 'text-blue-700', bgColor: 'bg-blue-100' }
 };
 
 // Small accessible dropdown component for category selection that shows a badge
-type CategoryType = "Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura" | "Ferramentas" | "Quizzes";
+type CategoryType = "Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura" | "Ferramentas" | "Quizzes" | "Filme e Série";
 
 function CategoryDropdown({ value, onChange }: { value: CategoryType; onChange: (v: CategoryType) => void }) {
   const [open, setOpen] = React.useState(false);
@@ -61,7 +62,8 @@ function CategoryDropdown({ value, onChange }: { value: CategoryType; onChange: 
     { value: 'Shorts', label: '⚡ Shorts' },
     { value: 'Leitura', label: '📖 Leitura' },
     { value: 'Ferramentas', label: '🔧 Ferramentas' },
-    { value: 'Quizzes', label: '❓ Quizzes' }
+    { value: 'Quizzes', label: '❓ Quizzes' },
+    { value: 'Filme e Série', label: '🎬 Filme e Série' }
   ];
 
   return (
@@ -274,7 +276,7 @@ export default function CreateContent() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState(""); // New field for textual content
-  const [category, setCategory] = useState<"Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura" | "Ferramentas" | "Quizzes">("Vídeo");
+  const [category, setCategory] = useState<"Vídeo" | "Podcast" | "Artigo" | "Livro" | "Áudio" | "Shorts" | "Leitura" | "Ferramentas" | "Quizzes" | "Filme e Série">("Vídeo");
   // Removido readingCategory pois não é mais necessário
   const [contentUrl, setContentUrl] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -653,7 +655,7 @@ export default function CreateContent() {
         }, 200);
 
         try {
-          const uploadResult = await uploadFileForPost(file);
+          const uploadResult = await uploadFileForPost(file, category);
           
           if (uploadResult.success && uploadResult.data) {
             // Converter para formato array para manter compatibilidade
@@ -692,8 +694,8 @@ export default function CreateContent() {
         }
       }
 
-  // Upload de thumbnail se fornecida (para Podcast, Artigo, Leitura, Vídeo, Áudio, Ferramentas e Quizzes)
-  if ((category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Áudio" || category === "Ferramentas" || category === "Quizzes") && thumbnailFile) {
+  // Upload de thumbnail se fornecida (para Podcast, Artigo, Leitura, Vídeo, Áudio, Ferramentas, Quizzes e Filme e Série)
+  if ((category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Áudio" || category === "Ferramentas" || category === "Quizzes" || category === "Filme e Série") && thumbnailFile) {
         console.log(`🖼️ Fazendo upload de thumbnail para categoria ${category}:`, {
           fileName: thumbnailFile.name,
           fileSize: thumbnailFile.size,
@@ -701,7 +703,7 @@ export default function CreateContent() {
         });
         
         try {
-          const thumbnailUploadResult = await uploadFileForPost(thumbnailFile);
+          const thumbnailUploadResult = await uploadFileForPost(thumbnailFile, category);
           
           if (thumbnailUploadResult.success && thumbnailUploadResult.data) {
             postData.thumbnail_url = thumbnailUploadResult.data.url;
@@ -1280,8 +1282,8 @@ export default function CreateContent() {
                       {renderContentPreview()}
                     </div>
 
-                    {/* Thumbnail upload (for Podcast, Article, Audio, Video, Reading, Tools and Quizzes) */}
-                    {(category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Áudio" || category === "Ferramentas" || category === "Quizzes") && (
+                    {/* Thumbnail upload (for Podcast, Article, Audio, Video, Reading, Tools, Quizzes and Movies/Series) */}
+                    {(category === "Podcast" || category === "Artigo" || category === "Leitura" || category === "Vídeo" || category === "Áudio" || category === "Ferramentas" || category === "Quizzes" || category === "Filme e Série") && (
                       <div>
                         <label className="block text-sm font-medium mb-3 text-gray-700">
                           <span className="flex items-center">

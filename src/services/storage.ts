@@ -45,7 +45,8 @@ const CATEGORY_FOLDERS: Record<string, string> = {
   'Áudio': 'audio',
   'Leitura': 'leitura',
   'Ferramentas': 'ferramentas',
-  'Quizzes': 'quizzes'
+  'Quizzes': 'quizzes',
+  'Filme e Série': 'filmes-series'
 }
 
 // Function to validate a file
@@ -149,7 +150,7 @@ export async function uploadFile(file: File, category?: string): Promise<UploadR
   // 📂 Build final path
     const categoryFolder = category && CATEGORY_FOLDERS[category] ? CATEGORY_FOLDERS[category] : undefined;
     const fileName = await generateUniqueFileName(file.name, user.id, categoryFolder);
-    const filePath = `${user.id}/${fileName}`;
+    const filePath = categoryFolder ? `${categoryFolder}/${user.id}/${fileName}` : `${user.id}/${fileName}`;
 
   // 🔄 Upload with simple retry
     let uploadRes;

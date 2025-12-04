@@ -417,7 +417,7 @@ export default function DetalhesConteudo() {
         tags: editTags,
         emotion_tags: editEmotionTags,
         min_age: editMinAge,
-        category: post.category as 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura' | 'Ferramentas' | 'Quizzes',
+        category: post.category as 'Vídeo' | 'Podcast' | 'Artigo' | 'Livro' | 'Áudio' | 'Shorts' | 'Leitura' | 'Ferramentas' | 'Quizzes' | 'Filme e Série',
       };
   // Convert to the service's expected type: CreatePostData.title/description
   // do not pass null (service expects string | undefined). Map null -> '' to signal removal.
@@ -504,14 +504,14 @@ export default function DetalhesConteudo() {
       payload.file_names = finalFileNames;
       payload.file_types = finalFileTypes;
       payload.file_sizes = finalFileSizes;
-    } else if ((post.category === 'Ferramentas' || post.category === 'Quizzes' || post.category === 'Artigo') && requestRemoveContentImage) {
-      // ✅ LÓGICA PARA REMOVER IMAGEM DE CONTEÚDO PARA FERRAMENTAS, QUIZZES E ARTIGOS
+    } else if ((post.category === 'Ferramentas' || post.category === 'Quizzes' || post.category === 'Artigo' || post.category === 'Filme e Série') && requestRemoveContentImage) {
+      // ✅ LÓGICA PARA REMOVER IMAGEM DE CONTEÚDO PARA FERRAMENTAS, QUIZZES, ARTIGOS E FILMES/SÉRIES
       payload.file_paths = [];
       payload.file_names = [];
       payload.file_types = [];
       payload.file_sizes = [];
-    } else if ((post.category === 'Ferramentas' || post.category === 'Quizzes' || post.category === 'Artigo') && editExistingFiles.length > 0) {
-      // ✅ LÓGICA PARA ATUALIZAR IMAGEM DE CONTEÚDO PARA FERRAMENTAS, QUIZZES E ARTIGOS
+    } else if ((post.category === 'Ferramentas' || post.category === 'Quizzes' || post.category === 'Artigo' || post.category === 'Filme e Série') && editExistingFiles.length > 0) {
+      // ✅ LÓGICA PARA ATUALIZAR IMAGEM DE CONTEÚDO PARA FERRAMENTAS, QUIZZES, ARTIGOS E FILMES/SÉRIES
       payload.file_paths = editExistingFiles.map(f => f.path);
       payload.file_names = editExistingFiles.map(f => f.name || '');
       payload.file_types = editExistingFiles.map(f => f.type || '');
@@ -848,7 +848,7 @@ export default function DetalhesConteudo() {
     setIsUploadingThumbnail(true);
 
     try {
-      const res = await uploadFileForPost(file);
+      const res = await uploadFileForPost(file, post?.category);
       if (!res.success || !res.data) {
         setUploadThumbnailError(res.error || 'Erro no upload da thumbnail');
         toast.error(res.error || 'Erro no upload da thumbnail');
@@ -2021,8 +2021,8 @@ export default function DetalhesConteudo() {
                     </div>
                   </div>
 
-                  {/* ✅ CAMPO PARA EDITAR THUMBNAIL URL (Podcasts, Áudio, Artigos, Ferramentas e Quizzes) */}
-                  {((post.category === "Podcast" && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Áudio" && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Ferramentas" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Quizzes" && !(post.file_paths && post.file_paths.length > 0))) && (
+                  {/* ✅ CAMPO PARA EDITAR THUMBNAIL URL (Podcasts, Áudio, Artigos, Ferramentas, Quizzes e Filmes/Séries) */}
+                  {((post.category === "Podcast" && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Áudio" && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Ferramentas" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Quizzes" && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Filme e Série" && !(post.file_paths && post.file_paths.length > 0))) && (
                     <div className="mb-6">
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-3">
@@ -2034,6 +2034,7 @@ export default function DetalhesConteudo() {
                              post.category === 'Áudio' ? 'Thumbnail do Áudio' :
                              post.category === 'Ferramentas' ? 'Thumbnail das Ferramentas' :
                              post.category === 'Quizzes' ? 'Thumbnail dos Quizzes' :
+                             post.category === 'Filme e Série' ? 'Thumbnail do Filme/Série' :
                              'Thumbnail do Artigo'}
                           </label>
                         </div>
@@ -2189,8 +2190,8 @@ export default function DetalhesConteudo() {
                     </div>
                   )}
 
-                  {/* ✅ SEÇÃO PARA EDITAR IMAGEM DE CONTEÚDO (Ferramentas, Quizzes, Artigos) */}
-                  {(post.category === "Ferramentas" || post.category === "Quizzes" || post.category === "Artigo") && (
+                  {/* ✅ SEÇÃO PARA EDITAR IMAGEM DE CONTEÚDO (Ferramentas, Quizzes, Artigos e Filmes/Séries) */}
+                  {(post.category === "Ferramentas" || post.category === "Quizzes" || post.category === "Artigo" || post.category === "Filme e Série") && (
                     <div className="mb-6">
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-3">
@@ -2198,7 +2199,7 @@ export default function DetalhesConteudo() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
                           <label className="text-sm font-semibold text-gray-900">
-                            Imagem de Conteúdo {post.category === 'Ferramentas' ? 'da Ferramenta' : post.category === 'Quizzes' ? 'do Quiz' : 'do Artigo'}
+                            Imagem de Conteúdo {post.category === 'Ferramentas' ? 'da Ferramenta' : post.category === 'Quizzes' ? 'do Quiz' : post.category === 'Filme e Série' ? 'do Filme/Série' : 'do Artigo'}
                           </label>
                         </div>
                         
@@ -2402,8 +2403,8 @@ export default function DetalhesConteudo() {
 
               <div className="my-6 border-b border-gray-200" />
 
-              {/* Thumbnail - exibir para Podcasts, Artigos, Ferramentas e Quizzes quando houver thumbnail */}
-              {((post.category === "Podcast" && post.thumbnail_url && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Ferramentas" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Quizzes" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0))) && (
+              {/* Thumbnail - exibir para Podcasts, Artigos, Ferramentas, Quizzes e Filmes/Séries quando houver thumbnail */}
+              {((post.category === "Podcast" && post.thumbnail_url && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Ferramentas" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Quizzes" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Filme e Série" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0))) && (
                 <div className="mb-6">
                   <div className="text-xs text-gray-500 font-bold mb-2">Thumbnail do Podcast</div>
                   <div className="border rounded-lg overflow-hidden max-w-md">
@@ -2452,13 +2453,14 @@ export default function DetalhesConteudo() {
                   <div className="mt-2 text-xs text-gray-500">
                     Imagem representativa do podcast
                   </div>
-                                {/* Thumbnail Info - apenas para podcasts, artigos, ferramentas e quizzes criados via link (não mostrar a URL bruta) */}
-              {((post.category === "Podcast" && post.thumbnail_url && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Ferramentas" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Quizzes" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0))) && (
+                                {/* Thumbnail Info - apenas para podcasts, artigos, ferramentas, quizzes e filmes/séries criados via link (não mostrar a URL bruta) */}
+              {((post.category === "Podcast" && post.thumbnail_url && post.content_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Artigo" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Ferramentas" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Quizzes" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0)) || (post.category === "Filme e Série" && post.thumbnail_url && !(post.file_paths && post.file_paths.length > 0))) && (
                 <div className="mb-4">
                   <div className="text-xs text-gray-500 font-bold">
                     {post.category === 'Podcast' ? 'Thumbnail do Podcast' : 
                      post.category === 'Ferramentas' ? 'Thumbnail das Ferramentas' :
                      post.category === 'Quizzes' ? 'Thumbnail dos Quizzes' :
+                     post.category === 'Filme e Série' ? 'Thumbnail do Filme/Série' :
                      'Thumbnail do Artigo'}
                   </div>
                   <div className="mt-1">

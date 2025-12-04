@@ -172,9 +172,11 @@ export default function PostFileUploader({
       return 'image/*,video/*';
     } else if (category === 'Vídeo' || category === 'Podcast') {
       return 'video/*,audio/*';
-    } else if (category === 'Artigo' || category === 'Ferramentas' || category === 'Quizzes') {
+    } else if (category === 'Artigo' || category === 'Ferramentas' || category === 'Quizzes' || category === 'Filme e Série') {
+      console.log(`📁 Categoria "${category}" aceita: image/*, PDF, text/*`);
       return 'image/*,application/pdf,text/*';
     }
+    console.log(`📁 Categoria "${category}" aceita: todos os tipos`);
     return '*/*';
   };
 
